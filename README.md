@@ -28,6 +28,54 @@ npm run dev          # اجرا
 
 ---
 
+## اگر به مشکل خوردی
+
+### `Cannot find native binding` هنگام `npm run dev`
+
+باگ شناخته‌شده‌ی npm در نصب وابستگی‌های اختیاری است
+([npm/cli#4828](https://github.com/npm/cli/issues/4828)) — ربطی به کد ندارد.
+Tailwind 4 یک باینری نیتیو دارد که npm گاهی نصبش نمی‌کند.
+
+```bash
+# مک / لینوکس
+rm -rf node_modules
+npm ci
+```
+
+```powershell
+# ویندوز (PowerShell)
+Remove-Item -Recurse -Force node_modules
+npm ci
+```
+
+`npm ci` را ترجیح بده به `npm install`؛ لاک‌فایل باینری همه‌ی پلتفرم‌ها را دارد
+و نصب تمیز نسخه‌ی درست را برمی‌دارد. اگر باز هم نشد:
+
+```bash
+rm -rf node_modules package-lock.json && npm install
+```
+
+> **نسخه‌ی Node را چک کن:** `node -v` باید ۲۰ یا بالاتر باشد.
+> Tailwind 4 روی Node 18 اجرا نمی‌شود و همین خطا را می‌دهد.
+
+### `npm run setup` گیر می‌کند یا خطای اتصال به دیتابیس می‌دهد
+
+یعنی Docker بالا نیست. Docker Desktop را اجرا کن و دوباره امتحان کن.
+اگر داکر نداری ولی PostgreSQL روی سیستمت نصب است، `DATABASE_URL` را در `.env`
+به دیتابیس خودت تغییر بده و به‌جای `setup` این‌ها را بزن:
+
+```bash
+npx prisma migrate deploy && npm run db:seed
+```
+
+### پورت ۳۰۰۰ اشغال است
+
+```bash
+npm run dev -- -p 3001
+```
+
+---
+
 ## امکانات
 
 ### بخش عمومی
