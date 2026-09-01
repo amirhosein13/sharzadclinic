@@ -6,7 +6,14 @@
 
 ## راه‌اندازی روی لپ‌تاپ (۳ دقیقه)
 
-پیش‌نیاز: **Node.js 20+** و **Docker Desktop**
+پیش‌نیاز: **Node.js 22** و **Docker**
+
+```bash
+node -v   # باید v22 باشد
+```
+
+اگر نسخه‌ات قدیمی‌تر است، بخش [ارتقای Node](#ارتقای-node) را ببین.
+فایل `.nvmrc` در مخزن هست، پس با nvm فقط کافی است `nvm use` بزنی.
 
 ```bash
 npm install          # نصب پکیج‌ها
@@ -29,6 +36,30 @@ npm run dev          # اجرا
 ---
 
 ## اگر به مشکل خوردی
+
+### ارتقای Node
+
+Tailwind 4 حداقل Node 20 می‌خواهد و درایور SQL Server (برای مهاجرت دیتای اپ قبلی)
+Node 22. پس روی **Node 22** برو.
+
+```bash
+# نصب nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+exec $SHELL          # ترمینال را دوباره بخوان
+
+nvm install 22
+nvm alias default 22 # از این به بعد پیش‌فرض
+node -v              # باید v22.x باشد
+```
+
+بعد از ارتقا، حتماً یک نصب تمیز بزن (باینری‌های نیتیو برای نسخه‌ی Node قبلی ساخته شده‌اند):
+
+```bash
+rm -rf node_modules
+npm ci
+```
+
+> داخل پوشه‌ی پروژه `nvm use` هم کافی است — نسخه از `.nvmrc` خوانده می‌شود.
 
 ### `Cannot find native binding` هنگام `npm run dev`
 
@@ -55,8 +86,8 @@ npm ci
 rm -rf node_modules package-lock.json && npm install
 ```
 
-> **نسخه‌ی Node را چک کن:** `node -v` باید ۲۰ یا بالاتر باشد.
-> Tailwind 4 روی Node 18 اجرا نمی‌شود و همین خطا را می‌دهد.
+> **اول از همه `node -v` را چک کن.** روی Node 18 یا پایین‌تر، Tailwind 4 اصلاً
+> اجرا نمی‌شود و دقیقاً همین خطا را می‌دهد — بخش [ارتقای Node](#ارتقای-node).
 
 ### `npm run setup` گیر می‌کند یا خطای اتصال به دیتابیس می‌دهد
 
