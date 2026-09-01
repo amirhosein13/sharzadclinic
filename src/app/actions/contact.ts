@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { contactSchema, fieldErrors } from "@/lib/validators";
+import { notifyContactMessage } from "@/lib/notifications";
 
 export type ContactState = {
   ok: boolean;
@@ -35,6 +36,12 @@ export async function submitContact(
         body: parsed.data.body,
       },
     });
+    await notifyContactMessage({
+      name: parsed.data.name,
+      phone: parsed.data.phone,
+      body: parsed.data.body,
+    }).catch(() => undefined);
+
     return { ok: true, message: "پیام شما ثبت شد. همکاران ما به‌زودی تماس می‌گیرند." };
   } catch {
     return { ok: false, message: "ثبت پیام با خطا مواجه شد. لطفاً دوباره تلاش کنید." };

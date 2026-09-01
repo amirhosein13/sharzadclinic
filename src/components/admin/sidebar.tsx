@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CalendarDays, FileText, Home, Image as ImageIcon, LayoutDashboard, LogOut,
-  Menu, MessageSquare, Quote, Settings, Sparkles, Users, X,
+  Menu, MessageSquare, Quote, Send, Settings, Sparkles, Users, X,
 } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -21,6 +21,7 @@ const NAV = [
   { href: "/admin/blog", label: "مجله", icon: FileText },
   { href: "/admin/testimonials", label: "نظرات", icon: Quote, badgeKey: "pendingTestimonials" },
   { href: "/admin/messages", label: "پیام‌ها", icon: MessageSquare, badgeKey: "unreadMessages" },
+  { href: "/admin/notifications", label: "پیامک و ایمیل", icon: Send },
   { href: "/admin/settings", label: "تنظیمات", icon: Settings },
 ] as const;
 

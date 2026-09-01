@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { logAction, requireUser } from "@/lib/auth";
 import { setSettings } from "@/lib/settings";
 import { testimonialSchema } from "@/lib/validators";
+import { notifyBookingCancelled, notifyBookingConfirmed } from "@/lib/notifications";
 import type { AppointmentStatus } from "@prisma/client";
 
 export type ActionResult = { ok: boolean; message: string };
@@ -32,7 +33,29 @@ export async function updateAppointmentStatus(
 ): Promise<ActionResult> {
   return guarded(async () => {
     const user = await requireUser();
-    const appointment = await prisma.appointment.update({ where: { id }, data: { status } });
+    const appointment = await prisma.appointment.update({
+      where: { id },
+      data: { status },
+      include: { customer: true, service: true },
+    });
+
+    // مشتری را از تأیید یا لغو باخبر می‌کنیم
+    const customerName = `${appointment.customer.firstName} ${appointment.customer.lastName}`;
+    if (status === "CONFIRMED") {
+      await notifyBookingConfirmed({
+        phone: appointment.customer.phone,
+        customerName,
+        serviceTitle: appointment.service.title,
+        startsAt: appointment.startsAt,
+      }).catch(() => undefined);
+    } else if (status === "CANCELLED") {
+      await notifyBookingCancelled({
+        phone: appointment.customer.phone,
+        customerName,
+        startsAt: appointment.startsAt,
+      }).catch(() => undefined);
+    }
+
     await logAction({
       userId: user.id,
       action: "appointment.status",

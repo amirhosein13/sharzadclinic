@@ -5,6 +5,7 @@ import { bookingSchema, fieldErrors, trackSchema } from "@/lib/validators";
 import { getAvailableSlots } from "@/lib/availability";
 import { atTime, formatJalaliDateTime, parseYmdKey } from "@/lib/date";
 import { generateBookingCode } from "@/lib/utils";
+import { notifyBookingCreated, notifyBookingEmail } from "@/lib/notifications";
 
 export type BookingResult =
   | { ok: true; code: string; summary: string }
@@ -98,6 +99,26 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
 
     if (!appointment) {
       return { ok: false, message: "ثبت نوبت با خطا مواجه شد. لطفاً دوباره تلاش کنید." };
+    }
+
+    // اطلاع‌رسانی نباید جریان رزرو را بلوکه یا خراب کند
+    const customerName = `${customer.firstName} ${customer.lastName}`;
+    await notifyBookingCreated({
+      phone: customer.phone,
+      customerName,
+      serviceTitle: service.title,
+      startsAt,
+      code: appointment.code,
+    }).catch(() => undefined);
+
+    if (customer.email) {
+      await notifyBookingEmail({
+        email: customer.email,
+        customerName,
+        serviceTitle: service.title,
+        startsAt,
+        code: appointment.code,
+      }).catch(() => undefined);
     }
 
     return {

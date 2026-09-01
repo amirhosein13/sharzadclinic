@@ -20,7 +20,8 @@
     "db:reset": "prisma migrate reset --force",
     "setup": "npm run db:up && node scripts/wait-for-db.mjs && prisma migrate deploy && prisma generate && npm run db:seed",
     "import:legacy": "tsx scripts/import-legacy.ts",
-    "test:smoke": "tsx --conditions=react-server scripts/smoke-test.ts"
+    "test:smoke": "tsx --conditions=react-server scripts/smoke-test.ts",
+    "reminders": "tsx --conditions=react-server scripts/send-reminders.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -37,6 +38,7 @@
     "lucide-react": "^1.39.0",
     "motion": "^13.1.1",
     "next": "^15.5.25",
+    "nodemailer": "^9.1.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "recharts": "^3.10.1",
@@ -51,6 +53,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/mssql": "^12.3.0",
     "@types/node": "^26.4.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "eslint": "^9.39.5",
