@@ -1,34 +1,45 @@
 import Image from "next/image";
-import { Eye, EyeOff, Users } from "lucide-react";
+import { Eye, EyeOff, Trash2, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
+import { StaffForm } from "@/components/admin/forms/staff-form";
+import { ScheduleForm } from "@/components/admin/forms/schedule-form";
 import { toggleStaffActive } from "@/app/actions/admin";
+import { deleteStaff } from "@/app/actions/content";
 import { Badge } from "@/components/ui/badge";
 import { WEEKDAYS_FA } from "@/lib/date";
-import { toFa } from "@/lib/utils";
+import { formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminStaffPage() {
-  const staff = await prisma.staff.findMany({
-    include: {
-      services: { include: { service: { select: { title: true } } } },
-      schedules: { where: { isActive: true }, orderBy: { weekday: "asc" } },
-      _count: { select: { appointments: true } },
-    },
-    orderBy: { order: "asc" },
-  });
+  const user = await getSession();
+  const canEdit = user?.role === "ADMIN" || user?.role === "MANAGER";
+
+  const [staff, services] = await Promise.all([
+    prisma.staff.findMany({
+      include: {
+        services: { include: { service: { select: { id: true, title: true } } } },
+        schedules: { where: { isActive: true }, orderBy: { weekday: "asc" } },
+        _count: { select: { appointments: true } },
+      },
+      orderBy: { order: "asc" },
+    }),
+    prisma.service.findMany({ where: { isActive: true }, select: { id: true, title: true }, orderBy: { order: "asc" } }),
+  ]);
 
   return (
     <>
       <AdminPageHeader
         title="پرسنل"
         description="برنامه‌ی هفتگی هر نفر تعیین می‌کند چه ساعت‌هایی برای رزرو آنلاین باز باشد."
+        action={canEdit ? <StaffForm services={services} /> : null}
       />
 
       {staff.length === 0 ? (
-        <EmptyState icon={Users} title="پرسنلی ثبت نشده" />
+        <EmptyState icon={Users} title="پرسنلی ثبت نشده" description="با دکمه‌ی «افزودن پرسنل» شروع کنید." />
       ) : (
         <div className="grid gap-5 lg:grid-cols-2">
           {staff.map((member) => (
@@ -49,6 +60,19 @@ export default async function AdminStaffPage() {
                   <p className="mt-1 text-xs text-[color:var(--fg-muted)]">
                     {toFa(member._count.appointments)} نوبت ثبت‌شده
                   </p>
+                </div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3 border-t border-[color:var(--line)] pt-5">
+                <div className="rounded-2xl bg-[color:var(--bg-sunken)] p-3 text-center">
+                  <p className="text-[11px] text-[color:var(--fg-muted)]">حقوق پایه</p>
+                  <p className="mt-1 text-sm font-bold">
+                    {member.baseSalary > 0 ? formatToman(member.baseSalary) : "—"}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-[color:var(--bg-sunken)] p-3 text-center">
+                  <p className="text-[11px] text-[color:var(--fg-muted)]">پورسانت</p>
+                  <p className="mt-1 text-sm font-bold">{toFa(member.commissionPercent)}٪</p>
                 </div>
               </div>
 
@@ -73,33 +97,80 @@ export default async function AdminStaffPage() {
               </div>
 
               <div className="mt-5 border-t border-[color:var(--line)] pt-5">
-                <p className="mb-2.5 text-xs font-semibold">
-                  خدمات ({toFa(member.services.length)})
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {member.services.map((s) => (
-                    <span
-                      key={s.serviceId}
-                      className="rounded-lg border border-[color:var(--line)] px-2.5 py-1 text-[11px]"
-                    >
-                      {s.service.title}
-                    </span>
-                  ))}
-                </div>
+                <p className="mb-2.5 text-xs font-semibold">خدمات ({toFa(member.services.length)})</p>
+                {member.services.length === 0 ? (
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    ⚠️ خدمتی انتخاب نشده — در رزرو آنلاین پیشنهاد نمی‌شود.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {member.services.map((s) => (
+                      <span
+                        key={s.serviceId}
+                        className="rounded-lg border border-[color:var(--line)] px-2.5 py-1 text-[11px]"
+                      >
+                        {s.service.title}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="mt-5">
+              <div className="mt-5 flex flex-wrap gap-2 border-t border-[color:var(--line)] pt-5">
+                {canEdit && (
+                  <>
+                    <StaffForm
+                      services={services}
+                      member={{
+                        id: member.id,
+                        name: member.name,
+                        title: member.title,
+                        bio: member.bio,
+                        avatar: member.avatar,
+                        licenseNo: member.licenseNo,
+                        instagram: member.instagram,
+                        baseSalary: member.baseSalary,
+                        commissionPercent: member.commissionPercent,
+                        order: member.order,
+                        isActive: member.isActive,
+                        acceptsBookings: member.acceptsBookings,
+                        serviceIds: member.services.map((s) => s.serviceId),
+                      }}
+                    />
+                    <ScheduleForm
+                      staffId={member.id}
+                      staffName={member.name}
+                      schedules={member.schedules.map((s) => ({
+                        weekday: s.weekday,
+                        startTime: s.startTime,
+                        endTime: s.endTime,
+                      }))}
+                    />
+                  </>
+                )}
+
                 <ActionButton action={toggleStaffActive.bind(null, member.id)}>
                   {member.isActive ? (
                     <>
-                      <EyeOff className="size-3.5" /> غیرفعال کن
+                      <EyeOff className="size-3.5" /> غیرفعال
                     </>
                   ) : (
                     <>
-                      <Eye className="size-3.5" /> فعال کن
+                      <Eye className="size-3.5" /> فعال
                     </>
                   )}
                 </ActionButton>
+
+                {canEdit && (
+                  <ActionButton
+                    action={deleteStaff.bind(null, member.id)}
+                    confirm={`«${member.name}» حذف شود؟`}
+                    title="حذف پرسنل"
+                    className="text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </ActionButton>
+                )}
               </div>
             </Card>
           ))}

@@ -45,12 +45,33 @@ export function formatDuration(minutes: number): string {
   return `${toFa(m)} دقیقه`;
 }
 
+/** نگاشت حروف فارسی/عربی به لاتین برای ساخت نشانی خوانا */
+const TRANSLITERATION: Record<string, string> = {
+  "آ": "a", "ا": "a", "أ": "a", "إ": "e", "ب": "b", "پ": "p", "ت": "t", "ث": "s",
+  "ج": "j", "چ": "ch", "ح": "h", "خ": "kh", "د": "d", "ذ": "z", "ر": "r", "ز": "z",
+  "ژ": "zh", "س": "s", "ش": "sh", "ص": "s", "ض": "z", "ط": "t", "ظ": "z", "ع": "a",
+  "غ": "gh", "ف": "f", "ق": "gh", "ک": "k", "ك": "k", "گ": "g", "ل": "l", "م": "m",
+  "ن": "n", "و": "v", "ؤ": "o", "ه": "h", "ة": "h", "ی": "i", "ي": "i", "ئ": "i",
+  // همزه و اعراب حذف می‌شوند
+  "ء": "", "\u064B": "", "\u064C": "", "\u064D": "", "\u064E": "",
+  "\u064F": "", "\u0650": "", "\u0651": "", "\u0652": "",
+  "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4",
+  "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
+};
+
+/**
+ * نشانی (slug) لاتین و امن برای URL می‌سازد.
+ * حروف فارسی به معادل لاتین تبدیل می‌شوند تا آدرس صفحه در همه‌ی
+ * مرورگرها، پیامک‌ها و شبکه‌های اجتماعی درست کار کند.
+ */
 export function slugify(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/[\s‌]+/g, "-")
-    .replace(/[^\p{L}\p{N}-]/gu, "")
+  const transliterated = [...input.trim().toLowerCase()]
+    .map((char) => (char in TRANSLITERATION ? TRANSLITERATION[char] : char))
+    .join("");
+
+  return transliterated
+    .replace(/[\s‌_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
     .replace(/-{2,}/g, "-")
     .replace(/^-|-$/g, "");
 }
@@ -86,4 +107,19 @@ export function truncate(text: string, max = 140): string {
 export function readingTime(text: string): number {
   const words = text.trim().split(/\s+/).length;
   return Math.max(1, Math.round(words / 200));
+}
+
+/**
+ * نشانی آمده از URL را برای جستجو در دیتابیس آماده می‌کند.
+ * محتوای قدیمی ممکن است نشانی غیرلاتین داشته باشد که مرورگر آن را
+ * درصدی (percent-encoded) می‌فرستد.
+ */
+export function decodeSlug(slug: string): string[] {
+  const variants = new Set([slug]);
+  try {
+    variants.add(decodeURIComponent(slug));
+  } catch {
+    // نشانی حاوی درصدِ نامعتبر — همان مقدار خام کافی است
+  }
+  return [...variants];
 }

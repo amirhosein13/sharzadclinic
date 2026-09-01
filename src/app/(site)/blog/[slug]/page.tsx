@@ -9,7 +9,7 @@ import { Prose } from "@/components/prose";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { formatJalaliLong } from "@/lib/date";
-import { toFa } from "@/lib/utils";
+import { decodeSlug, toFa } from "@/lib/utils";
 
 export const revalidate = 300;
 
@@ -26,7 +26,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const post = await prisma.post.findUnique({ where: { slug } });
+  const post = await prisma.post.findFirst({ where: { slug: { in: decodeSlug(slug) } } });
   if (!post) return { title: "مقاله پیدا نشد" };
 
   return {
@@ -47,8 +47,8 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const settings = await getSettings();
 
-  const post = await prisma.post.findUnique({
-    where: { slug },
+  const post = await prisma.post.findFirst({
+    where: { slug: { in: decodeSlug(slug) } },
     include: { category: true },
   });
 

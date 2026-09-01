@@ -1,6 +1,8 @@
 import Image from "next/image";
 import { Eye, EyeOff, ImageOff, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { GalleryForm } from "@/components/admin/forms/gallery-form";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
 import { deleteGalleryItem, toggleGalleryPublished } from "@/app/actions/admin";
@@ -10,17 +12,32 @@ import { toFa } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminGalleryPage() {
-  const items = await prisma.galleryItem.findMany({ orderBy: { order: "asc" } });
+  const user = await getSession();
+  const canEdit = user?.role === "ADMIN" || user?.role === "MANAGER";
+
+  const [items, services] = await Promise.all([
+    prisma.galleryItem.findMany({ orderBy: { order: "asc" } }),
+    prisma.service.findMany({
+      where: { isActive: true },
+      select: { slug: true, title: true },
+      orderBy: { order: "asc" },
+    }),
+  ]);
 
   return (
     <>
       <AdminPageHeader
         title="گالری نمونه کارها"
-        description={`${toFa(items.length)} نمونه‌کار. برای افزودن مورد جدید، تصویر را در public/images/gallery بگذارید و رکورد را از Prisma Studio اضافه کنید.`}
+        description={`${toFa(items.length)} نمونه‌کار. دستگیره‌ی هر تصویر در سایت، قبل و بعد را مقایسه می‌کند.`}
+        action={canEdit ? <GalleryForm services={services} /> : null}
       />
 
       {items.length === 0 ? (
-        <EmptyState icon={ImageOff} title="نمونه‌کاری ثبت نشده" />
+        <EmptyState
+          icon={ImageOff}
+          title="نمونه‌کاری ثبت نشده"
+          description="با دکمه‌ی «افزودن نمونه‌کار» تصویر قبل و بعد را آپلود کنید."
+        />
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
@@ -58,6 +75,21 @@ export default async function AdminGalleryPage() {
                 )}
 
                 <div className="mt-4 flex gap-2">
+                  {canEdit && (
+                    <GalleryForm
+                      services={services}
+                      item={{
+                        id: item.id,
+                        title: item.title,
+                        description: item.description,
+                        beforeImage: item.beforeImage,
+                        afterImage: item.afterImage,
+                        serviceSlug: item.serviceSlug,
+                        order: item.order,
+                        isPublished: item.isPublished,
+                      }}
+                    />
+                  )}
                   <ActionButton action={toggleGalleryPublished.bind(null, item.id)} className="flex-1">
                     {item.isPublished ? (
                       <>

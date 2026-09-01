@@ -13,7 +13,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { FaqAccordion } from "@/components/faq-accordion";
 import { ServiceCard } from "@/components/service-card";
 import { Prose } from "@/components/prose";
-import { formatDuration, formatPriceRange } from "@/lib/utils";
+import { decodeSlug, formatDuration, formatPriceRange } from "@/lib/utils";
 
 export const revalidate = 300;
 
@@ -31,7 +31,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const service = await prisma.service.findUnique({ where: { slug } });
+  const service = await prisma.service.findFirst({ where: { slug: { in: decodeSlug(slug) } } });
   if (!service) return { title: "خدمت پیدا نشد" };
 
   return {
@@ -54,8 +54,8 @@ export default async function ServiceDetailPage({
   const { slug } = await params;
   const settings = await getSettings();
 
-  const service = await prisma.service.findUnique({
-    where: { slug },
+  const service = await prisma.service.findFirst({
+    where: { slug: { in: decodeSlug(slug) } },
     include: {
       category: true,
       faqs: { orderBy: { order: "asc" } },

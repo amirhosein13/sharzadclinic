@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Eye, EyeOff, FileText, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { PostForm } from "@/components/admin/forms/post-form";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
 import { deletePost, togglePostPublished } from "@/app/actions/admin";
@@ -12,20 +14,28 @@ import { toFa } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminBlogPage() {
-  const posts = await prisma.post.findMany({
-    include: { category: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const user = await getSession();
+  const canEdit = user?.role === "ADMIN" || user?.role === "MANAGER";
+
+  const [posts, categories] = await Promise.all([
+    prisma.post.findMany({ include: { category: true }, orderBy: { createdAt: "desc" } }),
+    prisma.postCategory.findMany({ select: { id: true, title: true }, orderBy: { title: "asc" } }),
+  ]);
 
   return (
     <>
       <AdminPageHeader
         title="مجله"
-        description={`${toFa(posts.length)} مقاله. متن مقالات از Prisma Studio (npm run db:studio) قابل ویرایش است.`}
+        description={`${toFa(posts.length)} مقاله.`}
+        action={canEdit ? <PostForm categories={categories} /> : null}
       />
 
       {posts.length === 0 ? (
-        <EmptyState icon={FileText} title="مقاله‌ای ثبت نشده" />
+        <EmptyState
+          icon={FileText}
+          title="مقاله‌ای ثبت نشده"
+          description="با دکمه‌ی «مقاله جدید» اولین مطلب مجله را بنویسید."
+        />
       ) : (
         <Card padded={false}>
           <ul className="divide-y divide-[color:var(--line)]">
@@ -54,7 +64,23 @@ export default async function AdminBlogPage() {
                   </p>
                 </div>
 
-                <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  {canEdit && (
+                    <PostForm
+                      categories={categories}
+                      post={{
+                        id: post.id,
+                        title: post.title,
+                        excerpt: post.excerpt,
+                        content: post.content,
+                        coverImage: post.coverImage,
+                        categoryId: post.categoryId,
+                        isPublished: post.isPublished,
+                        metaTitle: post.metaTitle,
+                        metaDescription: post.metaDescription,
+                      }}
+                    />
+                  )}
                   <ActionButton action={togglePostPublished.bind(null, post.id)}>
                     {post.isPublished ? (
                       <>

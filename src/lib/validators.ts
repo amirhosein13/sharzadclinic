@@ -55,3 +55,109 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
   }
   return out;
 }
+
+// ─── فرم‌های پنل مدیریت ────────────────────────────────────────
+
+/** عدد اختیاری که ورودی خالی را به null تبدیل می‌کند و ارقام فارسی را می‌پذیرد */
+const optionalInt = z
+  .union([z.literal(""), z.string(), z.number()])
+  .optional()
+  .transform((v) => {
+    if (v === "" || v === undefined || v === null) return null;
+    const n = Number(toEn(String(v)));
+    return Number.isFinite(n) ? Math.round(n) : null;
+  });
+
+const requiredInt = (min: number, max: number, message: string) =>
+  z
+    .union([z.string(), z.number()])
+    .transform((v) => Number(toEn(String(v))))
+    .refine((n) => Number.isFinite(n) && n >= min && n <= max, message);
+
+export const serviceSchema = z.object({
+  title: z.string().trim().min(2, "عنوان خدمت را وارد کنید").max(120),
+  slug: z.string().trim().max(120).optional(),
+  categoryId: z.string().min(1, "دسته‌بندی را انتخاب کنید"),
+  shortDescription: z.string().trim().max(300).optional(),
+  description: z.string().trim().max(20000).optional(),
+  image: z.string().trim().max(500).optional(),
+  priceFrom: optionalInt,
+  priceTo: optionalInt,
+  durationMinutes: requiredInt(5, 600, "مدت جلسه باید بین ۵ تا ۶۰۰ دقیقه باشد"),
+  bufferMinutes: requiredInt(0, 120, "بافر باید بین ۰ تا ۱۲۰ دقیقه باشد"),
+  slotStepMinutes: optionalInt,
+  sessionsNeeded: z.string().trim().max(120).optional(),
+  preparation: z.string().trim().max(2000).optional(),
+  aftercare: z.string().trim().max(2000).optional(),
+  isFeatured: z.coerce.boolean().optional(),
+  isBookable: z.coerce.boolean().optional(),
+  isActive: z.coerce.boolean().optional(),
+  order: optionalInt,
+}).refine(
+  (v) => v.priceFrom === null || v.priceTo === null || v.priceFrom <= v.priceTo,
+  { message: "حداقل قیمت نمی‌تواند از حداکثر بیشتر باشد", path: ["priceFrom"] }
+);
+
+export const categorySchema = z.object({
+  title: z.string().trim().min(2, "عنوان دسته‌بندی را وارد کنید").max(100),
+  slug: z.string().trim().max(100).optional(),
+  description: z.string().trim().max(500).optional(),
+  icon: z.string().trim().max(60).optional(),
+  order: optionalInt,
+  isActive: z.coerce.boolean().optional(),
+});
+
+export const staffSchema = z.object({
+  name: z.string().trim().min(2, "نام پرسنل را وارد کنید").max(100),
+  slug: z.string().trim().max(100).optional(),
+  title: z.string().trim().min(2, "سمت را وارد کنید").max(120),
+  bio: z.string().trim().max(2000).optional(),
+  avatar: z.string().trim().max(500).optional(),
+  licenseNo: z.string().trim().max(60).optional(),
+  instagram: z.string().trim().max(200).optional(),
+  baseSalary: optionalInt,
+  commissionPercent: requiredInt(0, 100, "درصد پورسانت باید بین ۰ تا ۱۰۰ باشد"),
+  order: optionalInt,
+  isActive: z.coerce.boolean().optional(),
+  acceptsBookings: z.coerce.boolean().optional(),
+});
+
+export const galleryItemSchema = z.object({
+  title: z.string().trim().min(2, "عنوان نمونه‌کار را وارد کنید").max(150),
+  description: z.string().trim().max(500).optional(),
+  beforeImage: z.string().trim().min(1, "تصویر «قبل» الزامی است").max(500),
+  afterImage: z.string().trim().max(500).optional(),
+  serviceSlug: z.string().trim().max(120).optional(),
+  order: optionalInt,
+  isPublished: z.coerce.boolean().optional(),
+});
+
+export const postSchema = z.object({
+  title: z.string().trim().min(3, "عنوان مقاله را وارد کنید").max(200),
+  slug: z.string().trim().max(200).optional(),
+  excerpt: z.string().trim().max(400).optional(),
+  content: z.string().trim().min(20, "متن مقاله حداقل ۲۰ کاراکتر باشد").max(60000),
+  coverImage: z.string().trim().max(500).optional(),
+  categoryId: z.string().trim().optional(),
+  isPublished: z.coerce.boolean().optional(),
+  metaTitle: z.string().trim().max(200).optional(),
+  metaDescription: z.string().trim().max(400).optional(),
+});
+
+export const staffScheduleSchema = z.object({
+  staffId: z.string().min(1),
+  weekday: requiredInt(0, 6, "روز هفته نامعتبر است"),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "ساعت شروع نامعتبر است"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "ساعت پایان نامعتبر است"),
+}).refine((v) => v.startTime < v.endTime, {
+  message: "ساعت پایان باید بعد از ساعت شروع باشد",
+  path: ["endTime"],
+});
+
+export const paymentSchema = z.object({
+  appointmentId: z.string().min(1),
+  amount: requiredInt(0, 1_000_000_000, "مبلغ نامعتبر است"),
+  method: z.enum(["CASH", "CARD", "ONLINE", "OTHER"]),
+  reference: z.string().trim().max(120).optional(),
+  note: z.string().trim().max(500).optional(),
+});
