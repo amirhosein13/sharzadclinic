@@ -35,7 +35,9 @@ export default async function CustomerDetailPage({
 
   if (!customer) notFound();
 
-  const totalPaid = customer.payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalPaid = customer.payments
+    .filter((p) => p.status === "PAID")
+    .reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <>
@@ -172,9 +174,17 @@ export default async function CustomerDetailPage({
                 {customer.payments.map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-4 p-5">
                     <div>
-                      <p className="text-sm font-medium">{formatToman(p.amount)}</p>
+                      <p className="text-sm font-medium">
+                        {formatToman(p.amount)}
+                        {p.status !== "PAID" && (
+                          <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
+                            ({PAYMENT_STATUS_LABELS[p.status] ?? p.status})
+                          </span>
+                        )}
+                      </p>
                       <p className="mt-1 text-xs text-[color:var(--fg-muted)]">
-                        {formatJalaliLong(p.paidAt)} • {PAYMENT_LABELS[p.method] ?? p.method}
+                        {p.paidAt ? formatJalaliLong(p.paidAt) : "در انتظار پرداخت"} •{" "}
+                        {PAYMENT_LABELS[p.method] ?? p.method}
                       </p>
                     </div>
                     {p.reference && (
@@ -190,6 +200,13 @@ export default async function CustomerDetailPage({
     </>
   );
 }
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  PENDING: "در انتظار پرداخت",
+  PAID: "پرداخت‌شده",
+  FAILED: "ناموفق",
+  REFUNDED: "مسترد شده",
+};
 
 const PAYMENT_LABELS: Record<string, string> = {
   CASH: "نقدی",

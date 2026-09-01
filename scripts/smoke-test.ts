@@ -56,6 +56,38 @@ async function main() {
   }));
   check("رد ورودی نامعتبر با پیام فارسی", !bad.ok && Object.keys(bad.errors ?? {}).length === 3);
 
+  // ─── بافر بین نوبت‌ها ───
+  // نوبت رزروشده باید علاوه بر مدت خودش، بافر بعدش را هم اشغال کند.
+  await prisma.setting.upsert({
+    where: { key: "slotStepMinutes" },
+    create: { key: "slotStepMinutes", value: "15" },
+    update: { value: "15" },
+  });
+  const fineGrained = await getAvailableSlots({ serviceId: service.id, dateKey });
+  const booked = await prisma.appointment.findFirst({
+    where: { customer: { phone: "09129998877" } },
+    orderBy: { startsAt: "desc" },
+  });
+  const endMinutes = booked!.endsAt.getHours() * 60 + booked!.endsAt.getMinutes();
+  const firstAfter = fineGrained
+    .map((s) => Number(s.time.split(":")[0]) * 60 + Number(s.time.split(":")[1]))
+    .filter((m) => m >= endMinutes)
+    .sort((a, b) => a - b)[0];
+  check(
+    `بافر ${service.bufferMinutes} دقیقه‌ای بعد از نوبت رزروشده رعایت می‌شود`,
+    firstAfter === undefined || firstAfter >= endMinutes + service.bufferMinutes
+  );
+  await prisma.setting.deleteMany({ where: { key: "slotStepMinutes" } });
+
+  // ─── گام زمانی اختصاصی خدمت ───
+  await prisma.service.update({ where: { id: service.id }, data: { slotStepMinutes: 60 } });
+  const hourly = await getAvailableSlots({ serviceId: service.id, dateKey });
+  check(
+    "گام زمانی اختصاصی خدمت اعمال می‌شود (همه‌ی اسلات‌ها سر ساعت)",
+    hourly.length > 0 && hourly.every((s) => s.time.endsWith(":00"))
+  );
+  await prisma.service.update({ where: { id: service.id }, data: { slotStepMinutes: null } });
+
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });
   await prisma.customer.deleteMany({ where: { phone: "09129998877" } });
   await prisma.$disconnect();

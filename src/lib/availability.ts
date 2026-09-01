@@ -33,7 +33,7 @@ export async function getAvailableSlots(params: {
   const { serviceId, dateKey, staffId } = params;
 
   const settings = await getSettings();
-  const step = Number(settings.slotStepMinutes) || 30;
+  const defaultStep = Number(settings.slotStepMinutes) || 30;
   const leadMinutes = (Number(settings.bookingLeadHours) || 3) * 60;
   const horizonDays = Number(settings.bookingHorizonDays) || 45;
 
@@ -49,9 +49,19 @@ export async function getAvailableSlots(params: {
 
   const service = await prisma.service.findUnique({
     where: { id: serviceId },
-    select: { id: true, durationMinutes: true, bufferMinutes: true, isBookable: true, isActive: true },
+    select: {
+      id: true,
+      durationMinutes: true,
+      bufferMinutes: true,
+      slotStepMinutes: true,
+      isBookable: true,
+      isActive: true,
+    },
   });
   if (!service || !service.isBookable || !service.isActive) return [];
+
+  // خدماتی مثل لیزر که بلندتر از گام پیش‌فرض‌اند می‌توانند گام اختصاصی داشته باشند
+  const step = service.slotStepMinutes && service.slotStepMinutes > 0 ? service.slotStepMinutes : defaultStep;
 
   const weekday = jalaliWeekday(day);
 
@@ -92,7 +102,12 @@ export async function getAvailableSlots(params: {
         startsAt: { lte: dayEnd },
         endsAt: { gte: dayStart },
       },
-      select: { staffId: true, startsAt: true, endsAt: true },
+      select: {
+        staffId: true,
+        startsAt: true,
+        endsAt: true,
+        service: { select: { bufferMinutes: true } },
+      },
     }),
     prisma.timeOff.findMany({
       where: {
@@ -114,7 +129,13 @@ export async function getAvailableSlots(params: {
   for (const id of staffIds) busyByStaff.set(id, []);
   for (const appt of booked) {
     if (!appt.staffId) continue;
-    busyByStaff.get(appt.staffId)?.push({ start: toMinutes(appt.startsAt), end: toMinutes(appt.endsAt) });
+    // هر نوبت علاوه بر مدت خودش، بافر پاکسازی/آماده‌سازی بعدش را هم اشغال می‌کند.
+    // بدون این، نوبت بعدی می‌توانست دقیقاً لحظه‌ی پایان نوبت قبلی شروع شود.
+    const end = toMinutes(appt.endsAt);
+    busyByStaff.get(appt.staffId)?.push({
+      start: toMinutes(appt.startsAt),
+      end: end === 10000 ? end : end + appt.service.bufferMinutes,
+    });
   }
   for (const off of timeOffs) {
     const interval = { start: toMinutes(off.from), end: toMinutes(off.to) };
@@ -130,7 +151,9 @@ export async function getAvailableSlots(params: {
     return cutoff.getHours() * 60 + cutoff.getMinutes();
   })();
 
-  const total = service.durationMinutes + service.bufferMinutes;
+  // فاصله‌ی بعد از این نوبت، هنگام محاسبه‌ی نوبت‌های بعدی اعمال می‌شود،
+  // پس اینجا فقط باید مدت خود خدمت داخل ساعت کاری جا شود.
+  const total = service.durationMinutes;
   const seen = new Map<string, Slot>();
 
   for (const staff of staffList) {

@@ -31,7 +31,10 @@ export default async function AdminDashboard() {
     prisma.appointment.count({ where: { startsAt: { gte: todayStart, lt: todayEnd } } }),
     prisma.appointment.count({ where: { status: "PENDING" } }),
     prisma.customer.count(),
-    prisma.payment.aggregate({ _sum: { amount: true }, where: { paidAt: { gte: monthStart } } }),
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { status: "PAID", paidAt: { gte: monthStart } },
+    }),
     prisma.appointment.findMany({
       where: { startsAt: { gte: new Date() }, status: { in: ["PENDING", "CONFIRMED"] } },
       include: { customer: true, service: true, staff: true },

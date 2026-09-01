@@ -19,6 +19,7 @@ enum Role {
   ADMIN
   MANAGER
   RECEPTION
+  OPERATOR // پرسنل درمانگر — فقط نوبت‌ها و درآمد خودش را می‌بیند
 }
 
 model User {
@@ -31,6 +32,10 @@ model User {
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  /// اگر این حساب متعلق به یکی از پرسنل درمانگر باشد
+  staffId String? @unique
+  staff   Staff?  @relation(fields: [staffId], references: [id], onDelete: SetNull)
 
   auditLogs AuditLog[]
 
@@ -119,7 +124,9 @@ model Service {
   priceFrom        Int? // تومان
   priceTo          Int?
   durationMinutes  Int      @default(60)
-  bufferMinutes    Int      @default(10) // فاصله‌ی بین نوبت‌ها
+  bufferMinutes    Int      @default(10) // فاصله‌ی اجباری تا نوبت بعدی
+  /// گام نمایش ساعت‌های شروع. خالی یعنی از تنظیمات عمومی استفاده شود.
+  slotStepMinutes  Int?
   sessionsNeeded   String? // مثلا «۴ تا ۶ جلسه»
   preparation      String? // آمادگی قبل از انجام
   aftercare        String? // مراقبت‌های بعد از انجام
@@ -159,35 +166,45 @@ model ServiceFaq {
 // ─── پرسنل ─────────────────────────────────────────────────────
 
 model Staff {
-  id              String   @id @default(cuid())
-  legacyId        String?  @unique
-  slug            String   @unique
+  id              String  @id @default(cuid())
+  legacyId        String? @unique
+  slug            String  @unique
   name            String
   title           String // مثلا «متخصص پوست و مو»
   bio             String?
   avatar          String?
   licenseNo       String?
   instagram       String?
-  order           Int      @default(0)
-  isActive        Boolean  @default(true)
-  acceptsBookings Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  order           Int     @default(0)
+  isActive        Boolean @default(true)
+  acceptsBookings Boolean @default(true)
 
-  services     StaffOnService[]
-  schedules    StaffSchedule[]
-  timeOffs     TimeOff[]
-  appointments Appointment[]
-  treatments   TreatmentRecord[]
+  /// حقوق پایه‌ی ماهانه به تومان
+  baseSalary        Int @default(0)
+  /// درصد پورسانت پیش‌فرض از مبلغ خدمات انجام‌شده
+  commissionPercent Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  services       StaffOnService[]
+  schedules      StaffSchedule[]
+  timeOffs       TimeOff[]
+  appointments   Appointment[]
+  treatments     TreatmentRecord[]
+  payrollPeriods PayrollPeriod[]
+  user           User?
 
   @@map("staff")
 }
 
 model StaffOnService {
-  staffId   String
-  serviceId String
-  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  staffId           String
+  serviceId         String
+  staff             Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  service           Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  /// اگر خالی باشد، درصد پیش‌فرض خود پرسنل اعمال می‌شود
+  commissionPercent Int?
 
   @@id([staffId, serviceId])
   @@map("staff_services")
@@ -241,23 +258,25 @@ enum AppointmentStatus {
 }
 
 model Appointment {
-  id         String            @id @default(cuid())
-  legacyId   String?           @unique
-  code       String            @unique // کد پیگیری برای مشتری
-  customerId String
-  customer   Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  serviceId  String
-  service    Service           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-  staffId    String?
-  staff      Staff?            @relation(fields: [staffId], references: [id], onDelete: SetNull)
-  startsAt   DateTime
-  endsAt     DateTime
-  status     AppointmentStatus @default(PENDING)
-  note       String? // یادداشت مشتری
-  adminNote  String?
-  source     String            @default("website")
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  legacyId       String?           @unique
+  code           String            @unique // کد پیگیری برای مشتری
+  customerId     String
+  customer       Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  serviceId      String
+  service        Service           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  staffId        String?
+  staff          Staff?            @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  startsAt       DateTime
+  endsAt         DateTime
+  status         AppointmentStatus @default(PENDING)
+  note           String? // یادداشت مشتری
+  adminNote      String?
+  source         String            @default("website")
+  /// زمان ارسال پیامک یادآوری — برای جلوگیری از ارسال تکراری
+  reminderSentAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   payments Payment[]
 
@@ -296,6 +315,13 @@ enum PaymentMethod {
   OTHER
 }
 
+enum PaymentStatus {
+  PENDING // در انتظار پرداخت در درگاه
+  PAID
+  FAILED
+  REFUNDED
+}
+
 model Payment {
   id            String        @id @default(cuid())
   legacyId      String?       @unique
@@ -305,12 +331,20 @@ model Payment {
   appointment   Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   amount        Int // تومان
   method        PaymentMethod @default(CASH)
-  paidAt        DateTime
+  status        PaymentStatus @default(PAID)
+  /// برای پرداخت آنلاین: نام درگاه، کد Authority و شماره پیگیری تراکنش
+  gateway       String?
+  authority     String?       @unique
+  refId         String?
+  /// تا وقتی پرداخت آنلاین تأیید نشده خالی است
+  paidAt        DateTime?
   reference     String?
   note          String?
   createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@index([paidAt])
+  @@index([status])
   @@map("payments")
 }
 
@@ -409,4 +443,81 @@ model Setting {
   updatedAt DateTime @updatedAt
 
   @@map("settings")
+}
+
+// ─── حقوق و دستمزد ─────────────────────────────────────────────
+
+/// یک دوره‌ی حقوقی (معمولاً یک ماه شمسی) برای هر پرسنل
+model PayrollPeriod {
+  id      String @id @default(cuid())
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  /// ابتدا و انتهای دوره
+  from DateTime
+  to   DateTime
+
+  /// برچسب فارسی دوره، مثلاً «شهریور ۱۴۰۵»
+  label String
+
+  baseSalary       Int @default(0)
+  /// مجموع مبلغ خدماتی که مبنای پورسانت است
+  commissionBase   Int @default(0)
+  commissionAmount Int @default(0)
+  bonus            Int @default(0)
+  deduction        Int @default(0)
+  total            Int @default(0)
+
+  /// تعداد نوبت‌های انجام‌شده در دوره
+  sessionCount Int @default(0)
+
+  note      String?
+  isPaid    Boolean   @default(false)
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([staffId, from, to])
+  @@index([from, to])
+  @@map("payroll_periods")
+}
+
+// ─── ورود مشتری با کد یکبارمصرف ────────────────────────────────
+
+model OtpCode {
+  id         String    @id @default(cuid())
+  phone      String
+  codeHash   String
+  purpose    String    @default("login")
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone, createdAt])
+  @@map("otp_codes")
+}
+
+// ─── لاگ پیامک و ایمیل ─────────────────────────────────────────
+
+enum NotificationChannel {
+  SMS
+  EMAIL
+}
+
+model NotificationLog {
+  id         String              @id @default(cuid())
+  channel    NotificationChannel
+  recipient  String
+  template   String
+  body       String
+  /// sent | failed | skipped
+  status     String
+  error      String?
+  providerId String?
+  createdAt  DateTime            @default(now())
+
+  @@index([createdAt])
+  @@index([channel, status])
+  @@map("notification_logs")
 }
