@@ -47,6 +47,19 @@ export default async function NotificationsPage() {
         <Stat icon={MessageSquare} label="شبیه‌سازی‌شده" value={simulated} tone="amber" />
       </div>
 
+      {process.env.NODE_ENV === "production" && (process.env.SMS_PROVIDER ?? "console") === "console" && (
+        <Card className="mb-6 border-red-300/60 bg-red-50/60 dark:border-red-400/25 dark:bg-red-500/5">
+          <p className="flex items-start gap-3 text-sm leading-7">
+            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-red-600" />
+            <span>
+              <strong>سایت منتشر شده اما سرویس پیامک تنظیم نشده است.</strong> در این حالت مشتریان
+              نمی‌توانند وارد حساب کاربری شوند و پیامک تأیید و یادآوری نوبت هم ارسال نمی‌شود.
+              برای رفع این مشکل مقادیر کاوه‌نگار را در فایل <code className="rounded bg-[color:var(--bg-sunken)] px-1.5 py-0.5 text-xs">.env</code> سرور وارد کنید.
+            </span>
+          </p>
+        </Card>
+      )}
+
       {simulated > 0 && (
         <Card className="mb-6 border-amber-300/60 bg-amber-50/60 dark:border-amber-400/20 dark:bg-amber-500/5">
           <p className="text-sm leading-7">

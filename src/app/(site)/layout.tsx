@@ -3,9 +3,11 @@ import { Footer } from "@/components/site/footer";
 import { FloatingActions } from "@/components/site/floating-actions";
 import { getSettings } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
+import { getCustomerSession } from "@/lib/customer-auth";
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const settings = await getSettings();
+  const customer = await getCustomerSession();
 
   const categories = await prisma.serviceCategory
     .findMany({
@@ -48,7 +50,11 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Header clinicName={settings.clinicName} phone={settings.phone} />
+      <Header
+        clinicName={settings.clinicName}
+        phone={settings.phone}
+        customerName={customer?.name.split(" ")[0] ?? null}
+      />
       <main id="main" className="flex-1">
         {children}
       </main>

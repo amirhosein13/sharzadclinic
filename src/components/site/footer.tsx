@@ -10,6 +10,7 @@ const QUICK_LINKS = [
   { href: "/gallery", label: "نمونه کارها" },
   { href: "/blog", label: "مجله زیبایی" },
   { href: "/about", label: "درباره‌ی ما" },
+  { href: "/login", label: "حساب کاربری من" },
 ];
 
 const HOURS = [
@@ -126,7 +127,12 @@ export function Footer({
           <p>
             © {toFa(year)} {settings.clinicName} — تمامی حقوق محفوظ است.
           </p>
-          <p>ساخته‌شده با ❤️ برای زیبایی شما</p>
+          <div className="flex items-center gap-4">
+            <p>ساخته‌شده با ❤️ برای زیبایی شما</p>
+            <Link href="/admin" className="transition-colors hover:text-gold-300">
+              ورود کارکنان
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarHeart, Menu, Phone, X } from "lucide-react";
+import { CalendarHeart, Menu, Phone, UserRound, X } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn, toFa } from "@/lib/utils";
@@ -17,7 +17,16 @@ const NAV = [
   { href: "/contact", label: "تماس با ما" },
 ];
 
-export function Header({ clinicName, phone }: { clinicName: string; phone: string }) {
+export function Header({
+  clinicName,
+  phone,
+  customerName,
+}: {
+  clinicName: string;
+  phone: string;
+  /** اگر مشتری وارد شده باشد، نامش نمایش داده می‌شود */
+  customerName?: string | null;
+}) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -94,6 +103,14 @@ export function Header({ clinicName, phone }: { clinicName: string; phone: strin
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            <Link
+              href={customerName ? "/account" : "/login"}
+              title={customerName ? `حساب ${customerName}` : "ورود به حساب"}
+              className="hidden size-10 place-items-center rounded-full border border-[color:var(--line)] transition-colors hover:bg-[color:var(--bg-sunken)] sm:grid"
+            >
+              <UserRound className="size-[18px]" />
+              <span className="sr-only">{customerName ? "حساب کاربری" : "ورود"}</span>
+            </Link>
             <ButtonLink href="/booking" size="sm" className="hidden sm:inline-flex">
               <CalendarHeart className="size-4" />
               رزرو نوبت
@@ -166,6 +183,13 @@ export function Header({ clinicName, phone }: { clinicName: string; phone: strin
               className="block rounded-2xl px-4 py-3.5 text-base font-medium hover:bg-[color:var(--bg-sunken)]"
             >
               پیگیری نوبت
+            </Link>
+            <Link
+              href={customerName ? "/account" : "/login"}
+              className="flex items-center gap-2 rounded-2xl px-4 py-3.5 text-base font-medium hover:bg-[color:var(--bg-sunken)]"
+            >
+              <UserRound className="size-[18px]" />
+              {customerName ? `حساب ${customerName}` : "ورود به حساب"}
             </Link>
           </nav>
 
