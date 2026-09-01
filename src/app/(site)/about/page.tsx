@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { Award, BadgeCheck, HeartPulse, ShieldCheck, Sparkles, Users } from "lucide-react";
-import { prisma } from "@/lib/prisma";
+import { prisma, safeQuery } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { PageHero } from "@/components/site/page-hero";
 import { Section, SectionHeading } from "@/components/ui/section";
@@ -41,10 +41,10 @@ const VALUES = [
 
 export default async function AboutPage() {
   const settings = await getSettings();
-  const staff = await prisma.staff.findMany({
-    where: { isActive: true },
-    orderBy: { order: "asc" },
-  });
+  const staff = await safeQuery(
+    prisma.staff.findMany({ where: { isActive: true }, orderBy: { order: "asc" } }),
+    []
+  );
 
   return (
     <>

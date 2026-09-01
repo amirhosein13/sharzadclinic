@@ -4,7 +4,7 @@ import {
   ArrowLeft, BadgeCheck, CalendarHeart, Gem, Heart, Phone, Scissors,
   Sparkles, Stethoscope, Syringe, TrendingUp, Zap,
 } from "lucide-react";
-import { prisma } from "@/lib/prisma";
+import { prisma, safeQuery } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { FAQS } from "../../../prisma/seed-data";
 import { Hero } from "@/components/home/hero";
@@ -48,10 +48,9 @@ const WHY_US = [
   },
 ];
 
-export default async function HomePage() {
-  const settings = await getSettings();
-
-  const [featured, categories, gallery, testimonials, posts] = await Promise.all([
+/** همه‌ی داده‌های صفحه‌ی اصلی در یک رفت‌وبرگشت */
+function loadHomeData() {
+  return Promise.all([
     prisma.service.findMany({
       where: { isActive: true, isFeatured: true },
       include: { category: { select: { title: true } } },
@@ -80,6 +79,20 @@ export default async function HomePage() {
       include: { category: { select: { title: true } } },
     }),
   ]);
+}
+
+/** اگر دیتابیس در زمان build در دسترس نباشد، صفحه با این مقدار خالی ساخته می‌شود */
+const EMPTY_HOME_DATA = [[], [], [], [], []] as unknown as Awaited<
+  ReturnType<typeof loadHomeData>
+>;
+
+export default async function HomePage() {
+  const settings = await getSettings();
+
+  const [featured, categories, gallery, testimonials, posts] = await safeQuery(
+    loadHomeData(),
+    EMPTY_HOME_DATA
+  );
 
   const faqJsonLd = {
     "@context": "https://schema.org",
