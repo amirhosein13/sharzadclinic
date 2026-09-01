@@ -1,0 +1,412 @@
+// ───────────────────────────────────────────────────────────────
+//  کلینیک زیبایی شهرزاد — اسکیمای دیتابیس
+//  هر مدلی که قرار است داده‌ی اپلیکیشن قدیمی (SQL Server) را
+//  بپذیرد یک فیلد `legacyId` دارد تا import ایمن و تکرارپذیر باشد.
+// ───────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── کاربران پنل مدیریت ────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  MANAGER
+  RECEPTION
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         Role      @default(RECEPTION)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── مشتریان / مراجعین ─────────────────────────────────────────
+
+enum Gender {
+  FEMALE
+  MALE
+  OTHER
+}
+
+model Customer {
+  id           String    @id @default(cuid())
+  legacyId     String?   @unique // کلید رکورد در دیتابیس قدیمی
+  firstName    String
+  lastName     String
+  phone        String    @unique
+  email        String?
+  nationalCode String?
+  gender       Gender    @default(FEMALE)
+  birthDate    DateTime?
+  address      String?
+  notes        String? // یادداشت پزشکی/پذیرش
+  allergies    String?
+  isBlocked    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  appointments Appointment[]
+  treatments   TreatmentRecord[]
+  payments     Payment[]
+  testimonials Testimonial[]
+
+  @@index([lastName, firstName])
+  @@index([createdAt])
+  @@map("customers")
+}
+
+// ─── خدمات ─────────────────────────────────────────────────────
+
+model ServiceCategory {
+  id          String   @id @default(cuid())
+  legacyId    String?  @unique
+  slug        String   @unique
+  title       String
+  description String?
+  icon        String? // نام آیکون lucide
+  image       String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  services Service[]
+
+  @@map("service_categories")
+}
+
+model Service {
+  id               String   @id @default(cuid())
+  legacyId         String?  @unique
+  slug             String   @unique
+  title            String
+  shortDescription String?
+  description      String? // متن کامل (Markdown-ish)
+  image            String?
+  gallery          String[] @default([])
+  priceFrom        Int? // تومان
+  priceTo          Int?
+  durationMinutes  Int      @default(60)
+  bufferMinutes    Int      @default(10) // فاصله‌ی بین نوبت‌ها
+  sessionsNeeded   String? // مثلا «۴ تا ۶ جلسه»
+  preparation      String? // آمادگی قبل از انجام
+  aftercare        String? // مراقبت‌های بعد از انجام
+  isFeatured       Boolean  @default(false)
+  isBookable       Boolean  @default(true)
+  isActive         Boolean  @default(true)
+  order            Int      @default(0)
+  metaTitle        String?
+  metaDescription  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  categoryId String
+  category   ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  faqs         ServiceFaq[]
+  appointments Appointment[]
+  staff        StaffOnService[]
+  treatments   TreatmentRecord[]
+
+  @@index([categoryId, isActive])
+  @@index([isFeatured])
+  @@map("services")
+}
+
+model ServiceFaq {
+  id        String  @id @default(cuid())
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  question  String
+  answer    String
+  order     Int     @default(0)
+
+  @@map("service_faqs")
+}
+
+// ─── پرسنل ─────────────────────────────────────────────────────
+
+model Staff {
+  id              String   @id @default(cuid())
+  legacyId        String?  @unique
+  slug            String   @unique
+  name            String
+  title           String // مثلا «متخصص پوست و مو»
+  bio             String?
+  avatar          String?
+  licenseNo       String?
+  instagram       String?
+  order           Int      @default(0)
+  isActive        Boolean  @default(true)
+  acceptsBookings Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  services     StaffOnService[]
+  schedules    StaffSchedule[]
+  timeOffs     TimeOff[]
+  appointments Appointment[]
+  treatments   TreatmentRecord[]
+
+  @@map("staff")
+}
+
+model StaffOnService {
+  staffId   String
+  serviceId String
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([staffId, serviceId])
+  @@map("staff_services")
+}
+
+/// برنامه‌ی هفتگی هر پرسنل. weekday: 0=شنبه ... 6=جمعه
+model StaffSchedule {
+  id        String  @id @default(cuid())
+  staffId   String
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  weekday   Int
+  startTime String // "09:00"
+  endTime   String // "18:00"
+  isActive  Boolean @default(true)
+
+  @@unique([staffId, weekday, startTime])
+  @@map("staff_schedules")
+}
+
+model TimeOff {
+  id      String   @id @default(cuid())
+  staffId String?
+  staff   Staff?   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  from    DateTime
+  to      DateTime
+  reason  String?
+
+  @@index([from, to])
+  @@map("time_offs")
+}
+
+/// ساعات کاری خودِ کلینیک (نمایش عمومی + محدودکردن رزرو)
+model WorkingHour {
+  id        String  @id @default(cuid())
+  weekday   Int     @unique
+  isOpen    Boolean @default(true)
+  startTime String  @default("09:00")
+  endTime   String  @default("21:00")
+
+  @@map("working_hours")
+}
+
+// ─── نوبت‌دهی ──────────────────────────────────────────────────
+
+enum AppointmentStatus {
+  PENDING // ثبت‌شده، منتظر تأیید
+  CONFIRMED // تأییدشده
+  DONE // انجام‌شده
+  CANCELLED // لغوشده
+  NO_SHOW // مراجعه نکرد
+}
+
+model Appointment {
+  id         String            @id @default(cuid())
+  legacyId   String?           @unique
+  code       String            @unique // کد پیگیری برای مشتری
+  customerId String
+  customer   Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  serviceId  String
+  service    Service           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  staffId    String?
+  staff      Staff?            @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  startsAt   DateTime
+  endsAt     DateTime
+  status     AppointmentStatus @default(PENDING)
+  note       String? // یادداشت مشتری
+  adminNote  String?
+  source     String            @default("website")
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  payments Payment[]
+
+  @@index([startsAt])
+  @@index([status, startsAt])
+  @@index([staffId, startsAt])
+  @@map("appointments")
+}
+
+// ─── پرونده و پرداخت (مقصد داده‌های اپ قدیمی) ──────────────────
+
+model TreatmentRecord {
+  id          String   @id @default(cuid())
+  legacyId    String?  @unique
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  serviceId   String?
+  service     Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  staffId     String?
+  staff       Staff?   @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  performedAt DateTime
+  sessionNo   Int?
+  description String?
+  beforePhoto String?
+  afterPhoto  String?
+  createdAt   DateTime @default(now())
+
+  @@index([customerId, performedAt])
+  @@map("treatment_records")
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  ONLINE
+  OTHER
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  legacyId      String?       @unique
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  appointmentId String?
+  appointment   Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  amount        Int // تومان
+  method        PaymentMethod @default(CASH)
+  paidAt        DateTime
+  reference     String?
+  note          String?
+  createdAt     DateTime      @default(now())
+
+  @@index([paidAt])
+  @@map("payments")
+}
+
+// ─── گالری قبل/بعد ─────────────────────────────────────────────
+
+model GalleryItem {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  beforeImage String
+  afterImage  String?
+  serviceSlug String? // برای فیلترکردن
+  order       Int      @default(0)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished, order])
+  @@map("gallery_items")
+}
+
+// ─── مجله / بلاگ ───────────────────────────────────────────────
+
+model PostCategory {
+  id    String @id @default(cuid())
+  slug  String @unique
+  title String
+  posts Post[]
+
+  @@map("post_categories")
+}
+
+model Post {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  title           String
+  excerpt         String?
+  content         String
+  coverImage      String?
+  readingMinutes  Int       @default(5)
+  isPublished     Boolean   @default(false)
+  publishedAt     DateTime?
+  views           Int       @default(0)
+  metaTitle       String?
+  metaDescription String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  categoryId String?
+  category   PostCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([isPublished, publishedAt])
+  @@map("posts")
+}
+
+// ─── نظرات مشتریان ─────────────────────────────────────────────
+
+model Testimonial {
+  id          String    @id @default(cuid())
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  authorName  String
+  serviceName String?
+  rating      Int       @default(5)
+  body        String
+  avatar      String?
+  isApproved  Boolean   @default(false)
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([isApproved])
+  @@map("testimonials")
+}
+
+// ─── پیام‌های تماس ─────────────────────────────────────────────
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  subject   String?
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([isRead, createdAt])
+  @@map("contact_messages")
+}
+
+// ─── تنظیمات عمومی سایت ────────────────────────────────────────
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" role="img" aria-label="میکرونیدلینگ">
+  <defs>
+    <linearGradient id="g17" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f2eee6"/>
+      <stop offset="55%" stop-color="#dcd2bd"/>
+      <stop offset="100%" stop-color="#a88b48"/>
+    </linearGradient>
+    <radialGradient id="g17h" cx="72%" cy="22%" r="62%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#g17)"/>
+  <g><circle cx="513.4" cy="133.2" r="119.7" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.13"/><circle cx="136.2" cy="349.1" r="82.3" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.20"/><circle cx="244.3" cy="319.7" r="159.5" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.15"/><circle cx="231.0" cy="135.4" r="134.6" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.23"/><circle cx="267.9" cy="243.8" r="143.7" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.22"/><circle cx="436.0" cy="291.3" r="124.8" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.17"/><circle cx="120.9" cy="84.3" r="171.5" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.16"/><path d="M -20 224.3 Q 200 172.4 400 224.3 T 820 264.3" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 285.7 Q 200 198.5 400 285.7 T 820 325.7" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 158.1 Q 200 116.3 400 158.1 T 820 198.1" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/></g>
+  <rect width="800" height="500" fill="url(#g17h)"/>
+  <text x="400" y="268" text-anchor="middle" font-family="Vazirmatn, Tahoma, sans-serif" font-size="34" font-weight="700" fill="#ffffff" opacity="0.92">میکرونیدلینگ</text>
+  
+</svg>

@@ -1,0 +1,202 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ───────────────────────────────────────────────────────────
+   پالت رنگی «شهرزاد» — رزگلد، بادمجانی عمیق، کرم و شامپاینی
+   ─────────────────────────────────────────────────────────── */
+@theme {
+  --font-sans: "Vazirmatn Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-cream-50: #fdfaf8;
+  --color-cream-100: #faf4ef;
+  --color-cream-200: #f4e9e0;
+  --color-cream-300: #ebd9cb;
+
+  --color-rose-50: #fdf4f5;
+  --color-rose-100: #fbe8ea;
+  --color-rose-200: #f5cdd3;
+  --color-rose-300: #eaa9b4;
+  --color-rose-400: #d98a99;
+  --color-rose-500: #b76e79;
+  --color-rose-600: #9c5764;
+  --color-rose-700: #7d4450;
+
+  --color-plum-50: #f7f2f6;
+  --color-plum-100: #ecdfe9;
+  --color-plum-400: #6d4262;
+  --color-plum-500: #4a2545;
+  --color-plum-600: #3a1c36;
+  --color-plum-700: #2a1b23;
+  --color-plum-800: #1d1219;
+  --color-plum-900: #140c11;
+
+  --color-gold-300: #e2cc95;
+  --color-gold-400: #d4b877;
+  --color-gold-500: #c9a961;
+  --color-gold-600: #a88b48;
+
+  --radius-4xl: 2rem;
+  --radius-5xl: 2.75rem;
+
+  --shadow-soft: 0 2px 8px -2px rgb(74 37 69 / 0.08), 0 12px 32px -8px rgb(74 37 69 / 0.10);
+  --shadow-lift: 0 4px 12px -4px rgb(74 37 69 / 0.12), 0 24px 56px -16px rgb(74 37 69 / 0.18);
+  --shadow-glow: 0 0 0 1px rgb(183 110 121 / 0.15), 0 18px 48px -14px rgb(183 110 121 / 0.35);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-marquee: marquee 38s linear infinite;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(50%); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-18px) rotate(3deg); }
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* ───────────────────────────────────────────────────────────
+   توکن‌های معنایی (سطح/متن/حاشیه) با پشتیبانی حالت شب
+   ─────────────────────────────────────────────────────────── */
+:root {
+  --bg: var(--color-cream-50);
+  --bg-elevated: #ffffff;
+  --bg-sunken: var(--color-cream-100);
+  --fg: var(--color-plum-700);
+  --fg-muted: #7a6470;
+  --line: rgb(74 37 69 / 0.10);
+  --accent: var(--color-rose-500);
+  color-scheme: light;
+}
+
+.dark {
+  --bg: var(--color-plum-900);
+  --bg-elevated: #1d1219;
+  --bg-sunken: #100a0e;
+  --fg: #f5e9ee;
+  --fg-muted: #b39dab;
+  --line: rgb(245 233 238 / 0.12);
+  --accent: var(--color-rose-300);
+  color-scheme: dark;
+}
+
+@layer base {
+  * { border-color: var(--line); }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 6rem;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    font-feature-settings: "ss01", "ss02";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* اعداد فارسی در همه‌جا */
+  body { font-variant-numeric: normal; }
+
+  ::selection {
+    background-color: var(--color-rose-200);
+    color: var(--color-plum-700);
+  }
+
+  h1, h2, h3, h4 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg-sunken); }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-rose-200);
+    border-radius: 999px;
+    border: 2px solid var(--bg-sunken);
+  }
+  .dark ::-webkit-scrollbar-thumb { background: var(--color-plum-400); }
+
+  :focus-visible {
+    outline: 2px solid var(--color-rose-500);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  .container-page {
+    width: 100%;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+    max-width: 80rem;
+  }
+  @media (min-width: 1024px) { .container-page { padding-inline: 2rem; } }
+
+  .surface {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--line);
+  }
+
+  /* متن با گرادیان طلایی-رزگلد */
+  .text-gradient {
+    background-image: linear-gradient(100deg, var(--color-rose-500), var(--color-gold-500) 55%, var(--color-rose-400));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* قاب شیشه‌ای */
+  .glass {
+    background-color: color-mix(in oklab, var(--bg-elevated) 72%, transparent);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+  }
+
+  /* خط تزئینی زیر عنوان بخش‌ها */
+  .rule-ornament::after {
+    content: "";
+    display: block;
+    width: 4.5rem;
+    height: 2px;
+    margin: 1rem auto 0;
+    background: linear-gradient(90deg, transparent, var(--color-gold-500), transparent);
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--bg-sunken) 25%, var(--color-cream-200) 50%, var(--bg-sunken) 75%);
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+
+  /* دانه‌بندی ظریف روی هیرو */
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* پرینت تمیز برای فاکتور/نوبت */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+}

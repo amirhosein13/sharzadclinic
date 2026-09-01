@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs><linearGradient id="a3" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#fdf3ef"/><stop offset="100%" stop-color="#d98a99"/></linearGradient></defs>
+  <rect width="400" height="400" fill="url(#a3)"/>
+  <circle cx="200" cy="158" r="66" fill="#ffffff" opacity="0.85"/>
+  <path d="M 76 400 C 76 296 132 246 200 246 C 268 246 324 296 324 400 Z" fill="#ffffff" opacity="0.85"/>
+  <text x="200" y="176" text-anchor="middle" font-family="Vazirmatn, Tahoma, sans-serif" font-size="56" font-weight="700" fill="#d98a99">پ</text>
+</svg>

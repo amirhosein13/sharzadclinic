@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" role="img" aria-label="پی‌آر‌پی">
+  <defs>
+    <linearGradient id="g15" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fdf3ef"/>
+      <stop offset="55%" stop-color="#f0d3c6"/>
+      <stop offset="100%" stop-color="#d98a99"/>
+    </linearGradient>
+    <radialGradient id="g15h" cx="72%" cy="22%" r="62%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#g15)"/>
+  <g><circle cx="232.2" cy="213.6" r="100.4" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.18"/><circle cx="222.6" cy="311.2" r="180.9" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.15"/><circle cx="122.0" cy="204.4" r="94.4" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.16"/><circle cx="93.8" cy="334.7" r="74.9" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.15"/><circle cx="143.0" cy="421.0" r="183.7" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.25"/><circle cx="307.4" cy="79.3" r="112.1" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.10"/><circle cx="338.8" cy="118.2" r="153.0" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.12"/><path d="M -20 282.9 Q 200 214.6 400 282.9 T 820 322.9" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 295.1 Q 200 240.0 400 295.1 T 820 335.1" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 103.2 Q 200 53.9 400 103.2 T 820 143.2" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/></g>
+  <rect width="800" height="500" fill="url(#g15h)"/>
+  <text x="400" y="268" text-anchor="middle" font-family="Vazirmatn, Tahoma, sans-serif" font-size="34" font-weight="700" fill="#ffffff" opacity="0.92">پی‌آر‌پی</text>
+  
+</svg>

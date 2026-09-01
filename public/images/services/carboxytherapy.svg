@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" role="img" aria-label="کربوکسی‌تراپی">
+  <defs>
+    <linearGradient id="g16" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e9e6f0"/>
+      <stop offset="55%" stop-color="#c3bcd4"/>
+      <stop offset="100%" stop-color="#7b6f97"/>
+    </linearGradient>
+    <radialGradient id="g16h" cx="72%" cy="22%" r="62%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#g16)"/>
+  <g><circle cx="484.1" cy="114.8" r="152.9" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.17"/><circle cx="297.4" cy="67.5" r="180.7" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.19"/><circle cx="200.1" cy="414.7" r="108.2" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.10"/><circle cx="254.9" cy="218.7" r="126.9" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.25"/><circle cx="298.2" cy="218.0" r="167.3" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.13"/><circle cx="528.6" cy="181.0" r="137.8" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.24"/><circle cx="387.7" cy="250.6" r="161.7" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.24"/><path d="M -20 136.3 Q 200 47.7 400 136.3 T 820 176.3" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 375.3 Q 200 294.0 400 375.3 T 820 415.3" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 390.4 Q 200 337.5 400 390.4 T 820 430.4" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/></g>
+  <rect width="800" height="500" fill="url(#g16h)"/>
+  <text x="400" y="268" text-anchor="middle" font-family="Vazirmatn, Tahoma, sans-serif" font-size="34" font-weight="700" fill="#ffffff" opacity="0.92">کربوکسی‌تراپی</text>
+  
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" role="img" aria-label="پیلینگ شیمیایی">
+  <defs>
+    <linearGradient id="g18" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f6e2e6"/>
+      <stop offset="55%" stop-color="#e2b5bf"/>
+      <stop offset="100%" stop-color="#b76e79"/>
+    </linearGradient>
+    <radialGradient id="g18h" cx="72%" cy="22%" r="62%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#g18)"/>
+  <g><circle cx="334.8" cy="289.3" r="118.9" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.14"/><circle cx="594.4" cy="262.2" r="147.1" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.14"/><circle cx="170.4" cy="268.1" r="98.7" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.19"/><circle cx="209.1" cy="238.9" r="134.1" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.12"/><circle cx="682.4" cy="323.4" r="171.4" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.19"/><circle cx="151.0" cy="349.8" r="77.1" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.26"/><circle cx="207.1" cy="290.0" r="69.6" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.14"/><path d="M -20 354.6 Q 200 281.3 400 354.6 T 820 394.6" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 184.1 Q 200 117.9 400 184.1 T 820 224.1" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 403.1 Q 200 327.6 400 403.1 T 820 443.1" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/></g>
+  <rect width="800" height="500" fill="url(#g18h)"/>
+  <text x="400" y="268" text-anchor="middle" font-family="Vazirmatn, Tahoma, sans-serif" font-size="34" font-weight="700" fill="#ffffff" opacity="0.92">پیلینگ شیمیایی</text>
+  
+</svg>

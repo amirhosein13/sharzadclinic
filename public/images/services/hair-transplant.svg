@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" role="img" aria-label="کاشت مو">
+  <defs>
+    <linearGradient id="g13" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f7ece2"/>
+      <stop offset="55%" stop-color="#e6cdb4"/>
+      <stop offset="100%" stop-color="#c9a961"/>
+    </linearGradient>
+    <radialGradient id="g13h" cx="72%" cy="22%" r="62%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#g13)"/>
+  <g><circle cx="442.4" cy="196.8" r="50.6" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.11"/><circle cx="103.5" cy="62.6" r="53.7" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.16"/><circle cx="437.3" cy="390.8" r="138.3" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.24"/><circle cx="266.4" cy="123.2" r="124.1" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.17"/><circle cx="449.5" cy="293.9" r="58.4" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.22"/><circle cx="358.0" cy="309.2" r="90.9" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.12"/><circle cx="557.3" cy="213.3" r="53.4" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.16"/><path d="M -20 93.7 Q 200 7.4 400 93.7 T 820 133.7" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 178.4 Q 200 143.3 400 178.4 T 820 218.4" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 204.2 Q 200 157.7 400 204.2 T 820 244.2" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/></g>
+  <rect width="800" height="500" fill="url(#g13h)"/>
+  <text x="400" y="268" text-anchor="middle" font-family="Vazirmatn, Tahoma, sans-serif" font-size="34" font-weight="700" fill="#ffffff" opacity="0.92">کاشت مو</text>
+  
+</svg>

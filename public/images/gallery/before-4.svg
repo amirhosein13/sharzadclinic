@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" role="img" aria-label="قبل">
+  <defs>
+    <linearGradient id="g24" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#efe9e4"/>
+      <stop offset="55%" stop-color="#d8cbc2"/>
+      <stop offset="100%" stop-color="#a08e83"/>
+    </linearGradient>
+    <radialGradient id="g24h" cx="72%" cy="22%" r="62%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#g24)"/>
+  <g><circle cx="292.5" cy="426.3" r="84.1" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.12"/><circle cx="416.1" cy="104.4" r="80.6" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.18"/><circle cx="641.6" cy="357.6" r="136.6" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.16"/><circle cx="137.8" cy="226.5" r="140.7" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.16"/><circle cx="680.1" cy="407.7" r="116.5" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.16"/><circle cx="579.9" cy="206.2" r="184.8" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.21"/><circle cx="501.4" cy="112.3" r="68.3" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.24"/><path d="M -20 394.6 Q 200 353.6 400 394.6 T 820 434.6" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 145.4 Q 200 68.3 400 145.4 T 820 185.4" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 324.2 Q 200 283.0 400 324.2 T 820 364.2" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/></g>
+  <rect width="800" height="500" fill="url(#g24h)"/>
+  <text x="400" y="268" text-anchor="middle" font-family="Vazirmatn, Tahoma, sans-serif" font-size="34" font-weight="700" fill="#ffffff" opacity="0.92">قبل</text>
+  
+</svg>

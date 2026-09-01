@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" role="img" aria-label="تزریق لب">
+  <defs>
+    <linearGradient id="g19" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f7ece2"/>
+      <stop offset="55%" stop-color="#e6cdb4"/>
+      <stop offset="100%" stop-color="#c9a961"/>
+    </linearGradient>
+    <radialGradient id="g19h" cx="72%" cy="22%" r="62%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#g19)"/>
+  <g><circle cx="117.5" cy="184.2" r="107.9" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.24"/><circle cx="711.4" cy="182.6" r="138.0" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.20"/><circle cx="419.0" cy="372.5" r="57.1" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.19"/><circle cx="449.1" cy="211.2" r="126.5" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.12"/><circle cx="141.0" cy="251.2" r="147.1" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.25"/><circle cx="378.9" cy="134.2" r="51.3" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.13"/><circle cx="469.2" cy="169.1" r="64.7" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.26"/><path d="M -20 172.0 Q 200 139.7 400 172.0 T 820 212.0" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 400.4 Q 200 338.9 400 400.4 T 820 440.4" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/><path d="M -20 132.5 Q 200 58.3 400 132.5 T 820 172.5" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.16"/></g>
+  <rect width="800" height="500" fill="url(#g19h)"/>
+  <text x="400" y="268" text-anchor="middle" font-family="Vazirmatn, Tahoma, sans-serif" font-size="34" font-weight="700" fill="#ffffff" opacity="0.92">تزریق لب</text>
+  
+</svg>

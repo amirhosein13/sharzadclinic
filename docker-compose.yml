@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sharzad-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sharzad
+      POSTGRES_PASSWORD: sharzad
+      POSTGRES_DB: sharzad
+    ports:
+      - "5439:5432"
+    volumes:
+      - sharzad-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sharzad -d sharzad"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  sharzad-pgdata:
