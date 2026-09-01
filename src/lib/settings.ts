@@ -20,6 +20,8 @@ export const DEFAULT_SETTINGS = {
   bookingLeadHours: "3",
   bookingHorizonDays: "45",
   slotStepMinutes: "30",
+  /** درصد بیعانه‌ی آنلاین از قیمت پایه‌ی خدمت */
+  depositPercent: "30",
 } as const;
 
 export type SettingsMap = Record<string, string>;

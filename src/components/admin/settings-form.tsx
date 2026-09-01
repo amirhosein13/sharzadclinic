@@ -32,6 +32,7 @@ const FIELDS: {
   { key: "bookingLeadHours", label: "حداقل فاصله تا نوبت (ساعت)", hint: "مثلاً ۳ یعنی نوبت‌های ۳ ساعت آینده قابل رزرو نیستند", ltr: true },
   { key: "bookingHorizonDays", label: "افق رزرو (روز)", hint: "تا چند روز آینده بتوان نوبت گرفت", ltr: true },
   { key: "slotStepMinutes", label: "گام زمانی نوبت‌ها (دقیقه)", hint: "مثلاً ۳۰ یعنی نوبت‌ها هر نیم‌ساعت", ltr: true },
+  { key: "depositPercent", label: "درصد بیعانه‌ی آنلاین", hint: "چند درصد از قیمت خدمت هنگام رزرو آنلاین پرداخت شود", ltr: true },
 ];
 
 export function SettingsForm({ settings }: { settings: SettingsMap }) {

@@ -5,11 +5,14 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCustomerSession } from "@/lib/customer-auth";
+import { getSettings } from "@/lib/settings";
+import { isZarinpalConfigured } from "@/lib/zarinpal";
 import { customerLogout } from "@/app/actions/customer";
 import { PageHero } from "@/components/site/page-hero";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AppointmentActions } from "@/components/site/appointment-actions";
+import { DepositButton } from "@/components/site/deposit-button";
 import { ProfileForm } from "@/components/site/profile-form";
 import { STATUS_META } from "@/lib/appointment-status";
 import { formatJalaliLong, formatJalaliWithWeekday, formatTime } from "@/lib/date";
@@ -26,11 +29,19 @@ export default async function AccountPage() {
   const session = await getCustomerSession();
   if (!session) redirect("/login");
 
+  const settings = await getSettings();
+  const depositPercent = Number(settings.depositPercent) || 30;
+  const gatewayReady = isZarinpalConfigured();
+
   const customer = await prisma.customer.findUnique({
     where: { id: session.id },
     include: {
       appointments: {
-        include: { service: true, staff: { select: { name: true } } },
+        include: {
+          service: true,
+          staff: { select: { name: true } },
+          payments: { where: { status: "PAID" }, select: { amount: true } },
+        },
         orderBy: { startsAt: "desc" },
       },
       treatments: {
@@ -109,11 +120,25 @@ export default async function AccountPage() {
                         <p className="text-xs text-[color:var(--fg-muted)]">
                           کد پیگیری: <span className="font-bold tracking-wider">{appt.code}</span>
                         </p>
-                        <AppointmentActions
-                          id={appt.id}
-                          startsAt={appt.startsAt.toISOString()}
-                          serviceTitle={appt.service.title}
-                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          {gatewayReady &&
+                            appt.payments.length === 0 &&
+                            !!appt.service.priceFrom &&
+                            Math.round((appt.service.priceFrom * depositPercent) / 100) >= 1000 && (
+                              <DepositButton
+                                appointmentId={appt.id}
+                                amount={Math.round((appt.service.priceFrom * depositPercent) / 100)}
+                              />
+                            )}
+                          {appt.payments.length > 0 && (
+                            <Badge tone="green">بیعانه پرداخت شد</Badge>
+                          )}
+                          <AppointmentActions
+                            id={appt.id}
+                            startsAt={appt.startsAt.toISOString()}
+                            serviceTitle={appt.service.title}
+                          />
+                        </div>
                       </div>
                     </article>
                   ))}

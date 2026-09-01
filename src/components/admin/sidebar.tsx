@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  CalendarDays, FileText, Home, Image as ImageIcon, LayoutDashboard, LogOut,
+  CalendarDays, CreditCard, FileText, Home, Image as ImageIcon, LayoutDashboard, LogOut,
   Menu, MessageSquare, Quote, Send, Settings, Sparkles, Users, Wallet, X,
 } from "lucide-react";
 import { logout } from "@/app/actions/auth";
@@ -27,6 +27,7 @@ const NAV: {
   { href: "/admin/customers", label: "مشتریان", icon: Users, permission: "customers" },
   { href: "/admin/services", label: "خدمات", icon: Sparkles, permission: "content" },
   { href: "/admin/staff", label: "پرسنل", icon: Users, permission: "staff" },
+  { href: "/admin/payments", label: "پرداخت‌ها", icon: CreditCard, permission: "payroll" },
   { href: "/admin/payroll", label: "حقوق و دستمزد", icon: Wallet, permission: "payroll" },
   { href: "/admin/my/earnings", label: "درآمد من", icon: Wallet, permission: "payroll.own" },
   { href: "/admin/gallery", label: "گالری", icon: ImageIcon, permission: "content" },
