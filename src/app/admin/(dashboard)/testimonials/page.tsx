@@ -1,5 +1,6 @@
 import { Eye, EyeOff, Quote, Star, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
 import { NewTestimonialForm } from "@/components/admin/new-testimonial-form";
@@ -11,6 +12,7 @@ import { toFa } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminTestimonialsPage() {
+  await guardPage("content");
   const testimonials = await prisma.testimonial.findMany({
     orderBy: [{ isApproved: "asc" }, { createdAt: "desc" }],
   });

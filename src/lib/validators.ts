@@ -161,3 +161,15 @@ export const paymentSchema = z.object({
   reference: z.string().trim().max(120).optional(),
   note: z.string().trim().max(500).optional(),
 });
+
+export const userSchema = z.object({
+  name: z.string().trim().min(2, "نام را وارد کنید").max(80),
+  email: z.string().trim().toLowerCase().email("ایمیل معتبر نیست"),
+  role: z.enum(["ADMIN", "MANAGER", "RECEPTION", "OPERATOR"]),
+  staffId: z.string().trim().optional(),
+  password: z.union([z.literal(""), z.string().min(8, "رمز عبور حداقل ۸ کاراکتر باشد")]).optional(),
+  isActive: z.coerce.boolean().optional(),
+}).refine((v) => v.role !== "OPERATOR" || !!v.staffId, {
+  message: "برای نقش اپراتور باید یکی از پرسنل انتخاب شود",
+  path: ["staffId"],
+});

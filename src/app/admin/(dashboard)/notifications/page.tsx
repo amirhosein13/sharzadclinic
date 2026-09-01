@@ -1,5 +1,6 @@
 import { Mail, MessageSquare, Send, TriangleAlert } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { timeAgoFa } from "@/lib/date";
@@ -24,6 +25,7 @@ const STATUS_META: Record<string, { label: string; tone: "green" | "red" | "ambe
 };
 
 export default async function NotificationsPage() {
+  await guardPage("notifications");
   const [logs, counts] = await Promise.all([
     prisma.notificationLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
     prisma.notificationLog.groupBy({ by: ["status"], _count: true }),

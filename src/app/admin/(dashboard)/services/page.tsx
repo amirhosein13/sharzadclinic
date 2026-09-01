@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Eye, EyeOff, Sparkles, Star, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
 import { ServiceForm } from "@/components/admin/forms/service-form";
@@ -15,8 +15,8 @@ import { formatDuration, formatPriceRange, toFa } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminServicesPage() {
-  const user = await getSession();
-  const canEdit = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const user = await guardPage("content");
+  const canEdit = user.role === "ADMIN" || user.role === "MANAGER";
 
   const [categories, staff] = await Promise.all([
     prisma.serviceCategory.findMany({

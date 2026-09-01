@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { guardPage } from "@/lib/guard";
 import { getSettings } from "@/lib/settings";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { SettingsForm } from "@/components/admin/settings-form";
@@ -7,6 +8,7 @@ import { WorkingHoursForm } from "@/components/admin/working-hours-form";
 export const dynamic = "force-dynamic";
 
 export default async function AdminSettingsPage() {
+  await guardPage("settings");
   const [settings, workingHours] = await Promise.all([
     getSettings(),
     prisma.workingHour.findMany({ orderBy: { weekday: "asc" } }),

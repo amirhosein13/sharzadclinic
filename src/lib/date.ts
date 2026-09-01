@@ -141,6 +141,34 @@ export function fromJalali(jy: number, jm: number, jd: number): Date {
   return newDate(jy, jm - 1, jd);
 }
 
+/**
+ * بازه‌ی یک ماه شمسی. offset صفر یعنی ماه جاری، ۱- یعنی ماه قبل.
+ * برای دوره‌های حقوقی استفاده می‌شود.
+ */
+export function jalaliMonthRange(offsetMonths = 0): {
+  from: Date;
+  to: Date;
+  label: string;
+  key: string;
+} {
+  const anchor = addMonths(new Date(), offsetMonths);
+  const from = startOfMonth(anchor);
+  from.setHours(0, 0, 0, 0);
+
+  const to = endOfMonth(anchor);
+  to.setHours(23, 59, 59, 999);
+
+  const jMonth = getMonth(anchor);
+  const jYear = getYear(anchor);
+
+  return {
+    from,
+    to,
+    label: `${JALALI_MONTHS[jMonth]} ${toFa(jYear)}`,
+    key: `${jYear}-${String(jMonth + 1).padStart(2, "0")}`,
+  };
+}
+
 /** «۳ روز پیش» */
 export function timeAgoFa(date: Date): string {
   const diff = Date.now() - date.getTime();

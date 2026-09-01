@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { Eye, EyeOff, ImageOff, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guardPage } from "@/lib/guard";
 import { GalleryForm } from "@/components/admin/forms/gallery-form";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
@@ -12,8 +12,8 @@ import { toFa } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminGalleryPage() {
-  const user = await getSession();
-  const canEdit = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const user = await guardPage("content");
+  const canEdit = user.role === "ADMIN" || user.role === "MANAGER";
 
   const [items, services] = await Promise.all([
     prisma.galleryItem.findMany({ orderBy: { order: "asc" } }),

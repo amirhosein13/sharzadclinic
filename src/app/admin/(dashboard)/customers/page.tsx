@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Ban, CircleCheck, Search, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
 import { toggleCustomerBlock } from "@/app/actions/admin";
@@ -17,6 +18,7 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<{ q?: string; page?: string }>;
 }) {
+  await guardPage("customers");
   const { q, page: pageParam } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
 

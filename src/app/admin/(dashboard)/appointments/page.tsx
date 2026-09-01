@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { CalendarDays, Search, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { StatusSelect } from "@/components/admin/status-select";
 import { ActionButton } from "@/components/admin/action-button";
+import { PaymentForm } from "@/components/admin/forms/payment-form";
 import { deleteAppointment } from "@/app/actions/admin";
 import { STATUS_META, STATUS_ORDER } from "@/lib/appointment-status";
 import { formatJalaliWithWeekday, formatTime } from "@/lib/date";
@@ -19,6 +21,7 @@ export default async function AppointmentsPage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; page?: string; when?: string }>;
 }) {
+  await guardPage("appointments.all");
   const { status, q, page: pageParam, when } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
 
@@ -49,7 +52,12 @@ export default async function AppointmentsPage({
   const [appointments, total, counts] = await Promise.all([
     prisma.appointment.findMany({
       where,
-      include: { customer: true, service: true, staff: true },
+      include: {
+        customer: true,
+        service: true,
+        staff: true,
+        payments: { where: { status: "PAID" }, select: { amount: true } },
+      },
       orderBy: { startsAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -166,6 +174,14 @@ export default async function AppointmentsPage({
                       <StatusSelect id={appt.id} value={appt.status} />
                     </td>
                     <td className="px-5 py-4">
+                      <div className="flex gap-2">
+                        <PaymentForm
+                          appointmentId={appt.id}
+                          code={appt.code}
+                          serviceTitle={appt.service.title}
+                          suggestedAmount={appt.service.priceFrom}
+                          paidTotal={appt.payments.reduce((sum, p) => sum + p.amount, 0)}
+                        />
                       <ActionButton
                         action={deleteAppointment.bind(null, appt.id)}
                         confirm={`نوبت ${appt.code} حذف شود؟ این کار برگشت‌پذیر نیست.`}
@@ -174,6 +190,7 @@ export default async function AppointmentsPage({
                       >
                         <Trash2 className="size-3.5" />
                       </ActionButton>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, CalendarDays, FileText, Phone, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { CustomerNotes } from "@/components/admin/customer-notes";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ export default async function CustomerDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await guardPage("customers");
   const { id } = await params;
 
   const customer = await prisma.customer.findUnique({

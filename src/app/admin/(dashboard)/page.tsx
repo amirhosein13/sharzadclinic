@@ -3,7 +3,7 @@ import {
   ArrowLeft, CalendarDays, CircleCheck, Clock, MessageSquare, TrendingUp, Users, Wallet,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { AppointmentsChart } from "@/components/admin/revenue-chart";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ import { formatToman, toFa } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const user = await getSession();
+  const user = await guardPage("dashboard");
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);

@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Eye, EyeOff, FileText, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guardPage } from "@/lib/guard";
 import { PostForm } from "@/components/admin/forms/post-form";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
@@ -14,8 +14,8 @@ import { toFa } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminBlogPage() {
-  const user = await getSession();
-  const canEdit = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const user = await guardPage("content");
+  const canEdit = user.role === "ADMIN" || user.role === "MANAGER";
 
   const [posts, categories] = await Promise.all([
     prisma.post.findMany({ include: { category: true }, orderBy: { createdAt: "desc" } }),

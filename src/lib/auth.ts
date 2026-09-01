@@ -4,6 +4,7 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import type { Role } from "@prisma/client";
+import { can, type Permission } from "./permissions";
 
 const COOKIE_NAME = "sharzad_session";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // ۷ روز
@@ -13,6 +14,8 @@ export type SessionUser = {
   email: string;
   name: string;
   role: Role;
+  /** برای نقش اپراتور: شناسه‌ی پرسنلی که این حساب به آن متصل است */
+  staffId?: string | null;
 };
 
 function secretKey(): Uint8Array {
@@ -67,6 +70,7 @@ export async function getSession(): Promise<SessionUser | null> {
       email: String(payload.email),
       name: String(payload.name),
       role: payload.role as Role,
+      staffId: payload.staffId ? String(payload.staffId) : null,
     };
   } catch {
     return null;
@@ -86,13 +90,26 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
   return user;
 }
 
+/** بررسی دسترسی بر اساس مجوز، نه نقشِ خام — خواناتر و کم‌خطاتر است */
+export async function requirePermission(permission: Permission): Promise<SessionUser> {
+  const user = await requireUser();
+  if (!can(user.role, permission)) throw new Error("FORBIDDEN");
+  return user;
+}
+
 export async function authenticate(email: string, password: string): Promise<SessionUser | null> {
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
   if (!user || !user.isActive) return null;
   if (!(await verifyPassword(password, user.passwordHash))) return null;
 
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-  return { id: user.id, email: user.email, name: user.name, role: user.role };
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    staffId: user.staffId,
+  };
 }
 
 /** ثبت رویداد در گزارش تغییرات */

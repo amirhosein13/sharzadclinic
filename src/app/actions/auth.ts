@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { authenticate, createSession, destroySession, logAction } from "@/lib/auth";
 import { fieldErrors, loginSchema } from "@/lib/validators";
+import { homeFor } from "@/lib/guard";
 
 export type LoginState = { message?: string; errors?: Record<string, string> };
 
@@ -19,8 +20,10 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   await createSession(user);
   await logAction({ userId: user.id, action: "login", entity: "User", entityId: user.id });
 
-  const next = String(formData.get("next") || "/admin");
-  redirect(next.startsWith("/admin") ? next : "/admin");
+  // هر نقش به صفحه‌ی خانه‌ی خودش می‌رود
+  const home = homeFor(user);
+  const next = String(formData.get("next") || home);
+  redirect(next.startsWith("/admin") ? next : home);
 }
 
 export async function logout() {

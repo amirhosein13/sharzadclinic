@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { logAction, requireUser } from "@/lib/auth";
+import { logAction, requireRole, requireUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { setSettings } from "@/lib/settings";
 import { testimonialSchema } from "@/lib/validators";
 import { notifyBookingCancelled, notifyBookingConfirmed } from "@/lib/notifications";
@@ -33,6 +34,17 @@ export async function updateAppointmentStatus(
 ): Promise<ActionResult> {
   return guarded(async () => {
     const user = await requireUser();
+
+    // اپراتور فقط نوبت‌های خودش را می‌تواند تغییر دهد
+    if (!can(user.role, "appointments.write")) {
+      if (!can(user.role, "appointments.own")) return FAIL("دسترسی لازم برای این کار را ندارید.");
+      const owns = await prisma.appointment.findFirst({
+        where: { id, staffId: user.staffId ?? "__none__" },
+        select: { id: true },
+      });
+      if (!owns) return FAIL("این نوبت به شما اختصاص داده نشده است.");
+    }
+
     const appointment = await prisma.appointment.update({
       where: { id },
       data: { status },
@@ -71,7 +83,7 @@ export async function updateAppointmentStatus(
 
 export async function updateAppointmentNote(id: string, adminNote: string): Promise<ActionResult> {
   return guarded(async () => {
-    const user = await requireUser();
+    const user = await requireRole("ADMIN", "MANAGER", "RECEPTION");
     await prisma.appointment.update({ where: { id }, data: { adminNote: adminNote || null } });
     await logAction({ userId: user.id, action: "appointment.note", entity: "Appointment", entityId: id });
     revalidatePath("/admin/appointments");
@@ -81,7 +93,7 @@ export async function updateAppointmentNote(id: string, adminNote: string): Prom
 
 export async function deleteAppointment(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    const user = await requireUser();
+    const user = await requireRole("ADMIN", "MANAGER");
     await prisma.appointment.delete({ where: { id } });
     await logAction({ userId: user.id, action: "appointment.delete", entity: "Appointment", entityId: id });
     revalidatePath("/admin/appointments");
@@ -93,7 +105,7 @@ export async function deleteAppointment(id: string): Promise<ActionResult> {
 
 export async function updateCustomerNotes(id: string, notes: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER", "RECEPTION");
     await prisma.customer.update({ where: { id }, data: { notes: notes || null } });
     revalidatePath(`/admin/customers/${id}`);
     return OK("یادداشت مشتری ذخیره شد.");
@@ -102,7 +114,7 @@ export async function updateCustomerNotes(id: string, notes: string): Promise<Ac
 
 export async function toggleCustomerBlock(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    const user = await requireUser();
+    const user = await requireRole("ADMIN", "MANAGER", "RECEPTION");
     const customer = await prisma.customer.findUniqueOrThrow({ where: { id } });
     await prisma.customer.update({ where: { id }, data: { isBlocked: !customer.isBlocked } });
     await logAction({ userId: user.id, action: "customer.block", entity: "Customer", entityId: id });
@@ -115,7 +127,7 @@ export async function toggleCustomerBlock(id: string): Promise<ActionResult> {
 
 export async function toggleTestimonial(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     const item = await prisma.testimonial.findUniqueOrThrow({ where: { id } });
     await prisma.testimonial.update({ where: { id }, data: { isApproved: !item.isApproved } });
     revalidatePath("/admin/testimonials");
@@ -126,7 +138,7 @@ export async function toggleTestimonial(id: string): Promise<ActionResult> {
 
 export async function deleteTestimonial(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     await prisma.testimonial.delete({ where: { id } });
     revalidatePath("/admin/testimonials");
     revalidatePath("/");
@@ -136,7 +148,7 @@ export async function deleteTestimonial(id: string): Promise<ActionResult> {
 
 export async function createTestimonial(formData: FormData): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     const parsed = testimonialSchema.safeParse({
       authorName: formData.get("authorName"),
       serviceName: formData.get("serviceName") ?? "",
@@ -158,7 +170,7 @@ export async function createTestimonial(formData: FormData): Promise<ActionResul
 
 export async function toggleMessageRead(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER", "RECEPTION");
     const message = await prisma.contactMessage.findUniqueOrThrow({ where: { id } });
     await prisma.contactMessage.update({ where: { id }, data: { isRead: !message.isRead } });
     revalidatePath("/admin/messages");
@@ -168,7 +180,7 @@ export async function toggleMessageRead(id: string): Promise<ActionResult> {
 
 export async function deleteMessage(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     await prisma.contactMessage.delete({ where: { id } });
     revalidatePath("/admin/messages");
     return OK("پیام حذف شد.");
@@ -179,7 +191,7 @@ export async function deleteMessage(id: string): Promise<ActionResult> {
 
 export async function toggleServiceActive(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     const service = await prisma.service.findUniqueOrThrow({ where: { id } });
     await prisma.service.update({ where: { id }, data: { isActive: !service.isActive } });
     revalidatePath("/admin/services");
@@ -190,7 +202,7 @@ export async function toggleServiceActive(id: string): Promise<ActionResult> {
 
 export async function toggleServiceFeatured(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     const service = await prisma.service.findUniqueOrThrow({ where: { id } });
     await prisma.service.update({ where: { id }, data: { isFeatured: !service.isFeatured } });
     revalidatePath("/admin/services");
@@ -204,7 +216,7 @@ export async function updateServicePricing(
   data: { priceFrom: number | null; priceTo: number | null; durationMinutes: number }
 ): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     if (data.durationMinutes < 5 || data.durationMinutes > 600) {
       return FAIL("مدت جلسه باید بین ۵ تا ۶۰۰ دقیقه باشد.");
     }
@@ -220,7 +232,7 @@ export async function updateServicePricing(
 
 export async function toggleStaffActive(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     const member = await prisma.staff.findUniqueOrThrow({ where: { id } });
     await prisma.staff.update({ where: { id }, data: { isActive: !member.isActive } });
     revalidatePath("/admin/staff");
@@ -231,7 +243,7 @@ export async function toggleStaffActive(id: string): Promise<ActionResult> {
 
 export async function toggleGalleryPublished(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     const item = await prisma.galleryItem.findUniqueOrThrow({ where: { id } });
     await prisma.galleryItem.update({ where: { id }, data: { isPublished: !item.isPublished } });
     revalidatePath("/admin/gallery");
@@ -242,7 +254,7 @@ export async function toggleGalleryPublished(id: string): Promise<ActionResult> 
 
 export async function deleteGalleryItem(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     await prisma.galleryItem.delete({ where: { id } });
     revalidatePath("/admin/gallery");
     revalidatePath("/gallery");
@@ -252,7 +264,7 @@ export async function deleteGalleryItem(id: string): Promise<ActionResult> {
 
 export async function togglePostPublished(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     const post = await prisma.post.findUniqueOrThrow({ where: { id } });
     await prisma.post.update({
       where: { id },
@@ -269,7 +281,7 @@ export async function togglePostPublished(id: string): Promise<ActionResult> {
 
 export async function deletePost(id: string): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     await prisma.post.delete({ where: { id } });
     revalidatePath("/admin/blog");
     revalidatePath("/blog");
@@ -281,7 +293,7 @@ export async function deletePost(id: string): Promise<ActionResult> {
 
 export async function saveSettings(formData: FormData): Promise<ActionResult> {
   return guarded(async () => {
-    const user = await requireUser();
+    const user = await requireRole("ADMIN", "MANAGER");
     const values: Record<string, string> = {};
     for (const [key, value] of formData.entries()) {
       if (typeof value === "string") values[key] = value.trim();
@@ -295,7 +307,7 @@ export async function saveSettings(formData: FormData): Promise<ActionResult> {
 
 export async function saveWorkingHours(formData: FormData): Promise<ActionResult> {
   return guarded(async () => {
-    await requireUser();
+    await requireRole("ADMIN", "MANAGER");
     for (let weekday = 0; weekday <= 6; weekday++) {
       const isOpen = formData.get(`open-${weekday}`) === "on";
       const startTime = String(formData.get(`start-${weekday}`) || "09:00");

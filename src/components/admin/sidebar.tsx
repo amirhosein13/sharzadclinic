@@ -5,25 +5,38 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CalendarDays, FileText, Home, Image as ImageIcon, LayoutDashboard, LogOut,
-  Menu, MessageSquare, Quote, Send, Settings, Sparkles, Users, X,
+  Menu, MessageSquare, Quote, Send, Settings, Sparkles, Users, Wallet, X,
 } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
 import { cn, toFa } from "@/lib/utils";
+import type { Role } from "@prisma/client";
 
-const NAV = [
-  { href: "/admin", label: "داشبورد", icon: LayoutDashboard, exact: true },
-  { href: "/admin/appointments", label: "نوبت‌ها", icon: CalendarDays, badgeKey: "pendingAppointments" },
-  { href: "/admin/customers", label: "مشتریان", icon: Users },
-  { href: "/admin/services", label: "خدمات", icon: Sparkles },
-  { href: "/admin/staff", label: "پرسنل", icon: Users },
-  { href: "/admin/gallery", label: "گالری", icon: ImageIcon },
-  { href: "/admin/blog", label: "مجله", icon: FileText },
-  { href: "/admin/testimonials", label: "نظرات", icon: Quote, badgeKey: "pendingTestimonials" },
-  { href: "/admin/messages", label: "پیام‌ها", icon: MessageSquare, badgeKey: "unreadMessages" },
-  { href: "/admin/notifications", label: "پیامک و ایمیل", icon: Send },
-  { href: "/admin/settings", label: "تنظیمات", icon: Settings },
-] as const;
+const NAV: {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  permission: Permission;
+  exact?: boolean;
+  badgeKey?: keyof SidebarBadges;
+}[] = [
+  { href: "/admin", label: "داشبورد", icon: LayoutDashboard, permission: "dashboard", exact: true },
+  { href: "/admin/appointments", label: "نوبت‌ها", icon: CalendarDays, permission: "appointments.all", badgeKey: "pendingAppointments" },
+  { href: "/admin/my", label: "نوبت‌های من", icon: CalendarDays, permission: "appointments.own", exact: true },
+  { href: "/admin/customers", label: "مشتریان", icon: Users, permission: "customers" },
+  { href: "/admin/services", label: "خدمات", icon: Sparkles, permission: "content" },
+  { href: "/admin/staff", label: "پرسنل", icon: Users, permission: "staff" },
+  { href: "/admin/payroll", label: "حقوق و دستمزد", icon: Wallet, permission: "payroll" },
+  { href: "/admin/my/earnings", label: "درآمد من", icon: Wallet, permission: "payroll.own" },
+  { href: "/admin/gallery", label: "گالری", icon: ImageIcon, permission: "content" },
+  { href: "/admin/blog", label: "مجله", icon: FileText, permission: "content" },
+  { href: "/admin/testimonials", label: "نظرات", icon: Quote, permission: "content", badgeKey: "pendingTestimonials" },
+  { href: "/admin/messages", label: "پیام‌ها", icon: MessageSquare, permission: "messages", badgeKey: "unreadMessages" },
+  { href: "/admin/users", label: "کاربران", icon: Users, permission: "users" },
+  { href: "/admin/notifications", label: "پیامک و ایمیل", icon: Send, permission: "notifications" },
+  { href: "/admin/settings", label: "تنظیمات", icon: Settings, permission: "settings" },
+];
 
 export type SidebarBadges = {
   pendingAppointments?: number;
@@ -35,9 +48,10 @@ export function Sidebar({
   user,
   badges,
 }: {
-  user: { name: string; email: string; role: string };
+  user: { name: string; email: string; role: Role };
   badges: SidebarBadges;
 }) {
+  const visibleNav = NAV.filter((item) => can(user.role, item.permission));
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -57,8 +71,8 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-4" aria-label="منوی مدیریت">
-        {NAV.map((item) => {
-          const count = "badgeKey" in item ? badges[item.badgeKey as keyof SidebarBadges] : 0;
+        {visibleNav.map((item) => {
+          const count = item.badgeKey ? badges[item.badgeKey] : 0;
           return (
             <Link
               key={item.href}
@@ -66,7 +80,7 @@ export function Sidebar({
               onClick={() => setOpen(false)}
               className={cn(
                 "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
-                isActive(item.href, "exact" in item ? item.exact : false)
+                isActive(item.href, item.exact)
                   ? "bg-rose-500 text-white shadow-[0_6px_18px_-8px_rgba(183,110,121,0.9)]"
                   : "text-[color:var(--fg-muted)] hover:bg-[color:var(--bg-sunken)] hover:text-[color:var(--fg)]"
               )}
@@ -77,7 +91,7 @@ export function Sidebar({
                 <span
                   className={cn(
                     "grid min-w-6 place-items-center rounded-full px-1.5 py-0.5 text-[11px] font-bold",
-                    isActive(item.href, "exact" in item ? item.exact : false)
+                    isActive(item.href, item.exact)
                       ? "bg-white/25 text-white"
                       : "bg-rose-500 text-white"
                   )}
@@ -97,7 +111,7 @@ export function Sidebar({
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{user.name}</p>
-            <p className="truncate text-[11px] text-[color:var(--fg-muted)]">{ROLE_LABELS[user.role] ?? user.role}</p>
+            <p className="truncate text-[11px] text-[color:var(--fg-muted)]">{ROLE_LABELS[user.role]}</p>
           </div>
           <ThemeToggle className="size-9" />
         </div>
@@ -164,9 +178,3 @@ export function Sidebar({
     </>
   );
 }
-
-const ROLE_LABELS: Record<string, string> = {
-  ADMIN: "مدیر کل",
-  MANAGER: "مدیر",
-  RECEPTION: "پذیرش",
-};

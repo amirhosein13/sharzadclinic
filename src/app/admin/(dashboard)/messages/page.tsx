@@ -1,5 +1,6 @@
 import { MailOpen, MessageSquare, Phone, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
 import { deleteMessage, toggleMessageRead } from "@/app/actions/admin";
@@ -10,6 +11,7 @@ import { toFa } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminMessagesPage() {
+  await guardPage("messages");
   const messages = await prisma.contactMessage.findMany({
     orderBy: [{ isRead: "asc" }, { createdAt: "desc" }],
   });

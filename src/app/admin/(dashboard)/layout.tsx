@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/admin/sidebar";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = {
   title: { default: "پنل مدیریت", template: "%s | پنل مدیریت" },
@@ -13,10 +14,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const user = await getSession();
   if (!user) redirect("/admin/login");
 
+  // شمارنده‌های سایدبار فقط برای نقش‌هایی که آن بخش‌ها را می‌بینند
   const [pendingAppointments, pendingTestimonials, unreadMessages] = await Promise.all([
-    prisma.appointment.count({ where: { status: "PENDING" } }),
-    prisma.testimonial.count({ where: { isApproved: false } }),
-    prisma.contactMessage.count({ where: { isRead: false } }),
+    can(user.role, "appointments.all") ? prisma.appointment.count({ where: { status: "PENDING" } }) : 0,
+    can(user.role, "content") ? prisma.testimonial.count({ where: { isApproved: false } }) : 0,
+    can(user.role, "messages") ? prisma.contactMessage.count({ where: { isRead: false } }) : 0,
   ]);
 
   return (

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { Eye, EyeOff, Trash2, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
 import { StaffForm } from "@/components/admin/forms/staff-form";
@@ -15,8 +15,8 @@ import { formatToman, toFa } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminStaffPage() {
-  const user = await getSession();
-  const canEdit = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const user = await guardPage("staff");
+  const canEdit = user.role === "ADMIN" || user.role === "MANAGER";
 
   const [staff, services] = await Promise.all([
     prisma.staff.findMany({
