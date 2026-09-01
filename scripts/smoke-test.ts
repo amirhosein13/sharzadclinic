@@ -4,8 +4,9 @@
  * دیتای تستی ساخته و در پایان پاک می‌شود.
  */
 import { PrismaClient } from "@prisma/client";
-import { getAvailableSlots } from "../src/lib/availability";
+import { getAvailableSlots, releaseExpiredHolds } from "../src/lib/availability";
 import { createBooking, trackAppointment } from "../src/app/actions/booking";
+import { atTime, parseYmdKey } from "../src/lib/date";
 
 const prisma = new PrismaClient();
 
@@ -37,6 +38,10 @@ async function main() {
   check("ثبت نوبت جدید", res.ok);
   if (!res.ok) {
     console.error(res);
+    process.exit(1);
+  }
+  if (!("code" in res)) {
+    console.error("انتظار می‌رفت نوبت مستقیم ثبت شود، نه هدایت به درگاه.", res);
     process.exit(1);
   }
   console.log(`   کد پیگیری: ${res.code} — ${res.summary}`);
@@ -88,6 +93,41 @@ async function main() {
   );
   await prisma.service.update({ where: { id: service.id }, data: { slotStepMinutes: null } });
 
+  // ─── قفل نوبت هنگام پرداخت ───
+  const holdSlot = (await getAvailableSlots({ serviceId: service.id, dateKey }))[2];
+  const holdStart = atTime(parseYmdKey(dateKey), holdSlot.time);
+  const held = await prisma.appointment.create({
+    data: {
+      code: "SMOKE-HOLD",
+      customerId: (await prisma.customer.findFirstOrThrow({ where: { phone: "09129998877" } })).id,
+      serviceId: service.id,
+      staffId: holdSlot.staffId,
+      startsAt: holdStart,
+      endsAt: new Date(holdStart.getTime() + service.durationMinutes * 60_000),
+      status: "PENDING",
+      source: "smoke",
+      holdExpiresAt: new Date(Date.now() + 15 * 60_000),
+    },
+  });
+  const whileHeld = await getAvailableSlots({ serviceId: service.id, dateKey });
+  check(
+    "نوبتِ قفل‌شده برای پرداخت، برای دیگران بسته است",
+    !whileHeld.some((s) => s.time === holdSlot.time)
+  );
+
+  await prisma.appointment.update({
+    where: { id: held.id },
+    data: { holdExpiresAt: new Date(Date.now() - 60_000) },
+  });
+  const afterExpiry = await getAvailableSlots({ serviceId: service.id, dateKey });
+  check(
+    "قفل منقضی‌شده اسلات را آزاد می‌کند",
+    afterExpiry.some((s) => s.time === holdSlot.time)
+  );
+  const released = await prisma.appointment.findUnique({ where: { id: held.id } });
+  check("نوبت رهاشده خودکار لغو می‌شود", released?.status === "CANCELLED");
+
+  await prisma.appointment.deleteMany({ where: { source: "smoke" } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });
   await prisma.customer.deleteMany({ where: { phone: "09129998877" } });
   await prisma.$disconnect();

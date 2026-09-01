@@ -127,6 +127,9 @@ model Service {
   bufferMinutes    Int      @default(10) // فاصله‌ی اجباری تا نوبت بعدی
   /// گام نمایش ساعت‌های شروع. خالی یعنی از تنظیمات عمومی استفاده شود.
   slotStepMinutes  Int?
+  /// مبلغ ثابت رزرو (بیعانه) به تومان. اگر تعیین شود، رزرو آنلاین فقط
+  /// پس از پرداخت این مبلغ قطعی می‌شود.
+  depositAmount    Int?
   sessionsNeeded   String? // مثلا «۴ تا ۶ جلسه»
   preparation      String? // آمادگی قبل از انجام
   aftercare        String? // مراقبت‌های بعد از انجام
@@ -275,6 +278,9 @@ model Appointment {
   source         String            @default("website")
   /// زمان ارسال پیامک یادآوری — برای جلوگیری از ارسال تکراری
   reminderSentAt DateTime?
+  /// تا این لحظه نوبت برای پرداخت رزرو شده و کس دیگری نمی‌تواند آن را بگیرد.
+  /// پس از پرداخت موفق خالی می‌شود؛ اگر منقضی شود نوبت آزاد می‌گردد.
+  holdExpiresAt  DateTime?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 

@@ -10,7 +10,7 @@ import { CategoryForm } from "@/components/admin/forms/category-form";
 import { toggleServiceActive, toggleServiceFeatured } from "@/app/actions/admin";
 import { deleteCategory, deleteService } from "@/app/actions/content";
 import { Badge } from "@/components/ui/badge";
-import { formatDuration, formatPriceRange, toFa } from "@/lib/utils";
+import { formatDuration, formatPriceRange, formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -119,6 +119,11 @@ export default async function AdminServicesPage() {
                           {formatPriceRange(service.priceFrom, service.priceTo)} •{" "}
                           {formatDuration(service.durationMinutes)} • بافر {toFa(service.bufferMinutes)} دقیقه
                           {service.slotStepMinutes && ` • گام ${toFa(service.slotStepMinutes)} دقیقه`}
+                          {service.depositAmount !== null && service.depositAmount > 0 && (
+                            <span className="mr-1 text-gold-600 dark:text-gold-300">
+                              • بیعانه {formatToman(service.depositAmount)}
+                            </span>
+                          )}
                         </p>
                         <p className="mt-1 text-xs text-[color:var(--fg-muted)]">
                           {toFa(service.staff.length)} پرسنل مجاز
@@ -141,6 +146,7 @@ export default async function AdminServicesPage() {
                                 durationMinutes: service.durationMinutes,
                                 bufferMinutes: service.bufferMinutes,
                                 slotStepMinutes: service.slotStepMinutes,
+                                depositAmount: service.depositAmount,
                                 sessionsNeeded: service.sessionsNeeded,
                                 preparation: service.preparation,
                                 aftercare: service.aftercare,

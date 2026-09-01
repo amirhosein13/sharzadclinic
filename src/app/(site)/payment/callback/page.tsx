@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CircleCheck, Copy, TriangleAlert } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { verifyPayment } from "@/lib/zarinpal";
+import { notifyBookingConfirmed } from "@/lib/notifications";
 import { ButtonLink } from "@/components/ui/button";
 import { formatJalaliDateTime } from "@/lib/date";
 import { formatToman, toFa } from "@/lib/utils";
@@ -44,6 +45,7 @@ export default async function PaymentCallbackPage({
   // کاربر در درگاه انصراف داده است
   if (status !== "OK") {
     await prisma.payment.update({ where: { id: payment.id }, data: { status: "FAILED" } });
+    await releaseHeldAppointment(payment.appointmentId);
     return (
       <Result
         ok={false}
@@ -57,6 +59,7 @@ export default async function PaymentCallbackPage({
 
   if (!verified.ok) {
     await prisma.payment.update({ where: { id: payment.id }, data: { status: "FAILED" } });
+    await releaseHeldAppointment(payment.appointmentId);
     return <Result ok={false} title="تأیید پرداخت ناموفق بود" description={verified.message} />;
   }
 
@@ -65,12 +68,25 @@ export default async function PaymentCallbackPage({
     data: { status: "PAID", paidAt: new Date(), refId: verified.refId, reference: verified.refId },
   });
 
-  // پرداخت بیعانه یعنی نوبت قطعی است
+  // پرداخت بیعانه یعنی نوبت قطعی است — قفل هم برداشته می‌شود
   if (payment.appointmentId) {
     await prisma.appointment.updateMany({
       where: { id: payment.appointmentId, status: "PENDING" },
-      data: { status: "CONFIRMED" },
+      data: { status: "CONFIRMED", holdExpiresAt: null },
     });
+
+    const appt = await prisma.appointment.findUnique({
+      where: { id: payment.appointmentId },
+      include: { customer: true, service: true },
+    });
+    if (appt) {
+      await notifyBookingConfirmed({
+        phone: appt.customer.phone,
+        customerName: `${appt.customer.firstName} ${appt.customer.lastName}`,
+        serviceTitle: appt.service.title,
+        startsAt: appt.startsAt,
+      }).catch(() => undefined);
+    }
   }
 
   return (
@@ -83,6 +99,17 @@ export default async function PaymentCallbackPage({
       startsAt={payment.appointment?.startsAt}
     />
   );
+}
+
+/** نوبتی که فقط برای پرداخت رزرو شده بود و پرداخت نشد، آزاد می‌شود */
+async function releaseHeldAppointment(appointmentId: string | null) {
+  if (!appointmentId) return;
+  await prisma.appointment
+    .updateMany({
+      where: { id: appointmentId, status: "PENDING", holdExpiresAt: { not: null } },
+      data: { status: "CANCELLED", holdExpiresAt: null, adminNote: "بیعانه پرداخت نشد" },
+    })
+    .catch(() => undefined);
 }
 
 function Result({

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
+import { getCustomerSession } from "@/lib/customer-auth";
+import { getSettings } from "@/lib/settings";
+import { isZarinpalConfigured } from "@/lib/zarinpal";
 import { PageHero } from "@/components/site/page-hero";
 import { BookingWizard } from "@/components/booking/booking-wizard";
 import { CalendarCheck, PhoneCall, ShieldCheck } from "lucide-react";
@@ -24,6 +27,17 @@ export default async function BookingPage({
   searchParams: Promise<{ service?: string }>;
 }) {
   const { service } = await searchParams;
+
+  const [session, settings] = await Promise.all([getCustomerSession(), getSettings()]);
+  const gatewayReady = isZarinpalConfigured();
+  const globalPercent = Number(settings.depositPercent) || 0;
+
+  const customer = session
+    ? await prisma.customer.findUnique({
+        where: { id: session.id },
+        select: { firstName: true, lastName: true, phone: true },
+      })
+    : null;
 
   const [services, staff] = await Promise.all([
     prisma.service.findMany({
@@ -50,6 +64,7 @@ export default async function BookingPage({
       <div className="container-page py-14">
         <BookingWizard
           initialServiceSlug={service}
+          customer={customer}
           services={services.map((s) => ({
             id: s.id,
             slug: s.slug,
@@ -59,6 +74,8 @@ export default async function BookingPage({
             priceTo: s.priceTo,
             durationMinutes: s.durationMinutes,
             categoryTitle: s.category.title,
+            // بیعانه فقط وقتی معنی دارد که درگاه پرداخت تنظیم شده باشد
+            depositAmount: gatewayReady ? depositOf(s, globalPercent) : 0,
           }))}
           staff={staff.map((m) => ({
             id: m.id,
@@ -84,4 +101,14 @@ export default async function BookingPage({
       </div>
     </>
   );
+}
+
+/** مبلغ بیعانه‌ی هر خدمت: مقدار اختصاصی، وگرنه درصد عمومی از قیمت پایه */
+function depositOf(
+  service: { depositAmount: number | null; priceFrom: number | null },
+  globalPercent: number
+): number {
+  if (service.depositAmount !== null) return Math.max(0, service.depositAmount);
+  if (!globalPercent || !service.priceFrom) return 0;
+  return Math.round((service.priceFrom * globalPercent) / 100);
 }

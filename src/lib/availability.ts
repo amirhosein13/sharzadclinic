@@ -4,6 +4,22 @@ import { getSettings } from "./settings";
 import { atTime, jalaliWeekday, minutesFromHHMM, hhmmFromMinutes, parseYmdKey } from "./date";
 import { toFa } from "./utils";
 
+/**
+ * نوبت‌هایی که برای پرداخت رزرو شده بودند ولی مهلتشان تمام شده را آزاد می‌کند.
+ * پیش از هر محاسبه‌ی ظرفیت صدا زده می‌شود تا اسلات‌های رهاشده برنگردند.
+ */
+export async function releaseExpiredHolds(): Promise<number> {
+  const result = await prisma.appointment.updateMany({
+    where: {
+      status: "PENDING",
+      holdExpiresAt: { not: null, lt: new Date() },
+      payments: { none: { status: "PAID" } },
+    },
+    data: { status: "CANCELLED", holdExpiresAt: null, adminNote: "مهلت پرداخت بیعانه تمام شد" },
+  });
+  return result.count;
+}
+
 export type Slot = {
   /** «09:30» */
   time: string;
@@ -46,6 +62,8 @@ export async function getAvailableSlots(params: {
   const maxDay = new Date(todayMidnight);
   maxDay.setDate(maxDay.getDate() + horizonDays);
   if (day < todayMidnight || day > maxDay) return [];
+
+  await releaseExpiredHolds().catch(() => 0);
 
   const service = await prisma.service.findUnique({
     where: { id: serviceId },
@@ -101,6 +119,8 @@ export async function getAvailableSlots(params: {
         status: { in: ["PENDING", "CONFIRMED"] },
         startsAt: { lte: dayEnd },
         endsAt: { gte: dayStart },
+        // نوبتی که قفل پرداختش منقضی شده، ظرفیت را اشغال نمی‌کند
+        OR: [{ holdExpiresAt: null }, { holdExpiresAt: { gt: new Date() } }],
       },
       select: {
         staffId: true,

@@ -19,6 +19,7 @@ export type ServiceFormValues = {
   durationMinutes: number;
   bufferMinutes: number;
   slotStepMinutes: number | null;
+  depositAmount: number | null;
   sessionsNeeded: string | null;
   preparation: string | null;
   aftercare: string | null;
@@ -116,6 +117,23 @@ export function ServiceForm({
             </Field>
             <Field label="گام ساعت‌ها" error={errors.slotStepMinutes} hint="خالی = تنظیم عمومی">
               <Input name="slotStepMinutes" defaultValue={service?.slotStepMinutes ?? ""} inputMode="numeric" dir="ltr" className="text-right" />
+            </Field>
+          </div>
+
+          <div className="rounded-2xl border border-gold-500/30 bg-gold-500/5 p-4">
+            <Field
+              label="مبلغ رزرو / بیعانه (تومان)"
+              error={errors.depositAmount}
+              hint="اگر عددی بگذارید، نوبت آنلاین فقط پس از پرداخت همین مبلغ قطعی می‌شود و تا ۱۵ دقیقه برای مشتری نگه داشته می‌شود. خالی = استفاده از درصد عمومی تنظیمات. صفر = بدون بیعانه."
+            >
+              <Input
+                name="depositAmount"
+                defaultValue={service?.depositAmount ?? ""}
+                inputMode="numeric"
+                dir="ltr"
+                className="text-right"
+                placeholder="مثلاً ۲۰۰۰۰۰"
+              />
             </Field>
           </div>
 

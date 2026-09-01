@@ -86,6 +86,7 @@ export const serviceSchema = z.object({
   durationMinutes: requiredInt(5, 600, "مدت جلسه باید بین ۵ تا ۶۰۰ دقیقه باشد"),
   bufferMinutes: requiredInt(0, 120, "بافر باید بین ۰ تا ۱۲۰ دقیقه باشد"),
   slotStepMinutes: optionalInt,
+  depositAmount: optionalInt,
   sessionsNeeded: z.string().trim().max(120).optional(),
   preparation: z.string().trim().max(2000).optional(),
   aftercare: z.string().trim().max(2000).optional(),

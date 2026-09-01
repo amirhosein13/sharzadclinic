@@ -140,8 +140,13 @@ export async function destroyCustomerSession(): Promise<void> {
 }
 
 export async function getCustomerSession(): Promise<CustomerSession | null> {
-  const store = await cookies();
-  const token = store.get(COOKIE_NAME)?.value;
+  // خارج از یک درخواست (مثلاً در اسکریپت‌ها) کوکی در دسترس نیست
+  let token: string | undefined;
+  try {
+    token = (await cookies()).get(COOKIE_NAME)?.value;
+  } catch {
+    return null;
+  }
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secretKey());

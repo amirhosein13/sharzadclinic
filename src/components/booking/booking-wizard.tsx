@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Calendar, Check, CircleCheck, Clock, Copy,
+  ArrowLeft, ArrowRight, Calendar, Check, CircleCheck, Clock, Copy, CreditCard,
   Loader2, Sparkles, User,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ import { JalaliCalendar } from "./jalali-calendar";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
-import { cn, formatDuration, formatPriceRange, toFa } from "@/lib/utils";
+import { cn, formatDuration, formatPriceRange, formatToman, toFa } from "@/lib/utils";
 
 export type WizardService = {
   id: string;
@@ -24,6 +24,14 @@ export type WizardService = {
   priceTo: number | null;
   durationMinutes: number;
   categoryTitle: string;
+  /** اگر بیشتر از صفر باشد، نوبت فقط پس از پرداخت این مبلغ قطعی می‌شود */
+  depositAmount: number;
+};
+
+export type WizardCustomer = {
+  firstName: string;
+  lastName: string;
+  phone: string;
 };
 
 export type WizardStaff = {
@@ -42,10 +50,13 @@ export function BookingWizard({
   services,
   staff,
   initialServiceSlug,
+  customer,
 }: {
   services: WizardService[];
   staff: WizardStaff[];
   initialServiceSlug?: string;
+  /** اگر مشتری وارد حساب شده باشد، مرحله‌ی اطلاعات تماس رد می‌شود */
+  customer?: WizardCustomer | null;
 }) {
   const initial = services.find((s) => s.slug === initialServiceSlug) ?? null;
 
@@ -57,7 +68,7 @@ export function BookingWizard({
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [done, setDone] = useState<{ code: string; summary: string } | null>(null);
+  const [done, setDone] = useState<{ code: string; summary: string; loggedIn: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
 
   const eligibleStaff = service ? staff.filter((s) => s.serviceIds.includes(service.id)) : [];
@@ -103,7 +114,13 @@ export function BookingWizard({
     startTransition(async () => {
       const result = await createBooking(formData);
       if (result.ok) {
-        setDone({ code: result.code, summary: result.summary });
+        if ("redirectTo" in result) {
+          // نوبت رزرو شد و تا پایان مهلت پرداخت برای کسی دیگر باز نمی‌شود
+          toast.success("در حال انتقال به درگاه پرداخت...");
+          window.location.href = result.redirectTo;
+          return;
+        }
+        setDone({ code: result.code, summary: result.summary, loggedIn: result.loggedIn });
         setErrors({});
       } else {
         setErrors(result.errors ?? {});
@@ -113,7 +130,7 @@ export function BookingWizard({
   }
 
   if (done) {
-    return <SuccessCard code={done.code} summary={done.summary} />;
+    return <SuccessCard code={done.code} summary={done.summary} loggedIn={done.loggedIn} />;
   }
 
   return (
@@ -287,7 +304,14 @@ export function BookingWizard({
 
         {/* گام ۴ — اطلاعات تماس */}
         {step === 3 && service && dateKey && time && (
-          <StepShell title="اطلاعات تماس شما" hint="برای تأیید نهایی با همین شماره تماس می‌گیریم.">
+          <StepShell
+            title={customer ? "تأیید نهایی" : "اطلاعات تماس شما"}
+            hint={
+              customer
+                ? "اطلاعات شما از حسابتان خوانده شد. فقط تأیید کنید."
+                : "برای تأیید نهایی با همین شماره تماس می‌گیریم."
+            }
+          >
             <Summary
               service={service}
               time={time}
@@ -295,37 +319,92 @@ export function BookingWizard({
             />
 
             <form action={submit} className="mt-7 space-y-5">
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="نام" required error={errors.firstName}>
-                  <Input name="firstName" placeholder="مریم" autoComplete="given-name" />
-                </Field>
-                <Field label="نام خانوادگی" required error={errors.lastName}>
-                  <Input name="lastName" placeholder="رضایی" autoComplete="family-name" />
-                </Field>
-              </div>
+              {customer ? (
+                <div className="flex items-center gap-4 rounded-3xl border border-[color:var(--line)] bg-[color:var(--bg-sunken)] p-5">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-rose-200 to-cream-200 font-bold text-plum-600 dark:from-rose-500/25 dark:to-plum-700 dark:text-rose-100">
+                    {customer.firstName.charAt(0)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">
+                      {customer.firstName} {customer.lastName}
+                    </p>
+                    <p className="mt-0.5 text-xs text-[color:var(--fg-muted)]" dir="ltr">
+                      <span className="block text-right">{toFa(customer.phone)}</span>
+                    </p>
+                  </div>
+                  <Link
+                    href="/account"
+                    className="shrink-0 text-xs text-rose-600 hover:underline dark:text-rose-300"
+                  >
+                    ویرایش
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <Field label="نام" required error={errors.firstName}>
+                      <Input name="firstName" placeholder="مریم" autoComplete="given-name" />
+                    </Field>
+                    <Field label="نام خانوادگی" required error={errors.lastName}>
+                      <Input name="lastName" placeholder="رضایی" autoComplete="family-name" />
+                    </Field>
+                  </div>
 
-              <Field label="شماره موبایل" required error={errors.phone} hint="کد پیگیری به همین شماره مربوط می‌شود">
-                <Input
-                  name="phone"
-                  placeholder="۰۹۱۲۳۴۵۶۷۸۹"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  dir="ltr"
-                  className="text-right"
-                />
-              </Field>
+                  <Field
+                    label="شماره موبایل"
+                    required
+                    error={errors.phone}
+                    hint="کد پیگیری به همین شماره پیامک می‌شود"
+                  >
+                    <Input
+                      name="phone"
+                      placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      dir="ltr"
+                      className="text-right"
+                    />
+                  </Field>
+                </>
+              )}
 
               <Field label="توضیحات" error={errors.note} hint="اختیاری — هر نکته‌ای که لازم است بدانیم">
                 <Textarea name="note" rows={3} placeholder="مثلاً سابقه‌ی حساسیت، دارو یا سؤال خاص..." />
               </Field>
 
+              {service.depositAmount > 0 && (
+                <div className="rounded-3xl border border-gold-500/30 bg-gold-500/8 p-5">
+                  <p className="flex items-center gap-2 text-sm font-semibold">
+                    <CreditCard className="size-4 text-gold-600" />
+                    برای قطعی‌شدن این نوبت، مبلغ {formatToman(service.depositAmount)} بیعانه پرداخت می‌شود
+                  </p>
+                  <p className="mt-2 text-xs leading-6 text-[color:var(--fg-muted)]">
+                    پس از تأیید، به درگاه بانکی منتقل می‌شوید. این ساعت تا ۱۵ دقیقه برای شما
+                    نگه داشته می‌شود و در این مدت کسی دیگر نمی‌تواند آن را رزرو کند.
+                    مبلغ بیعانه از هزینه‌ی نهایی کسر می‌شود.
+                  </p>
+                </div>
+              )}
+
               <Button type="submit" size="lg" disabled={pending} className="w-full">
-                {pending ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}
-                {pending ? "در حال ثبت..." : "ثبت نهایی نوبت"}
+                {pending ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : service.depositAmount > 0 ? (
+                  <CreditCard className="size-5" />
+                ) : (
+                  <Check className="size-5" />
+                )}
+                {pending
+                  ? "در حال ثبت..."
+                  : service.depositAmount > 0
+                    ? "پرداخت بیعانه و قطعی‌کردن نوبت"
+                    : "ثبت نهایی نوبت"}
               </Button>
 
               <p className="text-center text-xs leading-6 text-[color:var(--fg-muted)]">
-                با ثبت نوبت، با تماس همکاران ما برای تأیید موافقت می‌کنید.
+                {service.depositAmount > 0
+                  ? "در صورت انصراف تا ۲۴ ساعت قبل، بیعانه بازگردانده می‌شود."
+                  : "با ثبت نوبت، با تماس همکاران ما برای تأیید موافقت می‌کنید."}
                 <br />
                 لغو یا جابه‌جایی تا ۶ ساعت قبل امکان‌پذیر است.
               </p>
@@ -479,7 +558,15 @@ function SummaryRow({
   );
 }
 
-function SuccessCard({ code, summary }: { code: string; summary: string }) {
+function SuccessCard({
+  code,
+  summary,
+  loggedIn,
+}: {
+  code: string;
+  summary: string;
+  loggedIn: boolean;
+}) {
   return (
     <div className="mx-auto max-w-xl rounded-[2rem] border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-10 text-center shadow-lift">
       <div className="mx-auto grid size-20 place-items-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
@@ -517,9 +604,16 @@ function SuccessCard({ code, summary }: { code: string; summary: string }) {
         این کد را یادداشت کنید — برای پیگیری لازم است
       </Badge>
 
+      {loggedIn && (
+        <p className="mt-6 rounded-2xl bg-[color:var(--bg-sunken)] p-4 text-xs leading-7 text-[color:var(--fg-muted)]">
+          حساب کاربری شما با همین شماره ساخته شد. از این به بعد می‌توانید همه‌ی نوبت‌ها و
+          سوابقتان را در «حساب من» ببینید.
+        </p>
+      )}
+
       <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-        <ButtonLink href="/track" variant="outline" className="flex-1">
-          پیگیری نوبت
+        <ButtonLink href={loggedIn ? "/account" : "/track"} variant="outline" className="flex-1">
+          {loggedIn ? "حساب من" : "پیگیری نوبت"}
         </ButtonLink>
         <ButtonLink href="/" className="flex-1">
           بازگشت به صفحه‌ی اصلی

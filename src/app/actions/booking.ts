@@ -2,24 +2,41 @@
 
 import { prisma } from "@/lib/prisma";
 import { bookingSchema, fieldErrors, trackSchema } from "@/lib/validators";
-import { getAvailableSlots } from "@/lib/availability";
+import { getAvailableSlots, releaseExpiredHolds } from "@/lib/availability";
 import { atTime, formatJalaliDateTime, parseYmdKey } from "@/lib/date";
 import { generateBookingCode } from "@/lib/utils";
 import { notifyBookingCreated, notifyBookingEmail } from "@/lib/notifications";
+import { createCustomerSession, getCustomerSession } from "@/lib/customer-auth";
+import { getSettings } from "@/lib/settings";
+import { isZarinpalConfigured, requestPayment } from "@/lib/zarinpal";
+
+/** مهلت پرداخت بیعانه؛ در این مدت نوبت برای کس دیگری قابل رزرو نیست */
+const HOLD_MINUTES = 15;
 
 export type BookingResult =
-  | { ok: true; code: string; summary: string }
+  | { ok: true; code: string; summary: string; loggedIn: boolean }
+  /** نوبت رزرو شد و کاربر باید به درگاه برود */
+  | { ok: true; redirectTo: string }
   | { ok: false; message?: string; errors?: Record<string, string> };
 
 export async function createBooking(formData: FormData): Promise<BookingResult> {
+  await releaseExpiredHolds().catch(() => 0);
+
+  const session = await getCustomerSession();
+
+  // کاربر واردشده نام و شماره‌اش را دوباره وارد نمی‌کند
+  const existingCustomer = session
+    ? await prisma.customer.findUnique({ where: { id: session.id } })
+    : null;
+
   const parsed = bookingSchema.safeParse({
     serviceId: formData.get("serviceId"),
     staffId: formData.get("staffId") || null,
     dateKey: formData.get("dateKey"),
     time: formData.get("time"),
-    firstName: formData.get("firstName"),
-    lastName: formData.get("lastName"),
-    phone: formData.get("phone"),
+    firstName: existingCustomer?.firstName ?? formData.get("firstName"),
+    lastName: existingCustomer?.lastName ?? formData.get("lastName"),
+    phone: existingCustomer?.phone ?? formData.get("phone"),
     note: formData.get("note") ?? "",
   });
 
@@ -49,39 +66,44 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
   const endsAt = new Date(startsAt.getTime() + service.durationMinutes * 60_000);
 
   try {
+    const before = await prisma.customer.findUnique({
+      where: { phone: input.phone },
+      select: { id: true, isBlocked: true, _count: { select: { appointments: true } } },
+    });
+
+    if (before?.isBlocked) {
+      return { ok: false, message: "امکان ثبت نوبت آنلاین برای این شماره وجود ندارد. لطفاً تماس بگیرید." };
+    }
+
     const customer = await prisma.customer.upsert({
       where: { phone: input.phone },
       update: { firstName: input.firstName, lastName: input.lastName },
       create: { firstName: input.firstName, lastName: input.lastName, phone: input.phone },
     });
 
-    if (customer.isBlocked) {
-      return { ok: false, message: "امکان ثبت نوبت آنلاین برای این شماره وجود ندارد. لطفاً تماس بگیرید." };
-    }
-
     // اگر همین مشتری برای همین ساعت نوبت دارد، تکراری نسازیم
     const duplicate = await prisma.appointment.findFirst({
-      where: {
-        customerId: customer.id,
-        startsAt,
-        status: { in: ["PENDING", "CONFIRMED"] },
-      },
+      where: { customerId: customer.id, startsAt, status: { in: ["PENDING", "CONFIRMED"] } },
     });
     if (duplicate) {
       return {
         ok: true,
         code: duplicate.code,
         summary: `${service.title} — ${formatJalaliDateTime(startsAt)}`,
+        loggedIn: !!session,
       };
     }
 
+    // آیا این خدمت برای قطعی‌شدن نیاز به پرداخت بیعانه دارد؟
+    const deposit = await depositFor(service.id);
+    const needsPayment = deposit > 0 && isZarinpalConfigured();
+
     let appointment = null;
     for (let attempt = 0; attempt < 5 && !appointment; attempt++) {
-      const code = generateBookingCode();
       try {
         appointment = await prisma.appointment.create({
           data: {
-            code,
+            code: generateBookingCode(),
             customerId: customer.id,
             serviceId: service.id,
             staffId: slot.staffId,
@@ -89,7 +111,9 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
             endsAt,
             note: input.note || null,
             status: "PENDING",
-            source: "website",
+            source: session ? "website-account" : "website",
+            // نوبت تا پایان مهلت پرداخت برای این مشتری قفل می‌شود
+            holdExpiresAt: needsPayment ? new Date(Date.now() + HOLD_MINUTES * 60_000) : null,
           },
         });
       } catch {
@@ -101,7 +125,51 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
       return { ok: false, message: "ثبت نوبت با خطا مواجه شد. لطفاً دوباره تلاش کنید." };
     }
 
-    // اطلاع‌رسانی نباید جریان رزرو را بلوکه یا خراب کند
+    // ورود خودکار فقط برای مشتری تازه‌وارد. اگر شماره سابقه داشته باشد،
+    // ورود بدون تأیید پیامکی یعنی هرکسی می‌توانست پرونده‌ی دیگری را ببیند.
+    const isNewCustomer = !before || before._count.appointments === 0;
+    if (!session && isNewCustomer) {
+      await createCustomerSession({
+        id: customer.id,
+        phone: customer.phone,
+        name: `${customer.firstName} ${customer.lastName}`,
+      }).catch(() => undefined);
+    }
+
+    if (needsPayment) {
+      const settings = await getSettings();
+      const base = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+      const payment = await requestPayment({
+        amountToman: deposit,
+        description: `رزرو ${service.title} — ${settings.clinicName}`,
+        callbackUrl: `${base}/payment/callback`,
+        mobile: customer.phone,
+        email: customer.email ?? undefined,
+      });
+
+      if (!payment.ok) {
+        // نوبت را آزاد می‌کنیم تا اسلات بلوکه نماند
+        await prisma.appointment.delete({ where: { id: appointment.id } }).catch(() => undefined);
+        return { ok: false, message: `اتصال به درگاه پرداخت ممکن نشد: ${payment.message}` };
+      }
+
+      await prisma.payment.create({
+        data: {
+          customerId: customer.id,
+          appointmentId: appointment.id,
+          amount: deposit,
+          method: "ONLINE",
+          status: "PENDING",
+          gateway: "zarinpal",
+          authority: payment.authority,
+          note: "بیعانه‌ی رزرو نوبت",
+        },
+      });
+
+      return { ok: true, redirectTo: payment.redirectUrl };
+    }
+
+    // بدون بیعانه: نوبت مستقیم ثبت و پیامک ارسال می‌شود
     const customerName = `${customer.firstName} ${customer.lastName}`;
     await notifyBookingCreated({
       phone: customer.phone,
@@ -125,10 +193,26 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
       ok: true,
       code: appointment.code,
       summary: `${service.title} — ${formatJalaliDateTime(startsAt)}`,
+      loggedIn: !!session || isNewCustomer,
     };
   } catch {
     return { ok: false, message: "ثبت نوبت با خطا مواجه شد. لطفاً دوباره تلاش کنید." };
   }
+}
+
+/** مبلغ بیعانه‌ی یک خدمت: مقدار اختصاصی، وگرنه درصد عمومی از قیمت پایه */
+export async function depositFor(serviceId: string): Promise<number> {
+  const service = await prisma.service.findUnique({
+    where: { id: serviceId },
+    select: { depositAmount: true, priceFrom: true },
+  });
+  if (!service) return 0;
+  if (service.depositAmount !== null) return service.depositAmount;
+
+  const settings = await getSettings();
+  const percent = Number(settings.depositPercent) || 0;
+  if (!percent || !service.priceFrom) return 0;
+  return Math.round((service.priceFrom * percent) / 100);
 }
 
 export type TrackResult =
