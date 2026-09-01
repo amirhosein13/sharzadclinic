@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
+import { CustomerForm } from "@/components/admin/forms/customer-form";
 import { toggleCustomerBlock } from "@/app/actions/admin";
 import { Badge } from "@/components/ui/badge";
 import { formatJalaliLong } from "@/lib/date";
@@ -55,6 +56,7 @@ export default async function CustomersPage({
         description={`${toFa(total)} مشتری${
           legacyCount > 0 ? ` — از این تعداد ${toFa(legacyCount)} نفر از اپلیکیشن قبلی منتقل شده‌اند.` : "."
         }`}
+        action={<CustomerForm />}
       />
 
       <Card className="mb-6">
@@ -78,7 +80,11 @@ export default async function CustomersPage({
       </Card>
 
       {customers.length === 0 ? (
-        <EmptyState icon={Users} title="مشتری‌ای پیدا نشد" />
+        <EmptyState
+          icon={Users}
+          title="مشتری‌ای پیدا نشد"
+          description="با دکمه‌ی «ثبت مشتری جدید» پرونده‌های کاغذی را وارد کنید."
+        />
       ) : (
         <Card padded={false}>
           <div className="overflow-x-auto">

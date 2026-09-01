@@ -61,6 +61,48 @@ export default async function AccountPage() {
   const past = customer.appointments.filter((a) => !upcoming.includes(a));
   const totalPaid = customer.payments.reduce((sum, p) => sum + p.amount, 0);
 
+  // خط زمانی مراجعات: پرونده‌ی درمانی به‌علاوه‌ی نوبت‌های انجام‌شده‌ای که
+  // سابقه‌ی جداگانه‌ای برایشان ثبت نشده، تا هیچ مراجعه‌ای جا نیفتد
+  type Visit = {
+    key: string;
+    kind: "treatment" | "appointment";
+    date: Date;
+    title: string;
+    staffName: string | null;
+    sessionNo: number | null;
+    description: string | null;
+    badge?: { label: string; tone: "rose" | "plum" };
+  };
+
+  const treatmentDays = new Set(
+    customer.treatments.map((t) => t.performedAt.toDateString())
+  );
+
+  const visits: Visit[] = [
+    ...customer.treatments.map((t) => ({
+      key: `t-${t.id}`,
+      kind: "treatment" as const,
+      date: t.performedAt,
+      title: t.service?.title ?? "جلسه‌ی درمان",
+      staffName: t.staff?.name ?? null,
+      sessionNo: t.sessionNo,
+      description: t.description,
+      badge: { label: "ثبت در پرونده", tone: "rose" as const },
+    })),
+    ...customer.appointments
+      .filter((a) => a.status === "DONE" && !treatmentDays.has(a.startsAt.toDateString()))
+      .map((a) => ({
+        key: `a-${a.id}`,
+        kind: "appointment" as const,
+        date: a.startsAt,
+        title: a.service.title,
+        staffName: a.staff?.name ?? null,
+        sessionNo: null,
+        description: null,
+        badge: { label: "نوبت انجام‌شده", tone: "plum" as const },
+      })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
   return (
     <>
       <PageHero
@@ -74,7 +116,7 @@ export default async function AccountPage() {
         <div className="grid gap-4 sm:grid-cols-4">
           <Stat icon={CalendarHeart} label="نوبت پیش‌رو" value={toFa(upcoming.length)} />
           <Stat icon={Sparkles} label="کل نوبت‌ها" value={toFa(customer.appointments.length)} />
-          <Stat icon={FileText} label="جلسات پرونده" value={toFa(customer.treatments.length)} />
+          <Stat icon={FileText} label="مراجعه" value={toFa(visits.length)} />
           <Stat icon={Wallet} label="مجموع پرداخت" value={formatToman(totalPaid)} />
         </div>
 
@@ -170,35 +212,48 @@ export default async function AccountPage() {
               </section>
             )}
 
-            {/* پرونده‌ی درمانی */}
-            {customer.treatments.length > 0 && (
+            {/* خط زمانی مراجعات */}
+            {visits.length > 0 && (
               <section>
-                <h2 className="mb-5 text-xl font-bold">پرونده‌ی درمانی</h2>
-                <div className="overflow-hidden rounded-4xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)]">
-                  <ul className="divide-y divide-[color:var(--line)]">
-                    {customer.treatments.map((t) => (
-                      <li key={t.id} className="p-5">
-                        <div className="flex items-center justify-between gap-4">
-                          <p className="text-sm font-medium">{t.service?.title ?? "جلسه‌ی درمان"}</p>
-                          <p className="shrink-0 text-xs text-[color:var(--fg-muted)]">
-                            {formatJalaliLong(t.performedAt)}
-                          </p>
-                        </div>
-                        {t.sessionNo && (
-                          <p className="mt-1 text-xs text-[color:var(--fg-muted)]">
-                            جلسه‌ی {toFa(t.sessionNo)}
-                            {t.staff && ` • ${t.staff.name}`}
-                          </p>
-                        )}
-                        {t.description && (
-                          <p className="mt-2 text-sm leading-7 text-[color:var(--fg-muted)]">
-                            {t.description}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="mb-5 flex items-center justify-between gap-4">
+                  <h2 className="text-xl font-bold">سوابق مراجعه‌ی شما</h2>
+                  <span className="text-xs text-[color:var(--fg-muted)]">
+                    {toFa(visits.length)} مراجعه
+                  </span>
                 </div>
+
+                <ol className="relative space-y-5 border-r-2 border-[color:var(--line)] pr-6">
+                  {visits.map((visit) => (
+                    <li key={visit.key} className="relative">
+                      <span
+                        className={
+                          visit.kind === "treatment"
+                            ? "absolute -right-[1.9rem] top-5 size-3.5 rounded-full border-2 border-[color:var(--bg)] bg-rose-500"
+                            : "absolute -right-[1.9rem] top-5 size-3.5 rounded-full border-2 border-[color:var(--bg)] bg-plum-400"
+                        }
+                      />
+                      <article className="rounded-3xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-5 shadow-soft">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h3 className="font-semibold">{visit.title}</h3>
+                            <p className="mt-1 text-xs text-[color:var(--fg-muted)]">
+                              {formatJalaliWithWeekday(visit.date)}
+                              {visit.staffName && ` • ${visit.staffName}`}
+                              {visit.sessionNo ? ` • جلسه‌ی ${toFa(visit.sessionNo)}` : ""}
+                            </p>
+                          </div>
+                          {visit.badge && <Badge tone={visit.badge.tone}>{visit.badge.label}</Badge>}
+                        </div>
+
+                        {visit.description && (
+                          <p className="mt-3 rounded-2xl bg-[color:var(--bg-sunken)] p-3.5 text-sm leading-7 text-[color:var(--fg-muted)]">
+                            {visit.description}
+                          </p>
+                        )}
+                      </article>
+                    </li>
+                  ))}
+                </ol>
               </section>
             )}
           </div>

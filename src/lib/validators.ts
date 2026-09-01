@@ -174,3 +174,62 @@ export const userSchema = z.object({
   message: "برای نقش اپراتور باید یکی از پرسنل انتخاب شود",
   path: ["staffId"],
 });
+
+/** تاریخ شمسی به شکل ۱۴۰۵/۰۶/۱۵ یا خالی */
+const jalaliDate = z
+  .union([z.literal(""), z.string()])
+  .optional()
+  .transform((v) => (v && v.trim() !== "" ? toEn(v.trim()) : null));
+
+export const customerSchema = z.object({
+  firstName: z.string().trim().min(2, "نام را وارد کنید").max(50),
+  lastName: z.string().trim().min(2, "نام خانوادگی را وارد کنید").max(50),
+  phone: phoneSchema,
+  email: z.union([z.literal(""), z.string().trim().email("ایمیل معتبر نیست")]).optional(),
+  nationalCode: z.string().trim().max(12).optional(),
+  gender: z.enum(["FEMALE", "MALE", "OTHER"]).optional(),
+  birthDate: jalaliDate,
+  address: z.string().trim().max(500).optional(),
+  notes: z.string().trim().max(3000).optional(),
+  allergies: z.string().trim().max(1000).optional(),
+});
+
+export const treatmentSchema = z.object({
+  customerId: z.string().min(1),
+  serviceId: z.string().trim().optional(),
+  staffId: z.string().trim().optional(),
+  // ارقام فارسی را هم می‌پذیریم؛ \d در جاوااسکریپت فقط لاتین را می‌گیرد
+  performedAt: z
+    .string()
+    .trim()
+    .transform(toEn)
+    .refine((v) => /^\d{4}\/\d{1,2}\/\d{1,2}$/.test(v), "تاریخ را به شکل ۱۴۰۵/۰۶/۱۵ وارد کنید"),
+  sessionNo: z
+    .union([z.literal(""), z.string(), z.number()])
+    .optional()
+    .transform((v) => {
+      if (v === "" || v === undefined || v === null) return null;
+      const n = Number(toEn(String(v)));
+      return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+    }),
+  description: z.string().trim().max(2000).optional(),
+});
+
+export const walkInSchema = z.object({
+  customerId: z.string().min(1, "مشتری را انتخاب کنید"),
+  serviceId: z.string().min(1, "خدمت را انتخاب کنید"),
+  staffId: z.string().trim().optional(),
+  dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "تاریخ را انتخاب کنید"),
+  time: z.string().regex(/^\d{2}:\d{2}$/, "ساعت را وارد کنید"),
+  status: z.enum(["PENDING", "CONFIRMED", "DONE"]).optional(),
+  adminNote: z.string().trim().max(1000).optional(),
+});
+
+export const timeOffSchema = z.object({
+  staffId: z.string().trim().optional(),
+  fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "تاریخ شروع را انتخاب کنید"),
+  toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "تاریخ پایان را انتخاب کنید"),
+  fromTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  toTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  reason: z.string().trim().max(200).optional(),
+});

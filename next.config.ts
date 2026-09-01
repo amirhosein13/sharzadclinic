@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 // همه‌ی محاسبات تاریخ/ساعت سمت سرور بر مبنای وقت تهران انجام می‌شود
-process.env.TZ = process.env.TZ || "Asia/Tehran";
+process.env.TZ ||= "Asia/Tehran";
 
 const nextConfig: NextConfig = {
   // standalone خروجی سبک برای Docker / لیارا / VPS می‌سازد

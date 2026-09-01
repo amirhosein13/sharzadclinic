@@ -1,3 +1,4 @@
+import "../src/lib/timezone";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { CATEGORIES, SERVICES, STAFF, POSTS, TESTIMONIALS, GALLERY } from "./seed-data";

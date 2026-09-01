@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, CalendarDays, FileText, Phone, Wallet } from "lucide-react";
+import { ArrowRight, CalendarDays, FileText, Phone, Trash2, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { CustomerNotes } from "@/components/admin/customer-notes";
+import { CustomerForm } from "@/components/admin/forms/customer-form";
+import { TreatmentForm } from "@/components/admin/forms/treatment-form";
+import { WalkInForm } from "@/components/admin/forms/walkin-form";
+import { ActionButton } from "@/components/admin/action-button";
+import { deleteTreatment } from "@/app/actions/reception";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_META } from "@/lib/appointment-status";
-import { formatJalaliLong, formatJalaliWithWeekday, formatTime } from "@/lib/date";
+import { formatJalaliLong, formatJalaliWithWeekday, formatTime, toJalaliInput } from "@/lib/date";
 import { formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +42,21 @@ export default async function CustomerDetailPage({
 
   if (!customer) notFound();
 
+  const [services, staff] = await Promise.all([
+    prisma.service.findMany({
+      where: { isActive: true },
+      select: { id: true, title: true },
+      orderBy: { order: "asc" },
+    }),
+    prisma.staff.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { order: "asc" },
+    }),
+  ]);
+
+  const fullName = `${customer.firstName} ${customer.lastName}`;
+
   const totalPaid = customer.payments
     .filter((p) => p.status === "PAID")
     .reduce((sum, p) => sum + p.amount, 0);
@@ -52,8 +72,25 @@ export default async function CustomerDetailPage({
       </Link>
 
       <AdminPageHeader
-        title={`${customer.firstName} ${customer.lastName}`}
+        title={fullName}
         description={`عضو از ${formatJalaliLong(customer.createdAt)}`}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <WalkInForm
+              compact
+              customerId={customer.id}
+              customerName={fullName}
+              services={services}
+              staff={staff}
+            />
+            <TreatmentForm
+              customerId={customer.id}
+              customerName={fullName}
+              services={services}
+              staff={staff}
+            />
+          </div>
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.8fr]">
@@ -82,6 +119,21 @@ export default async function CustomerDetailPage({
                 <Phone className="size-3.5" />
                 تماس
               </a>
+              <CustomerForm
+                customer={{
+                  id: customer.id,
+                  firstName: customer.firstName,
+                  lastName: customer.lastName,
+                  phone: customer.phone,
+                  email: customer.email,
+                  nationalCode: customer.nationalCode,
+                  gender: customer.gender,
+                  birthDate: customer.birthDate ? toJalaliInput(customer.birthDate) : null,
+                  address: customer.address,
+                  notes: customer.notes,
+                  allergies: customer.allergies,
+                }}
+              />
             </div>
           </Card>
 
@@ -132,37 +184,83 @@ export default async function CustomerDetailPage({
             )}
           </Card>
 
-          {customer.treatments.length > 0 && (
-            <Card padded={false}>
-              <h2 className="border-b border-[color:var(--line)] p-6 font-bold">
+          <Card padded={false}>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-6">
+              <h2 className="font-bold">
                 پرونده‌ی درمانی
                 <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
-                  (شامل سوابق منتقل‌شده از اپلیکیشن قبلی)
+                  ({toFa(customer.treatments.length)} جلسه)
                 </span>
               </h2>
+              <TreatmentForm
+                customerId={customer.id}
+                customerName={fullName}
+                services={services}
+                staff={staff}
+              />
+            </div>
+
+            {customer.treatments.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={FileText}
+                  title="سابقه‌ای ثبت نشده"
+                  description="مراجعات گذشته و پرونده‌های کاغذی را با دکمه‌ی بالا وارد کنید."
+                />
+              </div>
+            ) : (
               <ul className="divide-y divide-[color:var(--line)]">
                 {customer.treatments.map((t) => (
                   <li key={t.id} className="p-5">
-                    <div className="flex items-center justify-between gap-4">
-                      <p className="text-sm font-medium">{t.service?.title ?? "خدمت نامشخص"}</p>
-                      <p className="shrink-0 text-xs text-[color:var(--fg-muted)]">
-                        {formatJalaliLong(t.performedAt)}
-                      </p>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{t.service?.title ?? "خدمت نامشخص"}</p>
+                        {(t.sessionNo || t.staff) && (
+                          <p className="mt-1 text-xs text-[color:var(--fg-muted)]">
+                            {t.sessionNo ? `جلسه‌ی ${toFa(t.sessionNo)}` : ""}
+                            {t.sessionNo && t.staff ? " • " : ""}
+                            {t.staff?.name ?? ""}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-xs text-[color:var(--fg-muted)]">
+                          {formatJalaliLong(t.performedAt)}
+                        </span>
+                        <TreatmentForm
+                          customerId={customer.id}
+                          customerName={fullName}
+                          services={services}
+                          staff={staff}
+                          record={{
+                            id: t.id,
+                            serviceId: t.serviceId,
+                            staffId: t.staffId,
+                            performedAt: toJalaliInput(t.performedAt),
+                            sessionNo: t.sessionNo,
+                            description: t.description,
+                          }}
+                        />
+                        <ActionButton
+                          action={deleteTreatment.bind(null, t.id)}
+                          confirm="این سابقه حذف شود؟"
+                          title="حذف سابقه"
+                          className="size-8 p-0 text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </ActionButton>
+                      </div>
                     </div>
-                    {t.sessionNo && (
-                      <p className="mt-1 text-xs text-[color:var(--fg-muted)]">
-                        جلسه‌ی {toFa(t.sessionNo)}
-                        {t.staff && ` • ${t.staff.name}`}
-                      </p>
-                    )}
                     {t.description && (
-                      <p className="mt-2 text-sm leading-7 text-[color:var(--fg-muted)]">{t.description}</p>
+                      <p className="mt-2 rounded-xl bg-[color:var(--bg-sunken)] p-3 text-sm leading-7 text-[color:var(--fg-muted)]">
+                        {t.description}
+                      </p>
                     )}
                   </li>
                 ))}
               </ul>
-            </Card>
-          )}
+            )}
+          </Card>
 
           {customer.payments.length > 0 && (
             <Card padded={false}>

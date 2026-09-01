@@ -9,6 +9,7 @@
  * اسکریپت idempotent است: هر نوبت فقط یک بار یادآوری می‌گیرد
  * (فیلد reminderSentAt).
  */
+import "../src/lib/timezone";
 import { PrismaClient } from "@prisma/client";
 import { notifyBookingReminder } from "../src/lib/notifications";
 import { formatJalaliWithWeekday } from "../src/lib/date";

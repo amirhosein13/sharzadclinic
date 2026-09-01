@@ -19,9 +19,13 @@ export function toEn(input: string): string {
 }
 
 /** ۲۵۰۰۰۰ → «۲۵۰,۰۰۰ تومان» */
+/**
+ * مبلغ را به تومان با ارقام فارسی نمایش می‌دهد.
+ * صفر یعنی «۰ تومان» — مفهوم «رایگان» فقط برای قیمت خدمات معنی دارد
+ * و در formatPriceRange مدیریت می‌شود، نه در جمع مالی.
+ */
 export function formatToman(amount: number | null | undefined, withUnit = true): string {
   if (amount === null || amount === undefined) return "تماس بگیرید";
-  if (amount === 0) return "رایگان";
   // «٬» جداکننده‌ی هزارگان فارسی است، نه ویرگول لاتین
   const formatted = toFa(amount.toLocaleString("en-US")).replace(/,/g, "٬");
   return withUnit ? `${formatted} تومان` : formatted;
@@ -29,11 +33,13 @@ export function formatToman(amount: number | null | undefined, withUnit = true):
 
 /** بازه‌ی قیمت خدمت */
 export function formatPriceRange(from?: number | null, to?: number | null): string {
-  if (from === 0 && !to) return "رایگان";
-  if (from === null && to === null) return "استعلام قیمت";
-  if (from === undefined && to === undefined) return "استعلام قیمت";
-  if (from && to && from !== to) return `از ${formatToman(from, false)} تا ${formatToman(to)}`;
-  return formatToman(from ?? to);
+  const hasFrom = from !== null && from !== undefined;
+  const hasTo = to !== null && to !== undefined;
+
+  if (!hasFrom && !hasTo) return "استعلام قیمت";
+  if (from === 0 && !hasTo) return "رایگان";
+  if (hasFrom && hasTo && from !== to) return `از ${formatToman(from, false)} تا ${formatToman(to)}`;
+  return formatToman(hasFrom ? from : to);
 }
 
 /** ۹۰ → «۱ ساعت و ۳۰ دقیقه» */

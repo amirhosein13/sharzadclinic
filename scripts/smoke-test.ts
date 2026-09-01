@@ -3,8 +3,9 @@
  * اجرا:  npm run test:smoke
  * دیتای تستی ساخته و در پایان پاک می‌شود.
  */
+import "../src/lib/timezone";
 import { PrismaClient } from "@prisma/client";
-import { getAvailableSlots, releaseExpiredHolds } from "../src/lib/availability";
+import { getAvailableSlots } from "../src/lib/availability";
 import { createBooking, trackAppointment } from "../src/app/actions/booking";
 import { atTime, parseYmdKey } from "../src/lib/date";
 

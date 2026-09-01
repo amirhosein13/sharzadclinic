@@ -13,6 +13,7 @@
  *  تنظیمات نگاشت ستون‌ها در scripts/legacy-mapping.ts است.
  */
 
+import "../src/lib/timezone";
 import sql from "mssql";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import {

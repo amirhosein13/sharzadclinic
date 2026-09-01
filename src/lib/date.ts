@@ -183,3 +183,28 @@ export function timeAgoFa(date: Date): string {
 }
 
 export { addDays, addMonths, endOfMonth, startOfDay, startOfMonth, isSameDay };
+
+/**
+ * «۱۴۰۵/۰۶/۱۵» یا «1405/06/15» را به تاریخ میلادی تبدیل می‌کند.
+ * برای ورود دستی سوابق کاغذی استفاده می‌شود.
+ */
+export function parseJalaliInput(input: string): Date | null {
+  const parts = input.trim().split(/[/\-.]/).map((p) => Number(p.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return null;
+
+  const [jy, jm, jd] = parts;
+  if (jy < 1200 || jy > 1600 || jm < 1 || jm > 12 || jd < 1 || jd > 31) return null;
+
+  const date = fromJalali(jy, jm, jd);
+  if (Number.isNaN(date.getTime())) return null;
+
+  // تاریخ نامعتبر مثل ۳۱ اسفند در سال غیرکبیسه، به ماه بعد سُر می‌خورد
+  if (Number(format(date, "d")) !== jd) return null;
+  date.setHours(12, 0, 0, 0);
+  return date;
+}
+
+/** تاریخ میلادی → «۱۴۰۵/۰۶/۱۵» برای پر کردن فرم‌ها */
+export function toJalaliInput(date: Date): string {
+  return toFa(format(date, "yyyy/MM/dd"));
+}
