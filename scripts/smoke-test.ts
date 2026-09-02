@@ -8,6 +8,7 @@ import { PrismaClient } from "@prisma/client";
 import { getAvailableSlots } from "../src/lib/availability";
 import { createBooking, trackAppointment } from "../src/app/actions/booking";
 import { atTime, parseYmdKey } from "../src/lib/date";
+import { summarizePackages, activePackages } from "../src/lib/packages";
 
 const prisma = new PrismaClient();
 
@@ -127,6 +128,78 @@ async function main() {
   );
   const released = await prisma.appointment.findUnique({ where: { id: held.id } });
   check("نوبت رهاشده خودکار لغو می‌شود", released?.status === "CANCELLED");
+
+  // ── پکیج جلسات ──────────────────────────────────────────────
+  const PKG_PHONE = "09125556677";
+  await prisma.treatmentRecord.deleteMany({ where: { customer: { phone: PKG_PHONE } } });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: PKG_PHONE } } });
+  await prisma.package.deleteMany({ where: { customer: { phone: PKG_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: PKG_PHONE } });
+
+  const pkgCustomer = await prisma.customer.create({
+    data: { firstName: "تست", lastName: "پکیج", phone: PKG_PHONE },
+  });
+  const pkg = await prisma.package.create({
+    data: {
+      customerId: pkgCustomer.id,
+      serviceId: service.id,
+      title: "پکیج تست ۶ جلسه",
+      totalSessions: 6,
+      price: 9_000_000,
+      paidAmount: 2_000_000,
+    },
+  });
+  const addSession = (sessionNo: number, performedAt = new Date()) =>
+    prisma.treatmentRecord.create({
+      data: { customerId: pkgCustomer.id, serviceId: service.id, packageId: pkg.id, performedAt, sessionNo },
+    });
+  const pkgState = async () => (await summarizePackages(pkgCustomer.id)).find((p) => p.id === pkg.id)!;
+
+  let ps = await pkgState();
+  check(
+    `پکیج تازه: ${ps.remainingSessions} جلسه و ${ps.remainingAmount} تومان مانده`,
+    ps.usedSessions === 0 && ps.remainingSessions === 6 && ps.remainingAmount === 7_000_000
+  );
+
+  const s1 = await addSession(1);
+  await addSession(2);
+  await addSession(3);
+  ps = await pkgState();
+  check("شمارش جلسات پکیج از روی سابقه‌های واقعی", ps.usedSessions === 3 && ps.remainingSessions === 3);
+
+  await prisma.treatmentRecord.delete({ where: { id: s1.id } });
+  ps = await pkgState();
+  check("حذف یک جلسه، باقی‌مانده‌ی پکیج را برمی‌گرداند", ps.usedSessions === 2 && ps.remainingSessions === 4);
+
+  for (let i = 3; i <= 6; i++) await addSession(i);
+  ps = await pkgState();
+  check("پکیج پس از آخرین جلسه تمام‌شده می‌شود", ps.usedSessions === 6 && ps.remainingSessions === 0 && ps.isFinished);
+  check("پکیج تمام‌شده در فهرست فعالِ مشتری نمی‌آید", (await activePackages(pkgCustomer.id)).length === 0);
+
+  await addSession(7);
+  ps = await pkgState();
+  check("جلسه‌ی اضافه، باقی‌مانده را منفی نمی‌کند", ps.remainingSessions === 0);
+
+  const expiredPkg = await prisma.package.create({
+    data: {
+      customerId: pkgCustomer.id,
+      serviceId: service.id,
+      title: "پکیج منقضی",
+      totalSessions: 4,
+      price: 4_000_000,
+      paidAmount: 4_000_000,
+      expiresAt: new Date(Date.now() - 86_400_000),
+    },
+  });
+  const expiredState = (await summarizePackages(pkgCustomer.id)).find((p) => p.id === expiredPkg.id)!;
+  check(
+    "پکیج منقضی، نشانه‌گذاری و از فهرست فعال خارج می‌شود",
+    expiredState.isExpired && !(await activePackages(pkgCustomer.id)).some((p) => p.id === expiredPkg.id)
+  );
+
+  await prisma.treatmentRecord.deleteMany({ where: { customerId: pkgCustomer.id } });
+  await prisma.package.deleteMany({ where: { customerId: pkgCustomer.id } });
+  await prisma.customer.delete({ where: { id: pkgCustomer.id } });
 
   await prisma.appointment.deleteMany({ where: { source: "smoke" } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });

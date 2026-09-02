@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, CalendarDays, FileText, Phone, Trash2, Wallet } from "lucide-react";
+import { ArrowRight, CalendarDays, FileText, Package as PackageIcon, Phone, Trash2, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
@@ -10,9 +10,13 @@ import { TreatmentForm } from "@/components/admin/forms/treatment-form";
 import { WalkInForm } from "@/components/admin/forms/walkin-form";
 import { ActionButton } from "@/components/admin/action-button";
 import { deleteTreatment } from "@/app/actions/reception";
+import { PackageForm } from "@/components/admin/forms/package-form";
+import { PackageCard } from "@/components/admin/package-card";
+import { summarizePackages } from "@/lib/packages";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_META } from "@/lib/appointment-status";
 import { formatJalaliLong, formatJalaliWithWeekday, formatTime, toJalaliInput } from "@/lib/date";
+import { getSession } from "@/lib/auth";
 import { formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +46,7 @@ export default async function CustomerDetailPage({
 
   if (!customer) notFound();
 
-  const [services, staff] = await Promise.all([
+  const [services, staff, packages, currentUser] = await Promise.all([
     prisma.service.findMany({
       where: { isActive: true },
       select: { id: true, title: true },
@@ -53,7 +57,21 @@ export default async function CustomerDetailPage({
       select: { id: true, name: true },
       orderBy: { order: "asc" },
     }),
+    summarizePackages(customer.id),
+    getSession(),
   ]);
+
+  const packageOptions = packages
+    .filter((p) => !p.isFinished && !p.isExpired)
+    .map((p) => ({
+      id: p.id,
+      label: `${p.title} — ${toFa(p.remainingSessions)} جلسه باقی`,
+    }));
+
+  const canEditPackages =
+    currentUser?.role === "ADMIN" ||
+    currentUser?.role === "MANAGER" ||
+    currentUser?.role === "RECEPTION";
 
   const fullName = `${customer.firstName} ${customer.lastName}`;
 
@@ -88,6 +106,7 @@ export default async function CustomerDetailPage({
               customerName={fullName}
               services={services}
               staff={staff}
+              packages={packageOptions}
             />
           </div>
         }
@@ -184,6 +203,62 @@ export default async function CustomerDetailPage({
             )}
           </Card>
 
+          {/* پکیج‌های جلسات */}
+          <Card padded={false}>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-6">
+              <h2 className="flex items-center gap-2 font-bold">
+                <PackageIcon className="size-[18px] text-gold-600" />
+                پکیج جلسات
+                <span className="text-xs font-normal text-[color:var(--fg-muted)]">
+                  ({toFa(packages.length)} دوره)
+                </span>
+              </h2>
+              {canEditPackages && (
+                <PackageForm customerId={customer.id} customerName={fullName} services={services} />
+              )}
+            </div>
+
+            {packages.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={PackageIcon}
+                  title="پکیجی ثبت نشده"
+                  description="دوره‌های چندجلسه‌ای مثل «۶ جلسه لیزر» را اینجا ثبت کنید تا جلسات باقی‌مانده خودکار شمرده شود."
+                />
+              </div>
+            ) : (
+              <div className="space-y-4 p-6">
+                {packages.map((pkg) => (
+                  <PackageCard
+                    key={pkg.id}
+                    customerId={customer.id}
+                    customerName={fullName}
+                    services={services}
+                    canEdit={canEditPackages}
+                    pkg={{
+                      id: pkg.id,
+                      title: pkg.title,
+                      serviceTitle: pkg.serviceTitle,
+                      serviceId: pkg.serviceId,
+                      totalSessions: pkg.totalSessions,
+                      usedSessions: pkg.usedSessions,
+                      remainingSessions: pkg.remainingSessions,
+                      price: pkg.price,
+                      paidAmount: pkg.paidAmount,
+                      remainingAmount: pkg.remainingAmount,
+                      purchasedAt: pkg.purchasedAt.toISOString(),
+                      expiresAt: pkg.expiresAt?.toISOString() ?? null,
+                      expiresAtJalali: pkg.expiresAt ? toJalaliInput(pkg.expiresAt) : null,
+                      isExpired: pkg.isExpired,
+                      isFinished: pkg.isFinished,
+                      note: pkg.note,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </Card>
+
           <Card padded={false}>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-6">
               <h2 className="font-bold">
@@ -197,6 +272,7 @@ export default async function CustomerDetailPage({
                 customerName={fullName}
                 services={services}
                 staff={staff}
+                packages={packageOptions}
               />
             </div>
 
@@ -232,9 +308,11 @@ export default async function CustomerDetailPage({
                           customerName={fullName}
                           services={services}
                           staff={staff}
+                          packages={packageOptions}
                           record={{
                             id: t.id,
                             serviceId: t.serviceId,
+                            packageId: t.packageId,
                             staffId: t.staffId,
                             performedAt: toJalaliInput(t.performedAt),
                             sessionNo: t.sessionNo,

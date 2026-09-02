@@ -197,6 +197,7 @@ export const customerSchema = z.object({
 export const treatmentSchema = z.object({
   customerId: z.string().min(1),
   serviceId: z.string().trim().optional(),
+  packageId: z.string().trim().optional(),
   staffId: z.string().trim().optional(),
   // ارقام فارسی را هم می‌پذیریم؛ \d در جاوااسکریپت فقط لاتین را می‌گیرد
   performedAt: z

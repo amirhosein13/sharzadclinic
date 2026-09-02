@@ -9,6 +9,7 @@ import { saveTreatment } from "@/app/actions/reception";
 export type TreatmentFormValues = {
   id: string;
   serviceId: string | null;
+  packageId: string | null;
   staffId: string | null;
   performedAt: string;
   sessionNo: number | null;
@@ -21,12 +22,15 @@ export function TreatmentForm({
   record,
   services,
   staff,
+  packages = [],
 }: {
   customerId: string;
   customerName: string;
   record?: TreatmentFormValues;
   services: { id: string; title: string }[];
   staff: { id: string; name: string }[];
+  /** پکیج‌های فعال مشتری — جلسه از موجودی آن‌ها کم می‌شود */
+  packages?: { id: string; label: string }[];
 }) {
   const editing = !!record;
 
@@ -97,6 +101,23 @@ export function TreatmentForm({
               </Select>
             </Field>
           </div>
+
+          {packages.length > 0 && (
+            <Field
+              label="از کدام پکیج کم شود؟"
+              error={errors.packageId}
+              hint="اگر این جلسه بخشی از یک دوره‌ی خریداری‌شده است"
+            >
+              <Select name="packageId" defaultValue={record?.packageId ?? ""}>
+                <option value="">هیچ‌کدام (جلسه‌ی مستقل)</option>
+                {packages.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
 
           <Field label="شماره‌ی جلسه" error={errors.sessionNo} hint="مثلاً ۳ از یک دوره‌ی ۶ جلسه‌ای">
             <Input

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import {
-  CalendarHeart, CalendarPlus, FileText, LogOut, Sparkles, User, Wallet,
+  CalendarHeart, CalendarPlus, FileText, LogOut, Package as PackageIcon, Sparkles, User, Wallet,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCustomerSession } from "@/lib/customer-auth";
+import { activePackages } from "@/lib/packages";
 import { getSettings } from "@/lib/settings";
 import { isZarinpalConfigured } from "@/lib/zarinpal";
 import { customerLogout } from "@/app/actions/customer";
@@ -53,6 +54,8 @@ export default async function AccountPage() {
   });
 
   if (!customer) redirect("/login");
+
+  const packages = await activePackages(customer.id);
 
   const now = new Date();
   const upcoming = customer.appointments.filter(
@@ -208,6 +211,52 @@ export default async function AccountPage() {
                       </li>
                     ))}
                   </ul>
+                </div>
+              </section>
+            )}
+
+            {/* پکیج‌های فعال */}
+            {packages.length > 0 && (
+              <section>
+                <h2 className="mb-5 text-xl font-bold">دوره‌های فعال شما</h2>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {packages.map((pkg) => (
+                    <div
+                      key={pkg.id}
+                      className="rounded-4xl border border-gold-500/40 bg-gold-500/5 p-6"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="font-bold">{pkg.title}</h3>
+                        <PackageIcon className="size-5 shrink-0 text-gold-600" />
+                      </div>
+
+                      <p className="mt-4 text-3xl font-extrabold text-gold-600 dark:text-gold-300">
+                        {toFa(pkg.remainingSessions)}
+                        <span className="mr-1.5 text-sm font-normal text-[color:var(--fg-muted)]">
+                          جلسه باقی‌مانده
+                        </span>
+                      </p>
+
+                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-[color:var(--line)]">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-l from-gold-500 to-rose-400"
+                          style={{
+                            width: `${Math.min(100, (pkg.usedSessions / pkg.totalSessions) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-[color:var(--fg-muted)]">
+                        {toFa(pkg.usedSessions)} از {toFa(pkg.totalSessions)} جلسه انجام شده
+                        {pkg.expiresAt && ` • تا ${formatJalaliLong(pkg.expiresAt)}`}
+                      </p>
+
+                      {pkg.remainingAmount > 0 && (
+                        <p className="mt-3 border-t border-gold-500/25 pt-3 text-xs text-[color:var(--fg-muted)]">
+                          مانده‌ی پرداخت: {formatToman(pkg.remainingAmount)}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </section>
             )}

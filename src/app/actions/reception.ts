@@ -134,6 +134,7 @@ export async function saveTreatment(formData: FormData): Promise<FormResult> {
     const parsed = treatmentSchema.safeParse({
       customerId: text(formData.get("customerId")),
       serviceId: text(formData.get("serviceId")),
+      packageId: text(formData.get("packageId")),
       staffId: text(formData.get("staffId")),
       performedAt: text(formData.get("performedAt")),
       sessionNo: text(formData.get("sessionNo")),
@@ -153,6 +154,7 @@ export async function saveTreatment(formData: FormData): Promise<FormResult> {
     const data = {
       customerId: v.customerId,
       serviceId: nullable(v.serviceId),
+      packageId: nullable(v.packageId),
       staffId: nullable(v.staffId),
       performedAt,
       sessionNo: v.sessionNo,
