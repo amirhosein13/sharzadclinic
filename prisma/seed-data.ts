@@ -176,7 +176,7 @@ export const SERVICES: SeedService[] = [
 export const STAFF = [
   { slug: "dr-sharzad", name: "دکتر شهرزاد امیری", title: "متخصص پوست، مو و زیبایی | مؤسس کلینیک",
     bio: "بیش از ۱۸ سال سابقه‌ی بالینی در حوزه‌ی پوست و زیبایی، عضو انجمن متخصصان پوست ایران و مدرس دوره‌های تزریقات. باور من این است که بهترین نتیجه، نتیجه‌ای است که کسی متوجهش نشود؛ فقط بگویند سرحال به‌نظر می‌رسی.",
-    licenseNo: "م-۱۲۳۴۵", order: 1, serviceSlugs: ["botox", "filler", "lip-filler", "skin-rejuvenation", "hifu", "consultation", "mesotherapy", "prp"] },
+    licenseNo: "م-۱۲۳۴۵", order: 1, serviceSlugs: ["botox", "filler", "lip-filler", "skin-rejuvenation", "hifu", "consultation", "mesotherapy", "prp", "hair-transplant"] },
   { slug: "dr-parisa", name: "دکتر پریسا کیانی", title: "متخصص پوست | درمان آکنه و ملاسما",
     bio: "فوق تخصص در درمان‌های دارویی پوست، با تمرکز ویژه روی آکنه‌های مقاوم و اختلالات رنگدانه‌ای. پیگیر و صبور، دقیقاً همان چیزی که درمان لک لازم دارد.",
     licenseNo: "م-۲۳۴۵۶", order: 2, serviceSlugs: ["acne-treatment", "melasma", "chemical-peel", "microneedling", "consultation", "hydrafacial"] },

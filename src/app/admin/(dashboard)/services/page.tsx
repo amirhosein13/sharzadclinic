@@ -28,8 +28,24 @@ export default async function AdminServicesPage() {
       },
       orderBy: { order: "asc" },
     }),
-    prisma.staff.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { order: "asc" } }),
+    prisma.staff.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        acceptsBookings: true,
+        _count: { select: { schedules: { where: { isActive: true } } } },
+      },
+      orderBy: { order: "asc" },
+    }),
   ]);
+
+  // پرسنلی که واقعاً می‌توانند نوبت بگیرند: فعال، با رزرو آنلاین روشن و
+  // با برنامه‌ی هفتگی. خدمتی که هیچ‌کدام را ندارد در سایت «وقت خالی ندارد»
+  // نشان می‌دهد بدون اینکه بگوید چرا — پس همین‌جا هشدارش را می‌دهیم.
+  const readyStaffIds = new Set(
+    staff.filter((m) => m.acceptsBookings && m._count.schedules > 0).map((m) => m.id),
+  );
 
   const categoryOptions = categories.map((c) => ({ id: c.id, title: c.title }));
   const total = categories.reduce((sum, c) => sum + c.services.length, 0);
@@ -109,6 +125,11 @@ export default async function AdminServicesPage() {
                           {service.isFeatured && <Badge tone="gold">منتخب</Badge>}
                           {!service.isActive && <Badge tone="red">غیرفعال</Badge>}
                           {!service.isBookable && <Badge tone="neutral">بدون رزرو آنلاین</Badge>}
+                          {service.isActive &&
+                            service.isBookable &&
+                            !service.staff.some((link) => readyStaffIds.has(link.staffId)) && (
+                              <Badge tone="amber">پرسنلِ آماده ندارد — وقت خالی نشان نمی‌دهد</Badge>
+                            )}
                         </div>
 
                         <p className="mt-1.5 line-clamp-1 text-xs text-[color:var(--fg-muted)]">

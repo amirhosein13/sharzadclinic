@@ -179,9 +179,14 @@ export function BookingWizard({
         {step === 1 && service && (
           <StepShell
             title="متخصص را انتخاب کنید"
-            hint="اگر ترجیحی ندارید، «فرقی نمی‌کند» را بزنید تا اولین وقت خالی به شما پیشنهاد شود."
+            hint={
+              eligibleStaff.length > 0
+                ? "اگر ترجیحی ندارید، «فرقی نمی‌کند» را بزنید تا اولین وقت خالی به شما پیشنهاد شود."
+                : undefined
+            }
           >
             <div className="grid gap-3 sm:grid-cols-2">
+              {eligibleStaff.length > 0 && (
               <button
                 type="button"
                 onClick={() => {
@@ -205,6 +210,7 @@ export function BookingWizard({
                   </span>
                 </span>
               </button>
+              )}
 
               {eligibleStaff.map((member) => (
                 <button
@@ -237,8 +243,9 @@ export function BookingWizard({
             </div>
 
             {eligibleStaff.length === 0 && (
-              <p className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
-                برای این خدمت فعلاً متخصصی در سیستم ثبت نشده. لطفاً تلفنی هماهنگ کنید.
+              <p className="rounded-2xl bg-amber-50 p-4 text-sm leading-7 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                برای «{service.title}» هنوز متخصصی در سامانه‌ی رزرو آنلاین ثبت نشده است،
+                برای همین وقت خالی نشان داده نمی‌شود. لطفاً تلفنی هماهنگ کنید.
               </p>
             )}
           </StepShell>
@@ -268,7 +275,14 @@ export function BookingWizard({
                   </div>
                 )}
 
-                {dateKey && !loadingSlots && slots.length === 0 && (
+                {dateKey && !loadingSlots && slots.length === 0 && eligibleStaff.length === 0 && (
+                  <EmptyHint
+                    icon={Clock}
+                    text={`برای «${service.title}» هنوز متخصصی در رزرو آنلاین ثبت نشده. لطفاً تلفنی هماهنگ کنید.`}
+                  />
+                )}
+
+                {dateKey && !loadingSlots && slots.length === 0 && eligibleStaff.length > 0 && (
                   <>
                     <EmptyHint icon={Clock} text="متأسفانه این روز وقت خالی ندارد. روز دیگری را امتحان کنید." />
                     <WaitlistPrompt
