@@ -12,6 +12,7 @@
 import "../src/lib/timezone";
 import { PrismaClient } from "@prisma/client";
 import { notifyBookingReminder } from "../src/lib/notifications";
+import { generateFollowUps } from "../src/lib/followups";
 import { formatJalaliWithWeekday } from "../src/lib/date";
 import { toFa } from "../src/lib/utils";
 
@@ -72,7 +73,19 @@ async function main() {
   );
 }
 
+/** فهرست پیگیری منشی را هم روزانه به‌روز می‌کند */
+async function buildFollowUps() {
+  const result = await generateFollowUps();
+  const total = result.noShow + result.nextSession;
+  console.log(
+    total === 0
+      ? "\n🔎 پیگیری جدیدی لازم نبود."
+      : `\n🔎 ${toFa(total)} پیگیری جدید ساخته شد (${toFa(result.noShow)} مراجعه‌نکرده، ${toFa(result.nextSession)} جلسه‌ی بعد).`
+  );
+}
+
 main()
+  .then(() => buildFollowUps())
   .catch((error) => {
     console.error("❌ خطا در ارسال یادآوری‌ها:", error);
     process.exit(1);

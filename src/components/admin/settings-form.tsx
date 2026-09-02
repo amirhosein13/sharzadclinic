@@ -33,6 +33,7 @@ const FIELDS: {
   { key: "bookingHorizonDays", label: "افق رزرو (روز)", hint: "تا چند روز آینده بتوان نوبت گرفت", ltr: true },
   { key: "slotStepMinutes", label: "گام زمانی نوبت‌ها (دقیقه)", hint: "مثلاً ۳۰ یعنی نوبت‌ها هر نیم‌ساعت", ltr: true },
   { key: "depositPercent", label: "درصد بیعانه‌ی آنلاین", hint: "چند درصد از قیمت خدمت هنگام رزرو آنلاین پرداخت شود", ltr: true },
+  { key: "followUpAfterDays", label: "فاصله‌ی پیگیری جلسه‌ی بعد (روز)", hint: "اگر مشتری این‌قدر روز نیامده باشد، در فهرست پیگیری منشی می‌آید", ltr: true },
 ];
 
 export function SettingsForm({ settings }: { settings: SettingsMap }) {

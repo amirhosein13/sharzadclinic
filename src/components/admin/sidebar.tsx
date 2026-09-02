@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CalendarDays, CreditCard, FileText, Home, Image as ImageIcon, LayoutDashboard, LogOut,
-  Menu, MessageSquare, Quote, Send, Settings, Sparkles, Users, Wallet, X,
+  Menu, MessageSquare, PhoneCall, Quote, Send, Settings, Sparkles, Users, Wallet, X,
 } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -24,6 +24,7 @@ const NAV: {
   { href: "/admin", label: "داشبورد", icon: LayoutDashboard, permission: "dashboard", exact: true },
   { href: "/admin/appointments", label: "نوبت‌ها", icon: CalendarDays, permission: "appointments.all", badgeKey: "pendingAppointments" },
   { href: "/admin/my", label: "نوبت‌های من", icon: CalendarDays, permission: "appointments.own", exact: true },
+  { href: "/admin/followups", label: "پیگیری مراجعین", icon: PhoneCall, permission: "appointments.all", badgeKey: "openFollowUps" },
   { href: "/admin/customers", label: "مشتریان", icon: Users, permission: "customers" },
   { href: "/admin/services", label: "خدمات", icon: Sparkles, permission: "content" },
   { href: "/admin/staff", label: "پرسنل", icon: Users, permission: "staff" },
@@ -43,6 +44,7 @@ export type SidebarBadges = {
   pendingAppointments?: number;
   pendingTestimonials?: number;
   unreadMessages?: number;
+  openFollowUps?: number;
 };
 
 export function Sidebar({

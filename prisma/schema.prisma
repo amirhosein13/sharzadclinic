@@ -86,6 +86,11 @@ model Customer {
   treatments   TreatmentRecord[]
   payments     Payment[]
   testimonials Testimonial[]
+  packages     Package[]
+  followUps    FollowUp[]
+  consents     ConsentSignature[]
+  discountUses DiscountUse[]
+  waitlist     WaitlistEntry[]
 
   @@index([lastName, firstName])
   @@index([createdAt])
@@ -149,6 +154,8 @@ model Service {
   appointments Appointment[]
   staff        StaffOnService[]
   treatments   TreatmentRecord[]
+  packages     Package[]
+  waitlist     WaitlistEntry[]
 
   @@index([categoryId, isActive])
   @@index([isFeatured])
@@ -284,7 +291,11 @@ model Appointment {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  payments Payment[]
+  packageId String?
+  package   Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  payments  Payment[]
+  followUps FollowUp[]
 
   @@index([startsAt])
   @@index([status, startsAt])
@@ -308,7 +319,11 @@ model TreatmentRecord {
   description String?
   beforePhoto String?
   afterPhoto  String?
-  createdAt   DateTime @default(now())
+
+  packageId String?
+  package   Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
 
   @@index([customerId, performedAt])
   @@map("treatment_records")
@@ -526,4 +541,200 @@ model NotificationLog {
   @@index([createdAt])
   @@index([channel, status])
   @@map("notification_logs")
+}
+
+// ─── پکیج جلسات ────────────────────────────────────────────────
+
+/// دوره‌ی چندجلسه‌ای که مشتری یکجا می‌خرد (مثلاً «۶ جلسه لیزر کامل بدن»)
+model Package {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  serviceId  String
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  title         String
+  totalSessions Int
+  /// مبلغ کل دوره به تومان
+  price         Int    @default(0)
+  /// مبلغی که تا الان دریافت شده
+  paidAmount    Int    @default(0)
+
+  purchasedAt DateTime  @default(now())
+  /// پس از این تاریخ جلسات باقی‌مانده منقضی می‌شوند
+  expiresAt   DateTime?
+  note        String?
+  isActive    Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appointments Appointment[]
+  treatments   TreatmentRecord[]
+
+  @@index([customerId, isActive])
+  @@map("packages")
+}
+
+// ─── پیگیری مراجعین ────────────────────────────────────────────
+
+enum FollowUpKind {
+  NO_SHOW // مراجعه نکرد
+  NEXT_SESSION // وقت جلسه‌ی بعدی دوره رسیده
+  POST_CARE // پیگیری بعد از درمان
+  CUSTOM // یادداشت دستی منشی
+}
+
+enum FollowUpStatus {
+  OPEN
+  DONE
+  SNOOZED
+  DISMISSED
+}
+
+/// کارتابل پیگیری منشی — چه کسی باید تماس بگیرد و چرا
+model FollowUp {
+  id            String       @id @default(cuid())
+  customerId    String
+  customer      Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  kind   FollowUpKind
+  dueAt  DateTime
+  reason String?
+
+  status    FollowUpStatus @default(OPEN)
+  /// نتیجه‌ی تماس: پاسخ نداد، نوبت گرفت، منصرف شد و...
+  outcome   String?
+  note      String?
+  handledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, dueAt])
+  @@index([customerId])
+  @@map("follow_ups")
+}
+
+// ─── رضایت‌نامه دیجیتال ────────────────────────────────────────
+
+model ConsentTemplate {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  title    String
+  body     String
+  isActive Boolean @default(true)
+  order    Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  signatures ConsentSignature[]
+
+  @@map("consent_templates")
+}
+
+model ConsentSignature {
+  id         String          @id @default(cuid())
+  templateId String
+  template   ConsentTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  customerId String
+  customer   Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  /// نام و کد ملی همان‌طور که هنگام امضا وارد شده
+  fullName      String
+  nationalCode  String?
+  /// تصویر امضا به شکل data URL
+  signatureData String?
+  /// متن رضایت‌نامه در لحظه‌ی امضا، تا تغییر بعدی قالب سند را عوض نکند
+  bodySnapshot  String
+
+  signedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([customerId, signedAt])
+  @@map("consent_signatures")
+}
+
+// ─── کد تخفیف ──────────────────────────────────────────────────
+
+enum DiscountKind {
+  PERCENT
+  FIXED
+}
+
+model DiscountCode {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  kind        DiscountKind @default(PERCENT)
+  /// درصد (۱ تا ۱۰۰) یا مبلغ ثابت به تومان
+  value       Int
+  /// حداقل مبلغ خرید برای اعمال تخفیف
+  minAmount   Int?
+  /// سقف مبلغ تخفیف برای کدهای درصدی
+  maxDiscount Int?
+
+  maxUses   Int?
+  usedCount Int  @default(0)
+
+  startsAt  DateTime?
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
+  note      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  uses DiscountUse[]
+
+  @@index([isActive, expiresAt])
+  @@map("discount_codes")
+}
+
+model DiscountUse {
+  id            String       @id @default(cuid())
+  codeId        String
+  code          DiscountCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  customerId    String
+  customer      Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  appointmentId String?
+  /// مبلغ تخفیف اعمال‌شده به تومان
+  amount        Int
+  usedAt        DateTime     @default(now())
+
+  @@index([codeId])
+  @@map("discount_uses")
+}
+
+// ─── لیست انتظار ───────────────────────────────────────────────
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  BOOKED
+  CANCELLED
+}
+
+model WaitlistEntry {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  serviceId  String
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  /// بازه‌ی زمانی مورد نظر مشتری
+  fromDate DateTime
+  toDate   DateTime
+  note     String?
+
+  status     WaitlistStatus @default(WAITING)
+  notifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, fromDate])
+  @@map("waitlist_entries")
 }

@@ -22,6 +22,8 @@ export const DEFAULT_SETTINGS = {
   slotStepMinutes: "30",
   /** درصد بیعانه‌ی آنلاین از قیمت پایه‌ی خدمت */
   depositPercent: "30",
+  /** پس از چند روز از آخرین جلسه، پیگیری جلسه‌ی بعدی ساخته شود */
+  followUpAfterDays: "28",
 } as const;
 
 export type SettingsMap = Record<string, string>;
