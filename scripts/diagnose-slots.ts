@@ -9,6 +9,7 @@ import "../src/lib/timezone";
 import { PrismaClient } from "@prisma/client";
 import { getAvailableSlots } from "../src/lib/availability";
 import { getSettings } from "../src/lib/settings";
+import { listBackups } from "../src/lib/backup";
 import { formatJalali, jalaliWeekday, WEEKDAYS_FA, ymdKey } from "../src/lib/date";
 import { toFa } from "../src/lib/utils";
 
@@ -36,12 +37,23 @@ async function main() {
   console.log("\n🔌 سرویس‌های بیرونی (از فایل .env خوانده می‌شود)");
 
   const smsProvider = (process.env.SMS_PROVIDER ?? "console").toLowerCase();
-  const smsReady = smsProvider === "kavenegar" && !!process.env.KAVENEGAR_API_KEY;
+  const isMeli = smsProvider === "melipayamak" || smsProvider === "meli";
+  const smsReady = isMeli
+    ? !!process.env.MELIPAYAMAK_USERNAME && !!process.env.MELIPAYAMAK_PASSWORD
+    : smsProvider === "kavenegar" && !!process.env.KAVENEGAR_API_KEY;
   console.log(
     smsReady
-      ? `   ${OK} پیامک — کاوه‌نگار فعال است`
+      ? `   ${OK} پیامک — ${isMeli ? "ملی پیامک" : "کاوه‌نگار"} فعال است`
       : `   ${WARN}پیامک — حالت «${smsProvider}»: پیامک واقعی ارسال نمی‌شود، فقط در ترمینال چاپ می‌شود`,
   );
+  if (smsReady && isMeli && !process.env.MELIPAYAMAK_SENDER) {
+    problems.push("MELIPAYAMAK_SENDER (شماره‌ی فرستنده) تنظیم نشده — پیامک‌های عادی ارسال نمی‌شوند.");
+  }
+  if (smsReady && isMeli && !process.env.MELIPAYAMAK_OTP_BODY_ID) {
+    problems.push(
+      "MELIPAYAMAK_OTP_BODY_ID تنظیم نشده — کد ورود مشتری ارسال نمی‌شود و کسی نمی‌تواند وارد حسابش شود.",
+    );
+  }
   if (!smsReady) {
     problems.push(
       "پیامک واقعی ارسال نمی‌شود (SMS_PROVIDER/KAVENEGAR_API_KEY در .env تنظیم نشده) — مشتری نمی‌تواند وارد حسابش شود.",
@@ -80,6 +92,24 @@ async function main() {
   );
   if (weakSecret) {
     problems.push("AUTH_SECRET هنوز مقدار نمونه است — قبل از انتشار با `openssl rand -base64 32` عوضش کن.");
+  }
+
+  /* ── پشتیبان‌گیری ────────────────────────────────────── */
+  console.log("\n🗄️  پشتیبان‌گیری");
+  const backups = await listBackups();
+  if (backups.length === 0) {
+    console.log(`   ${BAD} هیچ پشتیبانی وجود ندارد`);
+    problems.push(
+      "هیچ پشتیبانی از دیتابیس گرفته نشده. یک بار `npm run backup` بزن و کرون شبانه را روی سرور تنظیم کن.",
+    );
+  } else {
+    const days = Math.floor((Date.now() - backups[0].createdAt.getTime()) / 86_400_000);
+    console.log(
+      `   ${days <= 1 ? OK : WARN}آخرین پشتیبان: ${formatJalali(backups[0].createdAt)} (${toFa(days)} روز پیش) • ${toFa(backups.length)} نسخه`,
+    );
+    if (days > 1) {
+      problems.push(`${toFa(days)} روز است پشتیبان گرفته نشده — کرون شبانه را بررسی کن.`);
+    }
   }
 
   /* ── ساعات کاری کلینیک ───────────────────────────────── */

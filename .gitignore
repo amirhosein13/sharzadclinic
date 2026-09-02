@@ -14,7 +14,7 @@ npm-debug.log*
 /public/uploads/*
 !/public/uploads/.gitkeep
 
-# عکس‌های پرونده‌ی مشتری — هیچ‌وقت داخل مخزن نمی‌روند
+# عکس‌های پرونده‌ی مشتری و فایل‌های پشتیبان — هیچ‌وقت داخل مخزن نمی‌روند
 /storage
 /prisma/*.db
 /data/

@@ -68,6 +68,78 @@ function kavenegarDriver(apiKey: string, sender: string, otpTemplate: string): S
   };
 }
 
+// ─── ملی پیامک ─────────────────────────────────────────────────
+
+/**
+ * REST API ملی پیامک (rest.payamak-panel.com) — همان چیزی که SDK رسمی
+ * خودشان استفاده می‌کند. با نام کاربری و رمز پنل کار می‌کند، نه توکن.
+ *
+ * پاسخ به شکل { Value, RetStatus, StrRetStatus } برمی‌گردد؛ در موفقیت
+ * RetStatus برابر ۱ و Value شناسه‌ی پیام است. اگر روزی قالب پاسخ عوض شد،
+ * شناسه‌ی عددیِ بلند در Value هم به‌عنوان موفقیت پذیرفته می‌شود.
+ */
+function meliPayamakDriver(
+  username: string,
+  password: string,
+  sender: string,
+  otpBodyId: string,
+): SmsDriver {
+  const base = "https://rest.payamak-panel.com/api/SendSMS";
+
+  type MeliResponse = { Value?: string | number; RetStatus?: number; StrRetStatus?: string };
+
+  async function call(path: string, body: Record<string, string>): Promise<SmsResult> {
+    try {
+      const res = await fetch(`${base}/${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, ...body }),
+        cache: "no-store",
+      });
+
+      if (!res.ok) return { ok: false, error: `خطای ${res.status} از ملی پیامک` };
+
+      const data = (await res.json()) as MeliResponse;
+      const value = String(data.Value ?? "");
+      // شناسه‌ی پیام یک عدد بلند است؛ کدهای خطا عددهای کوچک‌اند
+      const looksLikeMessageId = /^\d{6,}$/.test(value);
+
+      if (data.RetStatus === 1 || looksLikeMessageId) {
+        return { ok: true, providerId: value || undefined };
+      }
+      return {
+        ok: false,
+        error: data.StrRetStatus || `ملی پیامک کد ${value || data.RetStatus} برگرداند`,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "ارتباط با ملی پیامک برقرار نشد",
+      };
+    }
+  }
+
+  return {
+    name: "melipayamak",
+    async send(to, message) {
+      if (!sender) {
+        return { ok: false, error: "شماره‌ی فرستنده (MELIPAYAMAK_SENDER) تنظیم نشده است." };
+      }
+      return call("SendSMS", { to, from: sender, text: message, isFlash: "false" });
+    },
+    async sendOtp(to, code) {
+      if (!otpBodyId) {
+        return {
+          ok: false,
+          error: "شناسه‌ی الگوی خدمات پایه (MELIPAYAMAK_OTP_BODY_ID) تنظیم نشده است.",
+        };
+      }
+      // در «خدمات پایه»، text همان مقداری است که جای متغیر الگو می‌نشیند
+      return call("BaseServiceNumber", { to, text: code, bodyId: otpBodyId });
+    },
+  };
+}
+
 // ─── انتخاب درایور بر اساس تنظیمات ─────────────────────────────
 
 let cached: SmsDriver | null = null;
@@ -76,6 +148,25 @@ export function getSmsDriver(): SmsDriver {
   if (cached) return cached;
 
   const provider = (process.env.SMS_PROVIDER ?? "console").toLowerCase();
+
+  if (provider === "melipayamak" || provider === "meli") {
+    const username = process.env.MELIPAYAMAK_USERNAME;
+    const password = process.env.MELIPAYAMAK_PASSWORD;
+    if (!username || !password) {
+      console.warn(
+        "⚠️ SMS_PROVIDER=melipayamak است اما MELIPAYAMAK_USERNAME/PASSWORD تنظیم نشده — به حالت کنسول برمی‌گردیم.",
+      );
+      cached = consoleDriver;
+      return cached;
+    }
+    cached = meliPayamakDriver(
+      username,
+      password,
+      process.env.MELIPAYAMAK_SENDER ?? "",
+      process.env.MELIPAYAMAK_OTP_BODY_ID ?? "",
+    );
+    return cached;
+  }
 
   if (provider === "kavenegar") {
     const apiKey = process.env.KAVENEGAR_API_KEY;

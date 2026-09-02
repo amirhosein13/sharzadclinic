@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, CreditCard, FileSignature, FileText, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, PhoneCall, Quote, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
+import { BarChart3, CalendarDays, CreditCard, DatabaseBackup, FileSignature, FileText, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, PhoneCall, Quote, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -17,6 +17,8 @@ const NAV: {
   permission: Permission;
   exact?: boolean;
   badgeKey?: keyof SidebarBadges;
+  /** فقط مدیر کل ببیند */
+  adminOnly?: boolean;
 }[] = [
   { href: "/admin", label: "داشبورد", icon: LayoutDashboard, permission: "dashboard", exact: true },
   { href: "/admin/appointments", label: "نوبت‌ها", icon: CalendarDays, permission: "appointments.all", badgeKey: "pendingAppointments" },
@@ -40,6 +42,7 @@ const NAV: {
   { href: "/admin/users", label: "کاربران", icon: Users, permission: "users" },
   { href: "/admin/notifications", label: "پیامک و ایمیل", icon: Send, permission: "notifications" },
   { href: "/admin/settings", label: "تنظیمات", icon: Settings, permission: "settings" },
+  { href: "/admin/backup", label: "پشتیبان‌گیری", icon: DatabaseBackup, permission: "settings", adminOnly: true },
 ];
 
 export type SidebarBadges = {
@@ -58,7 +61,9 @@ export function Sidebar({
   user: { name: string; email: string; role: Role };
   badges: SidebarBadges;
 }) {
-  const visibleNav = NAV.filter((item) => can(user.role, item.permission));
+  const visibleNav = NAV.filter(
+    (item) => can(user.role, item.permission) && (!item.adminOnly || user.role === "ADMIN"),
+  );
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
