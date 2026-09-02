@@ -3,10 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  CalendarDays, CreditCard, FileText, Home, Image as ImageIcon, LayoutDashboard, LogOut,
-  Menu, MessageSquare, PhoneCall, Quote, Send, Settings, Sparkles, Users, Wallet, X,
-} from "lucide-react";
+import { CalendarDays, CreditCard, FileSignature, FileText, Home, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, PhoneCall, Quote, Send, Settings, Sparkles, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -31,6 +28,7 @@ const NAV: {
   { href: "/admin/payments", label: "پرداخت‌ها", icon: CreditCard, permission: "payroll" },
   { href: "/admin/payroll", label: "حقوق و دستمزد", icon: Wallet, permission: "payroll" },
   { href: "/admin/my/earnings", label: "درآمد من", icon: Wallet, permission: "payroll.own" },
+  { href: "/admin/consents", label: "رضایت‌نامه‌ها", icon: FileSignature, permission: "content" },
   { href: "/admin/gallery", label: "گالری", icon: ImageIcon, permission: "content" },
   { href: "/admin/blog", label: "مجله", icon: FileText, permission: "content" },
   { href: "/admin/testimonials", label: "نظرات", icon: Quote, permission: "content", badgeKey: "pendingTestimonials" },

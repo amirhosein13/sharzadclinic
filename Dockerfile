@@ -43,6 +43,12 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
+# آپلودهای عمومی و عکس‌های پرونده‌ی مشتری. روی هاست، این دو مسیر را به یک
+# دیسک ماندگار وصل کنید وگرنه با هر بار دیپلوی پاک می‌شوند.
+RUN mkdir -p /app/public/uploads /app/storage/private \
+  && chown -R nextjs:nodejs /app/public/uploads /app/storage
+VOLUME ["/app/public/uploads", "/app/storage"]
+
 USER nextjs
 EXPOSE 3000
 

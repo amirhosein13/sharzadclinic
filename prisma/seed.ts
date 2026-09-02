@@ -1,7 +1,9 @@
 import "../src/lib/timezone";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { CATEGORIES, SERVICES, STAFF, POSTS, TESTIMONIALS, GALLERY } from "./seed-data";
+import {
+  CATEGORIES, SERVICES, STAFF, POSTS, TESTIMONIALS, GALLERY, CONSENT_TEMPLATES,
+} from "./seed-data";
 
 const prisma = new PrismaClient();
 
@@ -217,6 +219,16 @@ async function main() {
         },
       });
     }
+  }
+
+  // ─── رضایت‌نامه‌ها ────────────────────────────────────────
+  for (const t of CONSENT_TEMPLATES) {
+    await prisma.consentTemplate.upsert({
+      where: { slug: t.slug },
+      // متن موجود بازنویسی نمی‌شود تا ویرایش‌های کلینیک از بین نرود
+      update: {},
+      create: { slug: t.slug, title: t.title, body: t.body, order: t.order },
+    });
   }
 
   console.log("✅ دیتابیس آماده شد.");

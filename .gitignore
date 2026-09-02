@@ -13,6 +13,9 @@ npm-debug.log*
 .idea/
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+# عکس‌های پرونده‌ی مشتری — هیچ‌وقت داخل مخزن نمی‌روند
+/storage
 /prisma/*.db
 /data/
 next-env.d.ts

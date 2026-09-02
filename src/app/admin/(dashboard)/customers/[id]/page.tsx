@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, CalendarDays, FileText, Package as PackageIcon, Phone, Trash2, Wallet } from "lucide-react";
+import { ArrowRight, CalendarDays, FileSignature, FileText, Package as PackageIcon, Phone, Trash2, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
@@ -10,9 +10,13 @@ import { TreatmentForm } from "@/components/admin/forms/treatment-form";
 import { WalkInForm } from "@/components/admin/forms/walkin-form";
 import { ActionButton } from "@/components/admin/action-button";
 import { deleteTreatment } from "@/app/actions/reception";
+import { deleteConsentSignature } from "@/app/actions/consents";
+import { ConsentSignForm } from "@/components/admin/forms/consent-sign-form";
 import { PackageForm } from "@/components/admin/forms/package-form";
 import { PackageCard } from "@/components/admin/package-card";
+import { CasePhotos } from "@/components/case-photos";
 import { summarizePackages } from "@/lib/packages";
+import { renderConsentBody } from "@/lib/consents";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_META } from "@/lib/appointment-status";
 import { formatJalaliLong, formatJalaliWithWeekday, formatTime, toJalaliInput } from "@/lib/date";
@@ -41,12 +45,16 @@ export default async function CustomerDetailPage({
         orderBy: { performedAt: "desc" },
       },
       payments: { orderBy: { paidAt: "desc" } },
+      consents: {
+        include: { template: { select: { title: true } } },
+        orderBy: { signedAt: "desc" },
+      },
     },
   });
 
   if (!customer) notFound();
 
-  const [services, staff, packages, currentUser] = await Promise.all([
+  const [services, staff, packages, consentTemplates, currentUser] = await Promise.all([
     prisma.service.findMany({
       where: { isActive: true },
       select: { id: true, title: true },
@@ -58,6 +66,11 @@ export default async function CustomerDetailPage({
       orderBy: { order: "asc" },
     }),
     summarizePackages(customer.id),
+    prisma.consentTemplate.findMany({
+      where: { isActive: true },
+      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+      select: { id: true, title: true, body: true },
+    }),
     getSession(),
   ]);
 
@@ -68,12 +81,27 @@ export default async function CustomerDetailPage({
       label: `${p.title} — ${toFa(p.remainingSessions)} جلسه باقی`,
     }));
 
+  const canManageContent = currentUser?.role === "ADMIN" || currentUser?.role === "MANAGER";
+
   const canEditPackages =
     currentUser?.role === "ADMIN" ||
     currentUser?.role === "MANAGER" ||
     currentUser?.role === "RECEPTION";
 
   const fullName = `${customer.firstName} ${customer.lastName}`;
+
+  // متن هر قالب با نام و تاریخ امروز آماده می‌شود تا منشی همان چیزی را
+  // ببیند که امضا می‌شود
+  const consentOptions = await Promise.all(
+    consentTemplates.map(async (t) => ({
+      id: t.id,
+      title: t.title,
+      preview: await renderConsentBody(t.body, {
+        fullName,
+        nationalCode: customer.nationalCode,
+      }),
+    })),
+  );
 
   const totalPaid = customer.payments
     .filter((p) => p.status === "PAID")
@@ -262,6 +290,72 @@ export default async function CustomerDetailPage({
           <Card padded={false}>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-6">
               <h2 className="font-bold">
+                رضایت‌نامه‌ها
+                <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
+                  ({toFa(customer.consents.length)} امضا)
+                </span>
+              </h2>
+              {consentOptions.length > 0 && canEditPackages && (
+                <ConsentSignForm
+                  customerId={customer.id}
+                  customerName={fullName}
+                  nationalCode={customer.nationalCode}
+                  templates={consentOptions}
+                />
+              )}
+            </div>
+
+            {customer.consents.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={FileSignature}
+                  title="رضایت‌نامه‌ای امضا نشده"
+                  description={
+                    consentOptions.length === 0
+                      ? "اول از بخش «رضایت‌نامه‌ها» یک متن بسازید."
+                      : "پیش از شروع درمان، متن را با مراجعه‌کننده بخوانید و امضا بگیرید."
+                  }
+                />
+              </div>
+            ) : (
+              <ul className="divide-y divide-[color:var(--line)]">
+                {customer.consents.map((c) => (
+                  <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 p-5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{c.template.title}</p>
+                      <p className="mt-1 text-xs text-[color:var(--fg-muted)]">
+                        {c.fullName} • {formatJalaliLong(c.signedAt)}
+                        {c.signatureData ? " • با امضا" : " • بدون امضای تصویری"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Link
+                        href={`/admin/print/consent/${c.id}`}
+                        target="_blank"
+                        className="rounded-lg border border-[color:var(--line)] px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[color:var(--bg-sunken)]"
+                      >
+                        مشاهده و چاپ
+                      </Link>
+                      {canManageContent && (
+                        <ActionButton
+                          action={deleteConsentSignature.bind(null, c.id)}
+                          confirm="این رضایت‌نامه‌ی امضاشده حذف شود؟"
+                          title="حذف رضایت‌نامه"
+                          className="size-8 p-0 text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </ActionButton>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          <Card padded={false}>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-6">
+              <h2 className="font-bold">
                 پرونده‌ی درمانی
                 <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
                   ({toFa(customer.treatments.length)} جلسه)
@@ -317,6 +411,8 @@ export default async function CustomerDetailPage({
                             performedAt: toJalaliInput(t.performedAt),
                             sessionNo: t.sessionNo,
                             description: t.description,
+                            beforePhoto: t.beforePhoto,
+                            afterPhoto: t.afterPhoto,
                           }}
                         />
                         <ActionButton
@@ -334,6 +430,11 @@ export default async function CustomerDetailPage({
                         {t.description}
                       </p>
                     )}
+                    <CasePhotos
+                      before={t.beforePhoto}
+                      after={t.afterPhoto}
+                      caption={`${t.service?.title ?? "خدمت نامشخص"} — ${formatJalaliLong(t.performedAt)}`}
+                    />
                   </li>
                 ))}
               </ul>

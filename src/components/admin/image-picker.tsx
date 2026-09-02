@@ -15,12 +15,15 @@ export function ImagePicker({
   defaultValue,
   aspect = "aspect-[16/10]",
   hint,
+  scope = "public",
 }: {
   name: string;
   label: string;
   defaultValue?: string | null;
   aspect?: string;
   hint?: string;
+  /** private برای عکس‌های پرونده‌ی مشتری — بیرون از public ذخیره می‌شوند */
+  scope?: "public" | "private";
 }) {
   const [url, setUrl] = useState(defaultValue ?? "");
   const [uploading, setUploading] = useState(false);
@@ -31,6 +34,7 @@ export function ImagePicker({
     try {
       const body = new FormData();
       body.set("file", file);
+      body.set("scope", scope);
       const res = await fetch("/api/upload", { method: "POST", body });
       const data = await res.json();
       if (data.ok) {
@@ -56,7 +60,13 @@ export function ImagePicker({
       >
         {url ? (
           <>
-            <Image src={url} alt="" fill sizes="400px" className="object-cover" />
+            {scope === "private" ? (
+              // فایل خصوصی پشت لایه‌ی دسترسی است و بهینه‌ساز تصویر به آن نمی‌رسد
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={url} alt="" className="absolute inset-0 size-full object-cover" />
+            ) : (
+              <Image src={url} alt="" fill sizes="400px" className="object-cover" />
+            )}
             <button
               type="button"
               onClick={() => setUrl("")}
@@ -86,7 +96,7 @@ export function ImagePicker({
 
       <div className="mt-2 flex items-center justify-between gap-3">
         <p className="text-xs text-[color:var(--fg-muted)]">
-          {hint ?? "JPG، PNG، WebP یا SVG — حداکثر ۵ مگابایت"}
+          {hint ?? (scope === "private" ? "JPG، PNG، WebP یا AVIF — حداکثر ۵ مگابایت" : "JPG، PNG، WebP یا SVG — حداکثر ۵ مگابایت")}
         </p>
         {url && (
           <button
@@ -102,7 +112,11 @@ export function ImagePicker({
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+        accept={
+          scope === "private"
+            ? "image/jpeg,image/png,image/webp,image/avif"
+            : "image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+        }
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];

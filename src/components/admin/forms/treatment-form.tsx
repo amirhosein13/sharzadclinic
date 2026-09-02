@@ -5,6 +5,7 @@ import { CrudDialog } from "@/components/admin/crud-dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { saveTreatment } from "@/app/actions/reception";
+import { ImagePicker } from "@/components/admin/image-picker";
 
 export type TreatmentFormValues = {
   id: string;
@@ -14,6 +15,8 @@ export type TreatmentFormValues = {
   performedAt: string;
   sessionNo: number | null;
   description: string | null;
+  beforePhoto: string | null;
+  afterPhoto: string | null;
 };
 
 export function TreatmentForm({
@@ -136,6 +139,32 @@ export function TreatmentForm({
           >
             <Textarea name="description" rows={4} defaultValue={record?.description ?? ""} />
           </Field>
+
+          <div className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-sunken)] p-4">
+            <p className="mb-1 text-sm font-medium">عکس قبل و بعد</p>
+            <p className="mb-4 text-xs text-[color:var(--fg-muted)]">
+              این عکس‌ها فقط در پرونده دیده می‌شوند؛ نه در سایت و نه با آدرس مستقیم.
+              پیش از عکس گرفتن رضایت مشتری را بگیرید.
+            </p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <ImagePicker
+                name="beforePhoto"
+                label="قبل"
+                scope="private"
+                aspect="aspect-[4/5]"
+                defaultValue={record?.beforePhoto}
+                hint=""
+              />
+              <ImagePicker
+                name="afterPhoto"
+                label="بعد"
+                scope="private"
+                aspect="aspect-[4/5]"
+                defaultValue={record?.afterPhoto}
+                hint=""
+              />
+            </div>
+          </div>
         </>
       )}
     </CrudDialog>

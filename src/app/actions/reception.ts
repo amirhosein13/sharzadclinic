@@ -8,6 +8,7 @@ import {
 } from "@/lib/validators";
 import { atTime, parseJalaliInput, parseYmdKey } from "@/lib/date";
 import { generateBookingCode } from "@/lib/utils";
+import { deletePrivateFile } from "@/lib/upload";
 import type { FormResult } from "./content";
 
 const OK = (message: string): FormResult => ({ ok: true, message });
@@ -139,6 +140,8 @@ export async function saveTreatment(formData: FormData): Promise<FormResult> {
       performedAt: text(formData.get("performedAt")),
       sessionNo: text(formData.get("sessionNo")),
       description: text(formData.get("description")),
+      beforePhoto: text(formData.get("beforePhoto")),
+      afterPhoto: text(formData.get("afterPhoto")),
     });
     if (!parsed.success) return FAIL("ورودی‌ها را بررسی کنید.", fieldErrors(parsed.error));
 
@@ -159,10 +162,26 @@ export async function saveTreatment(formData: FormData): Promise<FormResult> {
       performedAt,
       sessionNo: v.sessionNo,
       description: nullable(v.description),
+      beforePhoto: nullable(v.beforePhoto),
+      afterPhoto: nullable(v.afterPhoto),
     };
 
-    if (id) await prisma.treatmentRecord.update({ where: { id }, data });
-    else await prisma.treatmentRecord.create({ data });
+    if (id) {
+      const before = await prisma.treatmentRecord.findUnique({
+        where: { id },
+        select: { beforePhoto: true, afterPhoto: true },
+      });
+      await prisma.treatmentRecord.update({ where: { id }, data });
+      // عکس‌های جایگزین‌شده روی دیسک نمانند
+      if (before?.beforePhoto && before.beforePhoto !== data.beforePhoto) {
+        await deletePrivateFile(before.beforePhoto);
+      }
+      if (before?.afterPhoto && before.afterPhoto !== data.afterPhoto) {
+        await deletePrivateFile(before.afterPhoto);
+      }
+    } else {
+      await prisma.treatmentRecord.create({ data });
+    }
 
     revalidatePath(`/admin/customers/${v.customerId}`);
     revalidatePath("/account");
@@ -173,6 +192,8 @@ export async function saveTreatment(formData: FormData): Promise<FormResult> {
 export async function deleteTreatment(id: string): Promise<FormResult> {
   return guard(async () => {
     const record = await prisma.treatmentRecord.delete({ where: { id } });
+    await deletePrivateFile(record.beforePhoto);
+    await deletePrivateFile(record.afterPhoto);
     revalidatePath(`/admin/customers/${record.customerId}`);
     revalidatePath("/account");
     return OK("سابقه حذف شد.");

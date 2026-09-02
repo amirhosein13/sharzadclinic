@@ -1,10 +1,22 @@
 import "server-only";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 
-const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
+/** تصاویر عمومی سایت (گالری، خدمات، مجله) — مستقیم از وب سرو می‌شوند */
+const PUBLIC_DIR = join(process.cwd(), "public", "uploads");
+/**
+ * فایل‌های پرونده‌ی مشتری (عکس قبل/بعد). بیرون از public نگه داشته می‌شوند
+ * تا با حدس زدن آدرس قابل دیدن نباشند؛ فقط از مسیر /api/files و پس از
+ * بررسی دسترسی سرو می‌شوند.
+ */
+const PRIVATE_DIR = process.env.PRIVATE_UPLOAD_DIR
+  ? join(process.env.PRIVATE_UPLOAD_DIR)
+  : join(process.cwd(), "storage", "private");
+
 const MAX_BYTES = 5 * 1024 * 1024; // ۵ مگابایت
+
+export type UploadVisibility = "public" | "private";
 
 const ALLOWED: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -34,7 +46,10 @@ export type UploadResult = { ok: true; url: string } | { ok: false; message: str
  * فایل آپلودشده را در public/uploads ذخیره و آدرس عمومی‌اش را برمی‌گرداند.
  * نام فایل تصادفی است تا نام اصلی نتواند مسیر را دستکاری کند.
  */
-export async function saveUpload(file: File): Promise<UploadResult> {
+export async function saveUpload(
+  file: File,
+  visibility: UploadVisibility = "public",
+): Promise<UploadResult> {
   if (!file || file.size === 0) return { ok: false, message: "فایلی انتخاب نشده است." };
   if (file.size > MAX_BYTES) {
     return { ok: false, message: "حجم تصویر نباید بیشتر از ۵ مگابایت باشد." };
@@ -49,9 +64,52 @@ export async function saveUpload(file: File): Promise<UploadResult> {
     return { ok: false, message: "محتوای فایل با فرمت اعلام‌شده هم‌خوانی ندارد." };
   }
 
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  const name = `${Date.now()}-${randomBytes(6).toString("hex")}.${actual}`;
-  await writeFile(join(UPLOAD_DIR, name), buffer);
+  // SVG می‌تواند اسکریپت داشته باشد؛ در پرونده‌ی مشتری اصلاً لازم نیست
+  if (visibility === "private" && actual === "svg") {
+    return { ok: false, message: "برای عکس پرونده فقط JPG، PNG، WebP یا AVIF مجاز است." };
+  }
 
-  return { ok: true, url: `/uploads/${name}` };
+  const dir = visibility === "private" ? PRIVATE_DIR : PUBLIC_DIR;
+  await mkdir(dir, { recursive: true });
+  const name = `${Date.now()}-${randomBytes(6).toString("hex")}.${actual}`;
+  await writeFile(join(dir, name), buffer);
+
+  return {
+    ok: true,
+    url: visibility === "private" ? `${PRIVATE_URL_PREFIX}${name}` : `/uploads/${name}`,
+  };
+}
+
+export const PRIVATE_URL_PREFIX = "/api/files/";
+
+/** آیا این آدرس یک فایل خصوصیِ پرونده است؟ */
+export function isPrivateUrl(url: string | null | undefined): boolean {
+  return !!url && url.startsWith(PRIVATE_URL_PREFIX);
+}
+
+/**
+ * مسیر فایل خصوصی روی دیسک. نام فایل سخت‌گیرانه بررسی می‌شود تا
+ * با «..» یا اسلش نشود از پوشه بیرون رفت.
+ */
+export function privateFilePath(name: string): string | null {
+  if (!/^[a-z0-9]+-[a-z0-9]+\.(jpg|png|webp|avif)$/i.test(name)) return null;
+  return join(PRIVATE_DIR, name);
+}
+
+export const PRIVATE_CONTENT_TYPES: Record<string, string> = {
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  avif: "image/avif",
+};
+
+/**
+ * حذف فایل خصوصیِ بی‌استفاده (وقتی عکس عوض یا سابقه حذف می‌شود).
+ * اگر فایل نبود بی‌سروصدا رد می‌شود — نباید جلوی ذخیره‌ی رکورد را بگیرد.
+ */
+export async function deletePrivateFile(url: string | null | undefined): Promise<void> {
+  if (!isPrivateUrl(url)) return;
+  const path = privateFilePath(url!.slice(PRIVATE_URL_PREFIX.length));
+  if (!path) return;
+  await unlink(path).catch(() => {});
 }

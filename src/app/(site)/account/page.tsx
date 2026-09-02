@@ -1,8 +1,7 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import {
-  CalendarHeart, CalendarPlus, FileText, LogOut, Package as PackageIcon, Sparkles, User, Wallet,
-} from "lucide-react";
+import { CalendarHeart, CalendarPlus, FileSignature, FileText, LogOut, Package as PackageIcon, Sparkles, User, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCustomerSession } from "@/lib/customer-auth";
 import { activePackages } from "@/lib/packages";
@@ -15,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { AppointmentActions } from "@/components/site/appointment-actions";
 import { DepositButton } from "@/components/site/deposit-button";
 import { ProfileForm } from "@/components/site/profile-form";
+import { CasePhotos } from "@/components/case-photos";
 import { STATUS_META } from "@/lib/appointment-status";
 import { formatJalaliLong, formatJalaliWithWeekday, formatTime } from "@/lib/date";
 import { formatToman, toFa } from "@/lib/utils";
@@ -50,6 +50,10 @@ export default async function AccountPage() {
         orderBy: { performedAt: "desc" },
       },
       payments: { where: { status: "PAID" }, orderBy: { paidAt: "desc" } },
+      consents: {
+        include: { template: { select: { title: true } } },
+        orderBy: { signedAt: "desc" },
+      },
     },
   });
 
@@ -74,6 +78,8 @@ export default async function AccountPage() {
     staffName: string | null;
     sessionNo: number | null;
     description: string | null;
+    beforePhoto?: string | null;
+    afterPhoto?: string | null;
     badge?: { label: string; tone: "rose" | "plum" };
   };
 
@@ -90,6 +96,8 @@ export default async function AccountPage() {
       staffName: t.staff?.name ?? null,
       sessionNo: t.sessionNo,
       description: t.description,
+      beforePhoto: t.beforePhoto,
+      afterPhoto: t.afterPhoto,
       badge: { label: "ثبت در پرونده", tone: "rose" as const },
     })),
     ...customer.appointments
@@ -299,6 +307,12 @@ export default async function AccountPage() {
                             {visit.description}
                           </p>
                         )}
+
+                        <CasePhotos
+                          before={visit.beforePhoto}
+                          after={visit.afterPhoto}
+                          caption={`${visit.title} — ${formatJalaliWithWeekday(visit.date)}`}
+                        />
                       </article>
                     </li>
                   ))}
@@ -321,6 +335,34 @@ export default async function AccountPage() {
                 phone={customer.phone}
               />
             </div>
+
+            {customer.consents.length > 0 && (
+              <div className="rounded-4xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-7 shadow-soft">
+                <h2 className="mb-2 font-bold">رضایت‌نامه‌های من</h2>
+                <p className="mb-5 text-xs leading-6 text-[color:var(--fg-muted)]">
+                  متن‌هایی که پیش از درمان امضا کرده‌اید و همیشه در دسترس شماست.
+                </p>
+                <ul className="space-y-3">
+                  {customer.consents.map((c) => (
+                    <li key={c.id}>
+                      <Link
+                        href={`/account/consent/${c.id}`}
+                        target="_blank"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] p-3.5 text-sm transition-colors hover:border-rose-300 hover:bg-[color:var(--bg-sunken)]"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{c.template.title}</span>
+                          <span className="mt-0.5 block text-xs text-[color:var(--fg-muted)]">
+                            {formatJalaliLong(c.signedAt)}
+                          </span>
+                        </span>
+                        <FileSignature className="size-4 shrink-0 text-rose-500" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {customer.payments.length > 0 && (
               <div className="rounded-4xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-7 shadow-soft">

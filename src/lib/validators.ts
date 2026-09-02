@@ -214,6 +214,8 @@ export const treatmentSchema = z.object({
       return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
     }),
   description: z.string().trim().max(2000).optional(),
+  beforePhoto: z.string().trim().max(500).optional(),
+  afterPhoto: z.string().trim().max(500).optional(),
 });
 
 export const walkInSchema = z.object({
@@ -233,4 +235,38 @@ export const timeOffSchema = z.object({
   fromTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   toTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   reason: z.string().trim().max(200).optional(),
+});
+
+export const consentTemplateSchema = z.object({
+  title: z.string().trim().min(3, "عنوان رضایت‌نامه را بنویسید").max(150),
+  slug: z.string().trim().max(80).optional(),
+  body: z.string().trim().min(30, "متن رضایت‌نامه خیلی کوتاه است").max(20000),
+  order: z
+    .union([z.literal(""), z.string(), z.number()])
+    .optional()
+    .transform((v) => {
+      const n = Number(toEn(String(v ?? "")));
+      return Number.isFinite(n) ? Math.round(n) : 0;
+    }),
+  isActive: z.boolean().optional(),
+});
+
+export const consentSignatureSchema = z.object({
+  customerId: z.string().min(1),
+  templateId: z.string().min(1, "رضایت‌نامه را انتخاب کنید"),
+  fullName: z.string().trim().min(3, "نام و نام خانوادگی را کامل بنویسید").max(120),
+  nationalCode: z
+    .string()
+    .trim()
+    .transform(toEn)
+    .refine((v) => v === "" || /^\d{10}$/.test(v), "کد ملی باید ۱۰ رقم باشد")
+    .optional(),
+  // تصویر امضا به شکل data URL؛ حدود ۲۰۰ کیلوبایت کافی است
+  signatureData: z
+    .string()
+    .trim()
+    .max(400_000, "امضا خیلی سنگین است")
+    .refine((v) => v === "" || v.startsWith("data:image/png;base64,"), "امضا معتبر نیست")
+    .optional(),
+  agreed: z.literal(true, { message: "بدون تأیید متن، رضایت‌نامه ثبت نمی‌شود" }),
 });
