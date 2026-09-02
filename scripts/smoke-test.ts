@@ -10,6 +10,9 @@ import { createBooking, trackAppointment } from "../src/app/actions/booking";
 import { atTime, parseYmdKey } from "../src/lib/date";
 import { summarizePackages, activePackages } from "../src/lib/packages";
 import { buildReport } from "../src/lib/reports";
+import { checkDiscount, normalizeCode, redeemDiscount } from "../src/lib/discounts";
+import { joinWaitlist } from "../src/app/actions/waitlist";
+import { matchesForSlot } from "../src/lib/waitlist";
 
 const prisma = new PrismaClient();
 
@@ -283,6 +286,139 @@ async function main() {
   await prisma.payment.deleteMany({ where: { customerId: rpCustomer.id } });
   await prisma.appointment.deleteMany({ where: { customerId: rpCustomer.id } });
   await prisma.customer.delete({ where: { id: rpCustomer.id } });
+
+  // ── کد تخفیف ────────────────────────────────────────────────
+  await prisma.discountUse.deleteMany({ where: { code: { code: { startsWith: "SMOKE" } } } });
+  await prisma.discountCode.deleteMany({ where: { code: { startsWith: "SMOKE" } } });
+
+  const dcCustomer = await prisma.customer.findFirstOrThrow();
+  const dcOther = await prisma.customer.findFirstOrThrow({ where: { id: { not: dcCustomer.id } } });
+
+  check("کد تخفیف یکدست می‌شود (فارسی و فاصله)", normalizeCode(" smoke۲۰ ") === "SMOKE20");
+
+  const pct = await prisma.discountCode.create({
+    data: {
+      code: "SMOKE20",
+      kind: "PERCENT",
+      value: 20,
+      maxDiscount: 100_000,
+      minAmount: 200_000,
+      maxUses: 2,
+    },
+  });
+  const fixed = await prisma.discountCode.create({
+    data: { code: "SMOKEFIX", kind: "FIXED", value: 500_000 },
+  });
+  const expiredCode = await prisma.discountCode.create({
+    data: {
+      code: "SMOKEOLD",
+      kind: "FIXED",
+      value: 50_000,
+      expiresAt: new Date(Date.now() - 86_400_000),
+    },
+  });
+
+  const below = await checkDiscount({ code: "smoke20", amount: 100_000 });
+  check("کد زیر حداقل خرید رد می‌شود", !below.ok);
+
+  const okPct = await checkDiscount({ code: "SMOKE20", amount: 300_000 });
+  check(
+    "تخفیف درصدی درست حساب می‌شود",
+    okPct.ok && okPct.discount === 60_000 && okPct.finalAmount === 240_000
+  );
+
+  const capped = await checkDiscount({ code: "SMOKE20", amount: 2_000_000 });
+  check("سقف تخفیف درصدی رعایت می‌شود", capped.ok && capped.discount === 100_000);
+
+  const overFixed = await checkDiscount({ code: "SMOKEFIX", amount: 300_000 });
+  check(
+    "تخفیف ثابت از مبلغ خرید بیشتر نمی‌شود",
+    overFixed.ok && overFixed.discount === 300_000 && overFixed.finalAmount === 0
+  );
+
+  const stale = await checkDiscount({ code: "SMOKEOLD", amount: 300_000 });
+  check("کد منقضی‌شده رد می‌شود", !stale.ok);
+
+  await redeemDiscount({ codeId: pct.id, customerId: dcCustomer.id, amount: 60_000 });
+  const repeat = await checkDiscount({ code: "SMOKE20", amount: 300_000, customerId: dcCustomer.id });
+  check("هر مشتری فقط یک بار از یک کد استفاده می‌کند", !repeat.ok);
+
+  await redeemDiscount({ codeId: pct.id, customerId: dcOther.id, amount: 60_000 });
+  const overCapacity = await redeemDiscount({
+    codeId: pct.id,
+    customerId: dcCustomer.id,
+    amount: 60_000,
+  });
+  const afterUses = await prisma.discountCode.findUniqueOrThrow({ where: { id: pct.id } });
+  check(
+    "ظرفیت کل کد قابل دور زدن نیست",
+    !overCapacity && afterUses.usedCount === 2
+  );
+
+  await prisma.discountUse.deleteMany({
+    where: { codeId: { in: [pct.id, fixed.id, expiredCode.id] } },
+  });
+  await prisma.discountCode.deleteMany({ where: { code: { startsWith: "SMOKE" } } });
+
+  // ── لیست انتظار ─────────────────────────────────────────────
+  const WL_PHONE = "09125557788";
+  await prisma.waitlistEntry.deleteMany({ where: { customer: { phone: WL_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: WL_PHONE } });
+
+  const wlFromKey = dateKey;
+  const wlTo = new Date(d);
+  wlTo.setDate(wlTo.getDate() + 10);
+  const wlToKey = `${wlTo.getFullYear()}-${String(wlTo.getMonth() + 1).padStart(2, "0")}-${String(wlTo.getDate()).padStart(2, "0")}`;
+
+  const joined = await joinWaitlist(fd({
+    serviceId: service.id,
+    firstName: "تست",
+    lastName: "انتظار",
+    phone: "۰۹۱۲۵۵۵۷۷۸۸",
+    fromDate: wlFromKey,
+    toDate: wlToKey,
+    note: "فقط عصرها",
+  }));
+  check("ثبت لیست انتظار از سایت", joined.ok);
+
+  const wlCustomer = await prisma.customer.findUnique({ where: { phone: WL_PHONE } });
+  check("مشتری تازه برای لیست انتظار ساخته شد", !!wlCustomer);
+
+  const again = await joinWaitlist(fd({
+    serviceId: service.id,
+    firstName: "تست",
+    lastName: "انتظار",
+    phone: "09125557788",
+    fromDate: wlFromKey,
+    toDate: wlToKey,
+  }));
+  const wlCount = await prisma.waitlistEntry.count({ where: { customerId: wlCustomer!.id } });
+  check(`درخواست تکراری دوباره ثبت نمی‌شود (${wlCount} درخواست)`, again.ok && wlCount === 1);
+
+  const reversed = await joinWaitlist(fd({
+    serviceId: service.id,
+    firstName: "تست",
+    lastName: "انتظار",
+    phone: "09125557788",
+    fromDate: wlToKey,
+    toDate: wlFromKey,
+  }));
+  check("بازه‌ی برعکس رد می‌شود", !reversed.ok);
+
+  const inRange = await matchesForSlot(service.id, atTime(parseYmdKey(wlFromKey), "12:00"));
+  check(
+    "منتظرانِ همان خدمت در همان بازه پیدا می‌شوند",
+    inRange.some((e) => e.customerId === wlCustomer!.id)
+  );
+
+  const outOfRange = await matchesForSlot(service.id, new Date(wlTo.getTime() + 30 * 86_400_000));
+  check(
+    "خارج از بازه‌ی مشتری پیشنهاد نمی‌شود",
+    !outOfRange.some((e) => e.customerId === wlCustomer!.id)
+  );
+
+  await prisma.waitlistEntry.deleteMany({ where: { customerId: wlCustomer!.id } });
+  await prisma.customer.delete({ where: { id: wlCustomer!.id } });
 
   await prisma.appointment.deleteMany({ where: { source: "smoke" } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });

@@ -8,6 +8,7 @@ import { CustomerNotes } from "@/components/admin/customer-notes";
 import { CustomerForm } from "@/components/admin/forms/customer-form";
 import { TreatmentForm } from "@/components/admin/forms/treatment-form";
 import { WalkInForm } from "@/components/admin/forms/walkin-form";
+import { WaitlistForm } from "@/components/admin/forms/waitlist-form";
 import { ActionButton } from "@/components/admin/action-button";
 import { deleteTreatment } from "@/app/actions/reception";
 import { deleteConsentSignature } from "@/app/actions/consents";
@@ -135,6 +136,11 @@ export default async function CustomerDetailPage({
               services={services}
               staff={staff}
               packages={packageOptions}
+            />
+            <WaitlistForm
+              customerId={customer.id}
+              customerName={fullName}
+              services={services}
             />
           </div>
         }

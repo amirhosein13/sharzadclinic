@@ -7,6 +7,8 @@ import { can } from "@/lib/permissions";
 import { setSettings } from "@/lib/settings";
 import { testimonialSchema } from "@/lib/validators";
 import { notifyBookingCancelled, notifyBookingConfirmed } from "@/lib/notifications";
+import { matchesForSlot } from "@/lib/waitlist";
+import { toFa } from "@/lib/utils";
 import type { AppointmentStatus } from "@prisma/client";
 
 export type ActionResult = { ok: boolean; message: string };
@@ -77,6 +79,17 @@ export async function updateAppointmentStatus(
     });
     revalidatePath("/admin/appointments");
     revalidatePath("/admin");
+
+    // وقتی نوبتی لغو می‌شود، این وقت برای منتظرانِ همان خدمت خالی شده است
+    if (status === "CANCELLED") {
+      const waiting = await matchesForSlot(appointment.serviceId, appointment.startsAt);
+      if (waiting.length > 0) {
+        return OK(
+          `نوبت ${appointment.code} لغو شد. ${toFa(waiting.length)} نفر منتظر همین خدمت‌اند — از «لیست انتظار» خبرشان کنید.`,
+        );
+      }
+    }
+
     return OK(`وضعیت نوبت ${appointment.code} تغییر کرد.`);
   });
 }

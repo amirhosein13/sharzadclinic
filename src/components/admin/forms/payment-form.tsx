@@ -83,6 +83,14 @@ export function PaymentForm({
             <Input name="reference" dir="ltr" className="text-right" />
           </Field>
 
+          <Field
+            label="کد تخفیف"
+            error={errors.discountCode}
+            hint="اختیاری — مبلغ بالا با این کد کم می‌شود"
+          >
+            <Input name="discountCode" dir="ltr" className="text-right uppercase" placeholder="NOWRUZ1405" />
+          </Field>
+
           <Field label="یادداشت" error={errors.note} hint="اختیاری">
             <Textarea name="note" rows={2} />
           </Field>

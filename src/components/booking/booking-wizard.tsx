@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { createBooking } from "@/app/actions/booking";
 import { JalaliCalendar } from "./jalali-calendar";
+import { WaitlistPrompt } from "./waitlist-prompt";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
@@ -268,7 +269,15 @@ export function BookingWizard({
                 )}
 
                 {dateKey && !loadingSlots && slots.length === 0 && (
-                  <EmptyHint icon={Clock} text="متأسفانه این روز وقت خالی ندارد. روز دیگری را امتحان کنید." />
+                  <>
+                    <EmptyHint icon={Clock} text="متأسفانه این روز وقت خالی ندارد. روز دیگری را امتحان کنید." />
+                    <WaitlistPrompt
+                      serviceId={service.id}
+                      serviceTitle={service.title}
+                      dateKey={dateKey}
+                      customer={customer}
+                    />
+                  </>
                 )}
 
                 {dateKey && !loadingSlots && slots.length > 0 && (

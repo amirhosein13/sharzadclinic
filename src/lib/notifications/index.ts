@@ -158,6 +158,25 @@ export async function notifyBookingReminder(options: {
   return sendSms({ to: options.phone, template: "booking_reminder", message });
 }
 
+/** خبر دادن به کسی که در لیست انتظار است و حالا وقت خالی شده */
+export async function notifyWaitlistOpening(options: {
+  phone: string;
+  customerName: string;
+  serviceTitle: string;
+  startsAt?: Date | null;
+}): Promise<NotifyResult> {
+  const settings = await getSettings();
+  const when = options.startsAt
+    ? `وقت خالی: ${formatJalaliDateTime(options.startsAt)}\n`
+    : "";
+  const message =
+    `${options.customerName} عزیز، برای ${options.serviceTitle} وقت خالی شد.\n` +
+    when +
+    `برای رزرو تماس بگیرید: ${settings.phone}\n${settings.clinicName}`;
+
+  return sendSms({ to: options.phone, template: "waitlist_opening", message });
+}
+
 /** اطلاع‌رسانی پیام تماس جدید به مدیر کلینیک */
 export async function notifyContactMessage(options: {
   name: string;

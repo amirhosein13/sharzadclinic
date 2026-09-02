@@ -6,7 +6,8 @@ import { logAction, requireRole } from "@/lib/auth";
 import { computePayroll, payrollTotal } from "@/lib/payroll";
 import { fieldErrors, paymentSchema } from "@/lib/validators";
 import { jalaliMonthRange } from "@/lib/date";
-import { toEn } from "@/lib/utils";
+import { checkDiscount, redeemDiscount } from "@/lib/discounts";
+import { formatToman, toEn } from "@/lib/utils";
 import type { FormResult } from "./content";
 
 const OK = (message: string): FormResult => ({ ok: true, message });
@@ -133,29 +134,62 @@ export async function recordPayment(formData: FormData): Promise<FormResult> {
   });
   if (!parsed.success) return FAIL("ورودی‌ها را بررسی کنید.", fieldErrors(parsed.error));
 
+  const discountInput = String(formData.get("discountCode") ?? "").trim();
+
   try {
     const appointment = await prisma.appointment.findUniqueOrThrow({
       where: { id: parsed.data.appointmentId },
       select: { customerId: true, code: true },
     });
 
+    // کد تخفیف روی همین مبلغ اعمال و همان‌جا مصرف می‌شود؛ چون پرداخت
+    // در همین لحظه قطعی است، رزرو معلق و نیمه‌کاره‌ای باقی نمی‌ماند.
+    let amount = parsed.data.amount;
+    let discountNote = "";
+    if (discountInput) {
+      const check = await checkDiscount({
+        code: discountInput,
+        amount,
+        customerId: appointment.customerId,
+      });
+      if (!check.ok) return FAIL(check.message, { discountCode: check.message });
+
+      const redeemed = await redeemDiscount({
+        codeId: check.codeId,
+        customerId: appointment.customerId,
+        amount: check.discount,
+        appointmentId: parsed.data.appointmentId,
+      });
+      if (!redeemed) {
+        return FAIL("ظرفیت این کد همین الان تمام شد.", { discountCode: "ظرفیت تکمیل شد" });
+      }
+
+      amount = check.finalAmount;
+      discountNote = `کد ${check.code}: ${formatToman(check.discount)} تخفیف`;
+    }
+
     await prisma.payment.create({
       data: {
         customerId: appointment.customerId,
         appointmentId: parsed.data.appointmentId,
-        amount: parsed.data.amount,
+        amount,
         method: parsed.data.method,
         status: "PAID",
         paidAt: new Date(),
         reference: parsed.data.reference || null,
-        note: parsed.data.note || null,
+        note: [parsed.data.note, discountNote].filter(Boolean).join(" — ") || null,
       },
     });
 
     revalidatePath("/admin/appointments");
     revalidatePath("/admin/payroll");
+    revalidatePath("/admin/discounts");
     revalidatePath("/admin");
-    return OK(`پرداخت نوبت ${appointment.code} ثبت شد.`);
+    return OK(
+      discountNote
+        ? `پرداخت نوبت ${appointment.code} با ${discountNote} ثبت شد.`
+        : `پرداخت نوبت ${appointment.code} ثبت شد.`,
+    );
   } catch (error) {
     console.error(error);
     return FAIL("ثبت پرداخت با خطا مواجه شد.");

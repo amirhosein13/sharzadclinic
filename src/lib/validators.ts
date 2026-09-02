@@ -68,6 +68,16 @@ const optionalInt = z
     return Number.isFinite(n) ? Math.round(n) : null;
   });
 
+/** تاریخ شمسی اختیاری — خالی یعنی بدون محدودیت */
+const optionalJalaliDate = z
+  .union([z.literal(""), z.string()])
+  .optional()
+  .transform((v) => (v ? toEn(String(v)).trim() : ""))
+  .refine(
+    (v) => v === "" || /^\d{4}\/\d{1,2}\/\d{1,2}$/.test(v),
+    "تاریخ را به شکل ۱۴۰۵/۰۶/۱۵ وارد کنید",
+  );
+
 const requiredInt = (min: number, max: number, message: string) =>
   z
     .union([z.string(), z.number()])
@@ -269,4 +279,58 @@ export const consentSignatureSchema = z.object({
     .refine((v) => v === "" || v.startsWith("data:image/png;base64,"), "امضا معتبر نیست")
     .optional(),
   agreed: z.literal(true, { message: "بدون تأیید متن، رضایت‌نامه ثبت نمی‌شود" }),
+});
+
+export const discountSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .transform((v) => toEn(v).toUpperCase().replaceAll(/\s+/g, ""))
+    .refine((v) => /^[A-Z0-9_-]{3,24}$/.test(v), "کد باید ۳ تا ۲۴ حرف یا عدد انگلیسی باشد"),
+  kind: z.enum(["PERCENT", "FIXED"]),
+  value: z
+    .union([z.string(), z.number()])
+    .transform((v) => Math.round(Number(toEn(String(v))) || 0))
+    .refine((v) => v > 0, "مقدار تخفیف را وارد کنید"),
+  minAmount: optionalInt,
+  maxDiscount: optionalInt,
+  maxUses: z
+    .union([z.literal(""), z.string(), z.number()])
+    .optional()
+    .transform((v) => {
+      if (v === "" || v === undefined || v === null) return null;
+      const n = Math.round(Number(toEn(String(v))));
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }),
+  startsAt: optionalJalaliDate,
+  expiresAt: optionalJalaliDate,
+  isActive: z.boolean().optional(),
+  note: z.string().trim().max(300).optional(),
+});
+
+export const waitlistSchema = z.object({
+  customerId: z.string().min(1, "مشتری را انتخاب کنید"),
+  serviceId: z.string().min(1, "خدمت را انتخاب کنید"),
+  fromDate: z
+    .string()
+    .trim()
+    .transform(toEn)
+    .refine((v) => /^\d{4}\/\d{1,2}\/\d{1,2}$/.test(v), "تاریخ شروع را به شکل ۱۴۰۵/۰۶/۱۵ وارد کنید"),
+  toDate: z
+    .string()
+    .trim()
+    .transform(toEn)
+    .refine((v) => /^\d{4}\/\d{1,2}\/\d{1,2}$/.test(v), "تاریخ پایان را به شکل ۱۴۰۵/۰۶/۱۵ وارد کنید"),
+  note: z.string().trim().max(300).optional(),
+});
+
+/** ثبت‌نام لیست انتظار از سمت مشتری — بدون انتخاب مشتری */
+export const publicWaitlistSchema = z.object({
+  serviceId: z.string().min(1, "خدمت را انتخاب کنید"),
+  firstName: z.string().trim().min(2, "نام را وارد کنید").max(50),
+  lastName: z.string().trim().min(2, "نام خانوادگی را وارد کنید").max(50),
+  phone: phoneSchema,
+  fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "تاریخ شروع را انتخاب کنید"),
+  toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "تاریخ پایان را انتخاب کنید"),
+  note: z.string().trim().max(300).optional(),
 });

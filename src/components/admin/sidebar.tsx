@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, CreditCard, FileSignature, FileText, Home, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, PhoneCall, Quote, Send, Settings, Sparkles, Users, Wallet, X } from "lucide-react";
+import { BarChart3, CalendarDays, CreditCard, FileSignature, FileText, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, PhoneCall, Quote, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -23,6 +23,7 @@ const NAV: {
   { href: "/admin/my", label: "نوبت‌های من", icon: CalendarDays, permission: "appointments.own", exact: true },
   { href: "/admin/followups", label: "پیگیری مراجعین", icon: PhoneCall, permission: "appointments.all", badgeKey: "openFollowUps" },
   { href: "/admin/customers", label: "مشتریان", icon: Users, permission: "customers" },
+  { href: "/admin/waitlist", label: "لیست انتظار", icon: Hourglass, permission: "appointments.all", badgeKey: "waitingList" },
   { href: "/admin/services", label: "خدمات", icon: Sparkles, permission: "content" },
   { href: "/admin/staff", label: "پرسنل", icon: Users, permission: "staff" },
   { href: "/admin/payments", label: "پرداخت‌ها", icon: CreditCard, permission: "payroll" },
@@ -30,6 +31,7 @@ const NAV: {
   { href: "/admin/reports", label: "گزارش‌ها", icon: BarChart3, permission: "payroll" },
   { href: "/admin/my/earnings", label: "درآمد من", icon: Wallet, permission: "payroll.own" },
   { href: "/admin/consents", label: "رضایت‌نامه‌ها", icon: FileSignature, permission: "content" },
+  { href: "/admin/discounts", label: "کد تخفیف", icon: TicketPercent, permission: "content" },
   { href: "/admin/gallery", label: "گالری", icon: ImageIcon, permission: "content" },
   { href: "/admin/blog", label: "مجله", icon: FileText, permission: "content" },
   { href: "/admin/testimonials", label: "نظرات", icon: Quote, permission: "content", badgeKey: "pendingTestimonials" },
@@ -44,6 +46,7 @@ export type SidebarBadges = {
   pendingTestimonials?: number;
   unreadMessages?: number;
   openFollowUps?: number;
+  waitingList?: number;
 };
 
 export function Sidebar({

@@ -15,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/admin/login");
 
   // شمارنده‌های سایدبار فقط برای نقش‌هایی که آن بخش‌ها را می‌بینند
-  const [pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps] =
+  const [pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps, waitingList] =
     await Promise.all([
       can(user.role, "appointments.all") ? prisma.appointment.count({ where: { status: "PENDING" } }) : 0,
       can(user.role, "content") ? prisma.testimonial.count({ where: { isApproved: false } }) : 0,
@@ -23,13 +23,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
       can(user.role, "appointments.all")
         ? prisma.followUp.count({ where: { status: "OPEN", dueAt: { lte: new Date() } } })
         : 0,
+      can(user.role, "appointments.all")
+        ? prisma.waitlistEntry.count({ where: { status: "WAITING" } })
+        : 0,
     ]);
 
   return (
     <div className="flex min-h-dvh bg-[color:var(--bg-sunken)]">
       <Sidebar
         user={{ name: user.name, email: user.email, role: user.role }}
-        badges={{ pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps }}
+        badges={{
+          pendingAppointments,
+          pendingTestimonials,
+          unreadMessages,
+          openFollowUps,
+          waitingList,
+        }}
       />
       <div className="min-w-0 flex-1">
         <div className="mx-auto max-w-7xl p-5 sm:p-8">{children}</div>
