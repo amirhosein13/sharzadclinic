@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { logAction, requireRole, requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { setSettings } from "@/lib/settings";
+import { getSettings, setSettings } from "@/lib/settings";
 import { testimonialSchema } from "@/lib/validators";
 import { notifyBookingCancelled, notifyBookingConfirmed } from "@/lib/notifications";
 import { matchesForSlot } from "@/lib/waitlist";
+import { ensureFeedbackInvite, sendFeedbackRequest } from "./feedback";
 import { toFa } from "@/lib/utils";
 import type { AppointmentStatus } from "@prisma/client";
 
@@ -68,6 +69,18 @@ export async function updateAppointmentStatus(
         customerName,
         startsAt: appointment.startsAt,
       }).catch(() => undefined);
+    }
+
+    // نوبتِ انجام‌شده یعنی وقتِ پرسیدن «راضی بودید؟»
+    if (status === "DONE") {
+      await ensureFeedbackInvite(appointment.id)
+        .then(async (invite) => {
+          if (!invite || invite.sentAt) return;
+          const settings = await getSettings();
+          if (settings.feedbackAutoSms !== "1") return;
+          await sendFeedbackRequest(appointment.id);
+        })
+        .catch(() => undefined); // نظرسنجی نباید جلوی ثبت وضعیت نوبت را بگیرد
     }
 
     await logAction({

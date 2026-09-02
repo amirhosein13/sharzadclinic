@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { buildReport, isRangeKey, resolveRange } from "@/lib/reports";
+import { buildSatisfaction } from "@/lib/feedback";
 import { toCsv } from "@/lib/csv";
 import { formatJalali } from "@/lib/date";
 import { toEn } from "@/lib/utils";
@@ -17,7 +18,10 @@ export async function GET(request: Request) {
 
   const key = new URL(request.url).searchParams.get("range") ?? "this-month";
   const range = resolveRange(isRangeKey(key) ? key : "this-month");
-  const report = await buildReport(range);
+  const [report, satisfaction] = await Promise.all([
+    buildReport(range),
+    buildSatisfaction(range.from, range.to),
+  ]);
 
   // اعداد را خام می‌نویسیم تا در اکسل قابل جمع‌زدن باشند
   const csv = toCsv([
@@ -68,6 +72,40 @@ export async function GET(request: Request) {
       title: "مشتریان برتر",
       head: ["نام", "موبایل", "مراجعه", "مبلغ (تومان)"],
       rows: report.topCustomers.map((c) => [c.name, c.phone, c.visits, c.spent]),
+    },
+    {
+      title: "رضایت مشتری",
+      head: ["شاخص", "مقدار"],
+      rows: [
+        ["تعداد نظر ثبت‌شده", satisfaction.responses],
+        ["دعوت‌نامه‌ی فرستاده‌شده", satisfaction.invitesSent],
+        ["نرخ پاسخ (درصد)", satisfaction.responseRate],
+        ["میانگین امتیاز (از ۵)", satisfaction.averageRating],
+        ["راضی — ۴ و ۵ ستاره (درصد)", satisfaction.happyRate],
+        ["ناراضی یا متوسط (درصد)", satisfaction.unhappyRate],
+        ["پیشنهاد به دیگران (درصد)", satisfaction.recommendRate],
+        ["نارضایتی رسیدگی‌نشده", satisfaction.openComplaints],
+      ],
+    },
+    {
+      title: "بیشترین شکایت‌ها",
+      head: ["موضوع", "تعداد"],
+      rows: satisfaction.complaints.map((r) => [r.label, r.count]),
+    },
+    {
+      title: "بیشترین تعریف‌ها",
+      head: ["موضوع", "تعداد"],
+      rows: satisfaction.praises.map((r) => [r.label, r.count]),
+    },
+    {
+      title: "رضایت به تفکیک خدمت",
+      head: ["خدمت", "تعداد نظر", "میانگین امتیاز"],
+      rows: satisfaction.byService.map((r) => [r.label, r.responses, r.average]),
+    },
+    {
+      title: "رضایت به تفکیک پرسنل",
+      head: ["پرسنل", "تعداد نظر", "میانگین امتیاز"],
+      rows: satisfaction.byStaff.map((r) => [r.label, r.responses, r.average]),
     },
     {
       title: "روند روزانه",

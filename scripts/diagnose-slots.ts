@@ -32,6 +32,56 @@ async function main() {
   console.log(`   تا چند روز آینده باز است: ${toFa(settings.bookingHorizonDays)} روز`);
   console.log(`   گام پیش‌فرض بین نوبت‌ها: ${toFa(settings.slotStepMinutes)} دقیقه`);
 
+  /* ── سرویس‌های بیرونی ────────────────────────────────── */
+  console.log("\n🔌 سرویس‌های بیرونی (از فایل .env خوانده می‌شود)");
+
+  const smsProvider = (process.env.SMS_PROVIDER ?? "console").toLowerCase();
+  const smsReady = smsProvider === "kavenegar" && !!process.env.KAVENEGAR_API_KEY;
+  console.log(
+    smsReady
+      ? `   ${OK} پیامک — کاوه‌نگار فعال است`
+      : `   ${WARN}پیامک — حالت «${smsProvider}»: پیامک واقعی ارسال نمی‌شود، فقط در ترمینال چاپ می‌شود`,
+  );
+  if (!smsReady) {
+    problems.push(
+      "پیامک واقعی ارسال نمی‌شود (SMS_PROVIDER/KAVENEGAR_API_KEY در .env تنظیم نشده) — مشتری نمی‌تواند وارد حسابش شود.",
+    );
+  }
+  if (smsProvider === "kavenegar" && !process.env.KAVENEGAR_OTP_TEMPLATE) {
+    problems.push("KAVENEGAR_OTP_TEMPLATE تنظیم نشده — کد ورود مشتری با الگوی تأییدشده ارسال نمی‌شود.");
+  }
+
+  const merchantId = process.env.ZARINPAL_MERCHANT_ID ?? "";
+  const gatewayReady = /^[0-9a-fA-F-]{36}$/.test(merchantId);
+  console.log(
+    gatewayReady
+      ? `   ${OK} درگاه پرداخت — زرین‌پال ${process.env.ZARINPAL_SANDBOX === "true" ? "(سندباکس)" : "(واقعی)"}`
+      : `   ${WARN}درگاه پرداخت — خاموش: ${merchantId ? "ZARINPAL_MERCHANT_ID معتبر نیست" : "ZARINPAL_MERCHANT_ID در .env نیست"}`,
+  );
+  if (!gatewayReady) {
+    problems.push(
+      "درگاه پرداخت خاموش است، پس در فرم رزرو مرحله‌ی پرداخت بیعانه اصلاً نشان داده نمی‌شود و نوبت مستقیم ثبت می‌شود. برای روشن‌کردنش ZARINPAL_MERCHANT_ID را در .env بگذار.",
+    );
+  }
+
+  const emailReady = !!process.env.SMTP_HOST && !!process.env.SMTP_USER;
+  console.log(
+    emailReady
+      ? `   ${OK} ایمیل — SMTP تنظیم شده`
+      : `   ${WARN}ایمیل — SMTP تنظیم نشده: ایمیل‌ها فقط در ترمینال چاپ می‌شوند (اختیاری)`,
+  );
+
+  const secret = process.env.AUTH_SECRET ?? "";
+  const weakSecret = secret.length < 32 || secret.includes("CHANGE_ME");
+  console.log(
+    weakSecret
+      ? `   ${BAD} AUTH_SECRET — ${secret ? "هنوز مقدار نمونه است" : "تنظیم نشده"}`
+      : `   ${OK} AUTH_SECRET — تنظیم شده`,
+  );
+  if (weakSecret) {
+    problems.push("AUTH_SECRET هنوز مقدار نمونه است — قبل از انتشار با `openssl rand -base64 32` عوضش کن.");
+  }
+
   /* ── ساعات کاری کلینیک ───────────────────────────────── */
   console.log("\n🏥 ساعات کاری کلینیک");
   const hours = await prisma.workingHour.findMany({ orderBy: { weekday: "asc" } });

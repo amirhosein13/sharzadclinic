@@ -6,6 +6,7 @@ import { logAction, requireRole } from "@/lib/auth";
 import { fieldErrors, publicWaitlistSchema, waitlistSchema } from "@/lib/validators";
 import { parseJalaliInput, parseYmdKey } from "@/lib/date";
 import { notifyWaitlistOpening } from "@/lib/notifications";
+import { safeRevalidate } from "@/lib/revalidate";
 import type { FormResult } from "./content";
 
 const OK = (message: string): FormResult => ({ ok: true, message });
@@ -171,11 +172,7 @@ export async function joinWaitlist(formData: FormData): Promise<FormResult> {
       },
     });
 
-    try {
-      revalidatePath("/admin/waitlist");
-    } catch {
-      // بازتازه‌سازی کش خارج از یک درخواست معنی ندارد و مهم هم نیست
-    }
+    safeRevalidate("/admin/waitlist");
     return OK("در لیست انتظار ثبت شدید. به‌محض خالی‌شدن وقت با شما تماس می‌گیریم.");
   } catch (error) {
     console.error(error);

@@ -334,3 +334,16 @@ export const publicWaitlistSchema = z.object({
   toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "تاریخ پایان را انتخاب کنید"),
   note: z.string().trim().max(300).optional(),
 });
+
+export const feedbackSchema = z.object({
+  token: z.string().trim().min(10),
+  rating: z
+    .union([z.string(), z.number()])
+    .transform((v) => Math.round(Number(toEn(String(v)))))
+    .refine((v) => v >= 1 && v <= 5, "امتیاز را از ۱ تا ۵ انتخاب کنید"),
+  goodTags: z.array(z.string()).max(20).optional(),
+  badTags: z.array(z.string()).max(20).optional(),
+  comment: z.string().trim().max(2000).optional(),
+  wouldRecommend: z.enum(["yes", "no", ""]).optional(),
+  canPublish: z.boolean().optional(),
+});

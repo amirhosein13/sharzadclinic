@@ -13,6 +13,8 @@ import { buildReport } from "../src/lib/reports";
 import { checkDiscount, normalizeCode, redeemDiscount } from "../src/lib/discounts";
 import { joinWaitlist } from "../src/app/actions/waitlist";
 import { matchesForSlot } from "../src/lib/waitlist";
+import { submitFeedback } from "../src/app/actions/feedback";
+import { buildSatisfaction, newFeedbackToken } from "../src/lib/feedback";
 
 const prisma = new PrismaClient();
 
@@ -419,6 +421,100 @@ async function main() {
 
   await prisma.waitlistEntry.deleteMany({ where: { customerId: wlCustomer!.id } });
   await prisma.customer.delete({ where: { id: wlCustomer!.id } });
+
+  // ── نظرسنجی و گزارش رضایت ──────────────────────────────────
+  const FB_PHONE = "09125552211";
+  await prisma.feedback.deleteMany({ where: { customer: { phone: FB_PHONE } } });
+  await prisma.followUp.deleteMany({ where: { customer: { phone: FB_PHONE } } });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: FB_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: FB_PHONE } });
+
+  const fbCustomer = await prisma.customer.create({
+    data: { firstName: "تست", lastName: "نظر", phone: FB_PHONE },
+  });
+  const fbStaff = await prisma.staff.findFirstOrThrow();
+  const fbFrom = new Date(Date.now() - 3 * 86_400_000);
+  const fbTo = new Date(Date.now() + 86_400_000);
+
+  const makeInvite = async (label: string) =>
+    prisma.feedback.create({
+      data: {
+        customerId: fbCustomer.id,
+        serviceId: service.id,
+        staffId: fbStaff.id,
+        token: newFeedbackToken(),
+        sentAt: new Date(),
+      },
+      select: { id: true, token: true },
+    }).then((row) => ({ ...row, label }));
+
+  const happy = await makeInvite("راضی");
+  const angry = await makeInvite("ناراضی");
+  const untouched = await makeInvite("بی‌پاسخ");
+
+  const happyResult = await submitFeedback(fd({
+    token: happy.token,
+    rating: "۵",
+    comment: "خیلی راضی بودم",
+    wouldRecommend: "yes",
+    canPublish: "on",
+  }));
+  check("ثبت نظر با ارقام فارسی", happyResult.ok);
+
+  // تگ‌ها به‌صورت چندمقداری فرستاده می‌شوند
+  const angryForm = new FormData();
+  angryForm.set("token", angry.token);
+  angryForm.set("rating", "2");
+  angryForm.append("badTags", "waiting");
+  angryForm.append("badTags", "price");
+  angryForm.append("badTags", "__hack__"); // کلید ناشناخته باید دور ریخته شود
+  angryForm.append("goodTags", "staff");
+  angryForm.append("goodTags", "waiting"); // تضاد: هم خوب هم بد
+  angryForm.set("comment", "خیلی معطل شدم");
+  angryForm.set("wouldRecommend", "no");
+  const angryResult = await submitFeedback(angryForm);
+  check("ثبت نظر منفی", angryResult.ok);
+
+  const angryRow = await prisma.feedback.findUniqueOrThrow({ where: { id: angry.id } });
+  check(
+    "تگ ناشناخته ذخیره نمی‌شود",
+    !angryRow.badTags.includes("__hack__") && angryRow.badTags.length === 2
+  );
+  check(
+    "یک جنبه هم‌زمان خوب و بد نمی‌ماند",
+    angryRow.goodTags.includes("staff") && !angryRow.goodTags.includes("waiting")
+  );
+
+  const duplicate = await submitFeedback(fd({ token: happy.token, rating: "4" }));
+  check("نظر تکراری با همان لینک ثبت نمی‌شود", !duplicate.ok);
+
+  const badToken = await submitFeedback(fd({ token: "0".repeat(32), rating: "4" }));
+  check("لینک نامعتبر رد می‌شود", !badToken.ok);
+
+  const autoFollowUp = await prisma.followUp.count({
+    where: { customerId: fbCustomer.id, status: "OPEN" },
+  });
+  check(`نارضایتی خودکار به فهرست پیگیری می‌رود (${autoFollowUp})`, autoFollowUp === 1);
+
+  const sat = await buildSatisfaction(fbFrom, fbTo);
+  check(
+    `میانگین رضایت درست است (${sat.averageRating} از ${sat.responses} نظر)`,
+    sat.responses >= 2 && sat.averageRating > 0
+  );
+  check(
+    "دعوت‌نامه‌ی بی‌پاسخ در میانگین نمی‌آید ولی در نرخ پاسخ شمرده می‌شود",
+    sat.invitesSent >= 3 && sat.responseRate < 100
+  );
+  check(
+    "پرتکرارترین شکایت‌ها استخراج می‌شود",
+    sat.complaints.some((c) => c.key === "waiting") && sat.complaints.some((c) => c.key === "price")
+  );
+  check("نارضایتی باز شمرده می‌شود", sat.openComplaints >= 1);
+
+  await prisma.followUp.deleteMany({ where: { customerId: fbCustomer.id } });
+  await prisma.feedback.deleteMany({ where: { customerId: fbCustomer.id } });
+  await prisma.customer.delete({ where: { id: fbCustomer.id } });
+  void untouched;
 
   await prisma.appointment.deleteMany({ where: { source: "smoke" } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });

@@ -15,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/admin/login");
 
   // شمارنده‌های سایدبار فقط برای نقش‌هایی که آن بخش‌ها را می‌بینند
-  const [pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps, waitingList] =
+  const [pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps, waitingList, openFeedback] =
     await Promise.all([
       can(user.role, "appointments.all") ? prisma.appointment.count({ where: { status: "PENDING" } }) : 0,
       can(user.role, "content") ? prisma.testimonial.count({ where: { isApproved: false } }) : 0,
@@ -25,6 +25,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
         : 0,
       can(user.role, "appointments.all")
         ? prisma.waitlistEntry.count({ where: { status: "WAITING" } })
+        : 0,
+      can(user.role, "content")
+        ? prisma.feedback.count({
+            where: { submittedAt: { not: null }, status: { in: ["SUBMITTED", "SEEN"] } },
+          })
         : 0,
     ]);
 
@@ -38,6 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           unreadMessages,
           openFollowUps,
           waitingList,
+          openFeedback,
         }}
       />
       <div className="min-w-0 flex-1">

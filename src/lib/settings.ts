@@ -24,6 +24,8 @@ export const DEFAULT_SETTINGS = {
   depositPercent: "30",
   /** پس از چند روز از آخرین جلسه، پیگیری جلسه‌ی بعدی ساخته شود */
   followUpAfterDays: "28",
+  /** پس از «انجام‌شده» شدن نوبت، پیامک نظرسنجی خودکار برود؟ "1" یا "0" */
+  feedbackAutoSms: "1",
 } as const;
 
 export type SettingsMap = Record<string, string>;

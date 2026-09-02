@@ -158,6 +158,22 @@ export async function notifyBookingReminder(options: {
   return sendSms({ to: options.phone, template: "booking_reminder", message });
 }
 
+/** دعوت به نظرسنجی پس از مراجعه */
+export async function notifyFeedbackRequest(options: {
+  phone: string;
+  customerName: string;
+  serviceTitle: string;
+  url: string;
+}): Promise<NotifyResult> {
+  const settings = await getSettings();
+  const message =
+    `${options.customerName} عزیز، از مراجعه‌تان ممنونیم.\n` +
+    `نظرتان درباره‌ی ${options.serviceTitle} برای ما مهم است؛ یک دقیقه وقت می‌گیرد:\n` +
+    `${options.url}\n${settings.clinicName}`;
+
+  return sendSms({ to: options.phone, template: "feedback_request", message });
+}
+
 /** خبر دادن به کسی که در لیست انتظار است و حالا وقت خالی شده */
 export async function notifyWaitlistOpening(options: {
   phone: string;

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, CalendarDays, FileSignature, FileText, Package as PackageIcon, Phone, Trash2, Wallet } from "lucide-react";
+import { ArrowRight, CalendarDays, FileSignature, FileText, Package as PackageIcon, Phone, Star, Trash2, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
@@ -18,6 +18,7 @@ import { PackageCard } from "@/components/admin/package-card";
 import { CasePhotos } from "@/components/case-photos";
 import { summarizePackages } from "@/lib/packages";
 import { renderConsentBody } from "@/lib/consents";
+import { aspectLabel } from "@/lib/feedback";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_META } from "@/lib/appointment-status";
 import { formatJalaliLong, formatJalaliWithWeekday, formatTime, toJalaliInput } from "@/lib/date";
@@ -49,6 +50,11 @@ export default async function CustomerDetailPage({
       consents: {
         include: { template: { select: { title: true } } },
         orderBy: { signedAt: "desc" },
+      },
+      feedbacks: {
+        where: { submittedAt: { not: null } },
+        include: { service: { select: { title: true } } },
+        orderBy: { submittedAt: "desc" },
       },
     },
   });
@@ -292,6 +298,70 @@ export default async function CustomerDetailPage({
               </div>
             )}
           </Card>
+
+          {customer.feedbacks.length > 0 && (
+            <Card padded={false}>
+              <h2 className="border-b border-[color:var(--line)] p-6 font-bold">
+                نظرهای این مشتری
+                <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
+                  ({toFa(customer.feedbacks.length)} نظر)
+                </span>
+              </h2>
+              <ul className="divide-y divide-[color:var(--line)]">
+                {customer.feedbacks.map((f) => (
+                  <li key={f.id} className="p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-medium">
+                        {f.service?.title ?? "خدمت نامشخص"}
+                        <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
+                          {f.submittedAt ? formatJalaliLong(f.submittedAt) : ""}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 gap-0.5">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star
+                            key={i}
+                            className={
+                              i < (f.rating ?? 0)
+                                ? "size-3.5 fill-gold-400 text-gold-400"
+                                : "size-3.5 text-[color:var(--line)]"
+                            }
+                          />
+                        ))}
+                      </span>
+                    </div>
+
+                    {(f.goodTags.length > 0 || f.badTags.length > 0) && (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {f.badTags.map((t) => (
+                          <span
+                            key={`b-${t}`}
+                            className="rounded-lg bg-red-50 px-2 py-0.5 text-[11px] text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                          >
+                            ✕ {aspectLabel(t)}
+                          </span>
+                        ))}
+                        {f.goodTags.map((t) => (
+                          <span
+                            key={`g-${t}`}
+                            className="rounded-lg bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                          >
+                            ✓ {aspectLabel(t)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {f.comment && (
+                      <p className="mt-2.5 rounded-xl bg-[color:var(--bg-sunken)] p-3 text-sm leading-7 text-[color:var(--fg-muted)]">
+                        «{f.comment}»
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           <Card padded={false}>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-6">

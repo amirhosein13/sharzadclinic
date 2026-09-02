@@ -1,11 +1,13 @@
 import Link from "next/link";
 import {
-  BarChart3, CalendarX2, Download, TrendingUp, UserPlus, Users, Wallet,
+  BarChart3, CalendarX2, Download, Megaphone, MessageSquareHeart, Smile, Star,
+  TrendingUp, TriangleAlert, UserPlus, Users, Wallet,
 } from "lucide-react";
 import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ReportTrendChart } from "@/components/admin/revenue-chart";
 import { buildReport, isRangeKey, RANGE_PRESETS, resolveRange } from "@/lib/reports";
+import { buildSatisfaction } from "@/lib/feedback";
 import { formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +61,11 @@ export default async function ReportsPage({
 
   const { range: rangeParam } = await searchParams;
   const rangeKey = isRangeKey(rangeParam) ? rangeParam : "this-month";
-  const report = await buildReport(resolveRange(rangeKey));
+  const range = resolveRange(rangeKey);
+  const [report, satisfaction] = await Promise.all([
+    buildReport(range),
+    buildSatisfaction(range.from, range.to),
+  ]);
 
   const maxService = Math.max(1, ...report.byService.map((r) => r.revenue));
   const maxStaff = Math.max(1, ...report.byStaff.map((r) => r.revenue));
@@ -301,6 +307,195 @@ export default async function ReportsPage({
               </Card>
             </div>
           </div>
+
+          {/* ── رضایت مشتری ─────────────────────────────── */}
+          <div className="mt-10 mb-5 flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-lg font-extrabold">رضایت مشتری‌ها</h2>
+            <Link
+              href="/admin/feedback"
+              className="text-sm font-medium text-rose-600 hover:underline dark:text-rose-300"
+            >
+              رسیدگی به نظرها ←
+            </Link>
+          </div>
+
+          {satisfaction.responses === 0 ? (
+            <Card>
+              <EmptyState
+                icon={MessageSquareHeart}
+                title="در این بازه نظری ثبت نشده"
+                description={
+                  satisfaction.invitesSent > 0
+                    ? `${toFa(satisfaction.invitesSent)} دعوت‌نامه فرستاده شده ولی هنوز کسی پاسخ نداده است.`
+                    : "پس از «انجام‌شده» شدن هر نوبت، پیامک نظرسنجی خودکار برای مشتری می‌رود."
+                }
+              />
+            </Card>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <Stat
+                  icon={Star}
+                  label="میانگین رضایت"
+                  value={`${toFa(satisfaction.averageRating)} از ۵`}
+                  hint={`${toFa(satisfaction.responses)} نظر • نرخ پاسخ ${toFa(satisfaction.responseRate)}٪`}
+                />
+                <Stat
+                  icon={Smile}
+                  label="راضی (۴ و ۵ ستاره)"
+                  value={`${toFa(satisfaction.happyRate)}٪`}
+                  hint={`${toFa(satisfaction.unhappyRate)}٪ ناراضی یا متوسط`}
+                />
+                <Stat
+                  icon={Megaphone}
+                  label="پیشنهاد به دیگران"
+                  value={`${toFa(satisfaction.recommendRate)}٪`}
+                  hint="از کسانی که به این سؤال جواب داده‌اند"
+                />
+                <Stat
+                  icon={TriangleAlert}
+                  label="نارضایتی باز"
+                  value={toFa(satisfaction.openComplaints)}
+                  hint="هنوز رسیدگی نشده"
+                />
+              </div>
+
+              <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                <Card padded={false}>
+                  <h3 className="border-b border-[color:var(--line)] p-6 font-bold">
+                    بیشترین شکایت‌ها
+                  </h3>
+                  {satisfaction.complaints.length === 0 ? (
+                    <p className="p-6 text-sm text-[color:var(--fg-muted)]">
+                      هیچ‌کس از چیزی شکایت نکرده است.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-[color:var(--line)]">
+                      {satisfaction.complaints.slice(0, 8).map((row) => (
+                        <li key={row.key} className="p-5">
+                          <div className="flex items-baseline justify-between gap-3">
+                            <span className="text-sm font-medium">{row.label}</span>
+                            <span className="shrink-0 text-sm font-bold text-red-600 dark:text-red-300">
+                              {toFa(row.count)} نفر
+                            </span>
+                          </div>
+                          <div className="mt-2.5">
+                            <Share value={row.count} max={satisfaction.complaints[0].count} />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
+
+                <Card padded={false}>
+                  <h3 className="border-b border-[color:var(--line)] p-6 font-bold">
+                    بیشترین تعریف‌ها
+                  </h3>
+                  {satisfaction.praises.length === 0 ? (
+                    <p className="p-6 text-sm text-[color:var(--fg-muted)]">هنوز چیزی ثبت نشده.</p>
+                  ) : (
+                    <ul className="divide-y divide-[color:var(--line)]">
+                      {satisfaction.praises.slice(0, 8).map((row) => (
+                        <li key={row.key} className="p-5">
+                          <div className="flex items-baseline justify-between gap-3">
+                            <span className="text-sm font-medium">{row.label}</span>
+                            <span className="shrink-0 text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                              {toFa(row.count)} نفر
+                            </span>
+                          </div>
+                          <div className="mt-2.5">
+                            <Share value={row.count} max={satisfaction.praises[0].count} />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
+              </div>
+
+              <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                <Card padded={false}>
+                  <h3 className="border-b border-[color:var(--line)] p-6 font-bold">
+                    رضایت به تفکیک خدمت
+                    <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
+                      (ضعیف‌ترین‌ها اول)
+                    </span>
+                  </h3>
+                  <ul className="divide-y divide-[color:var(--line)]">
+                    {satisfaction.byService.map((row) => (
+                      <li key={row.key} className="flex items-center justify-between gap-3 p-5">
+                        <span className="min-w-0 truncate text-sm font-medium">{row.label}</span>
+                        <span className="shrink-0 text-sm">
+                          <span className="font-bold">{toFa(row.average)}</span>
+                          <span className="mr-1.5 text-xs text-[color:var(--fg-muted)]">
+                            از {toFa(row.responses)} نظر
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+
+                <Card padded={false}>
+                  <h3 className="border-b border-[color:var(--line)] p-6 font-bold">
+                    رضایت به تفکیک پرسنل
+                    <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
+                      (ضعیف‌ترین‌ها اول)
+                    </span>
+                  </h3>
+                  <ul className="divide-y divide-[color:var(--line)]">
+                    {satisfaction.byStaff.map((row) => (
+                      <li key={row.key} className="flex items-center justify-between gap-3 p-5">
+                        <span className="min-w-0 truncate text-sm font-medium">{row.label}</span>
+                        <span className="shrink-0 text-sm">
+                          <span className="font-bold">{toFa(row.average)}</span>
+                          <span className="mr-1.5 text-xs text-[color:var(--fg-muted)]">
+                            از {toFa(row.responses)} نظر
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              </div>
+
+              {satisfaction.recent.some((r) => r.comment) && (
+                <Card className="mt-6">
+                  <h3 className="mb-5 font-bold">آخرین حرف‌های مشتری‌ها</h3>
+                  <ul className="space-y-4">
+                    {satisfaction.recent
+                      .filter((r) => r.comment)
+                      .map((r) => (
+                        <li
+                          key={r.id}
+                          className="rounded-2xl border border-[color:var(--line)] p-4"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-sm font-medium">{r.customerName}</span>
+                            <span className="flex gap-0.5">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={
+                                    i < (r.rating ?? 0)
+                                      ? "size-3.5 fill-gold-400 text-gold-400"
+                                      : "size-3.5 text-[color:var(--line)]"
+                                  }
+                                />
+                              ))}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-7 text-[color:var(--fg-muted)]">
+                            «{r.comment}»
+                          </p>
+                        </li>
+                      ))}
+                  </ul>
+                </Card>
+              )}
+            </>
+          )}
 
           <p className="mt-6 text-xs leading-6 text-[color:var(--fg-muted)]">
             درآمد فقط از پرداخت‌های ثبت‌شده‌ی موفق شمرده می‌شود. اگر منشی مبلغ جلسه‌ای

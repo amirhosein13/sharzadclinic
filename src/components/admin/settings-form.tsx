@@ -34,6 +34,7 @@ const FIELDS: {
   { key: "slotStepMinutes", label: "گام زمانی نوبت‌ها (دقیقه)", hint: "مثلاً ۳۰ یعنی نوبت‌ها هر نیم‌ساعت", ltr: true },
   { key: "depositPercent", label: "درصد بیعانه‌ی آنلاین", hint: "چند درصد از قیمت خدمت هنگام رزرو آنلاین پرداخت شود", ltr: true },
   { key: "followUpAfterDays", label: "فاصله‌ی پیگیری جلسه‌ی بعد (روز)", hint: "اگر مشتری این‌قدر روز نیامده باشد، در فهرست پیگیری منشی می‌آید", ltr: true },
+  { key: "feedbackAutoSms", label: "پیامک نظرسنجی خودکار", hint: "۱ یعنی پس از «انجام‌شده» شدن هر نوبت، پیامک نظرسنجی برود. ۰ یعنی فقط دستی", ltr: true },
 ];
 
 export function SettingsForm({ settings }: { settings: SettingsMap }) {
