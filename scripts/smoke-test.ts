@@ -9,6 +9,7 @@ import { getAvailableSlots } from "../src/lib/availability";
 import { createBooking, trackAppointment } from "../src/app/actions/booking";
 import { atTime, parseYmdKey } from "../src/lib/date";
 import { summarizePackages, activePackages } from "../src/lib/packages";
+import { buildReport } from "../src/lib/reports";
 
 const prisma = new PrismaClient();
 
@@ -200,6 +201,88 @@ async function main() {
   await prisma.treatmentRecord.deleteMany({ where: { customerId: pkgCustomer.id } });
   await prisma.package.deleteMany({ where: { customerId: pkgCustomer.id } });
   await prisma.customer.delete({ where: { id: pkgCustomer.id } });
+
+  // ── گزارش‌های مدیریتی ───────────────────────────────────────
+  // بازه‌ای در گذشته‌ی دور انتخاب می‌کنیم تا داده‌ی واقعی کلینیک در آن نباشد
+  const RP_PHONE = "09125554433";
+  const rpFrom = new Date(2019, 0, 1, 0, 0, 0, 0);
+  const rpTo = new Date(2019, 0, 31, 23, 59, 59, 999);
+  const day = (d: number, h: number) => new Date(2019, 0, d, h, 0, 0, 0);
+
+  await prisma.payment.deleteMany({ where: { customer: { phone: RP_PHONE } } });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: RP_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: RP_PHONE } });
+
+  const rpCustomer = await prisma.customer.create({
+    data: { firstName: "تست", lastName: "گزارش", phone: RP_PHONE, createdAt: day(3, 9) },
+  });
+  const rpStaff = await prisma.staff.findFirstOrThrow();
+
+  const makeAppt = async (d: number, h: number, status: "DONE" | "CANCELLED" | "CONFIRMED") =>
+    prisma.appointment.create({
+      data: {
+        code: `SH-RP${d}${h}`,
+        customerId: rpCustomer.id,
+        serviceId: service.id,
+        staffId: rpStaff.id,
+        startsAt: day(d, h),
+        endsAt: new Date(day(d, h).getTime() + 45 * 60_000),
+        status,
+        source: "smoke",
+      },
+    });
+
+  const a1 = await makeAppt(5, 10, "DONE");
+  const a2 = await makeAppt(9, 10, "DONE");
+  await makeAppt(12, 16, "CANCELLED");
+  await makeAppt(15, 11, "CONFIRMED"); // گذشته و هنوز تأیید‌شده ⇒ عدم مراجعه
+
+  await prisma.payment.createMany({
+    data: [
+      { customerId: rpCustomer.id, appointmentId: a1.id, amount: 500_000, method: "CASH", status: "PAID", paidAt: day(5, 11) },
+      { customerId: rpCustomer.id, appointmentId: a2.id, amount: 300_000, method: "CARD", status: "PAID", paidAt: day(9, 11) },
+      { customerId: rpCustomer.id, amount: 1_000_000, method: "CARD", status: "PAID", paidAt: day(20, 12) },
+      // این یکی نباید در درآمد بیاید
+      { customerId: rpCustomer.id, amount: 999_000, method: "ONLINE", status: "PENDING", paidAt: null },
+    ],
+  });
+
+  const report = await buildReport({ from: rpFrom, to: rpTo, label: "بازه‌ی تست" });
+
+  check(
+    `درآمد گزارش فقط از پرداخت‌های موفق (${report.revenue})`,
+    report.revenue === 1_800_000 && report.paymentCount === 3
+  );
+  check(
+    `تفکیک وضعیت نوبت‌ها (${report.appointments.done}/${report.appointments.cancelled}/${report.appointments.noShow})`,
+    report.appointments.done === 2 &&
+      report.appointments.cancelled === 1 &&
+      report.appointments.noShow === 1 &&
+      report.appointments.noShowRate === 25
+  );
+  const serviceRow = report.byService.find((r) => r.key === service.id);
+  const looseRow = report.byService.find((r) => r.label.includes("بدون نوبت"));
+  check(
+    "درآمد به خدمتِ همان نوبت نسبت داده می‌شود",
+    serviceRow?.revenue === 800_000 && serviceRow?.sessions === 2
+  );
+  check("پرداخت بدون نوبت جدا شمرده می‌شود", looseRow?.revenue === 1_000_000);
+  check(
+    "مشتری جدید و بازگشتی",
+    report.customers.newCount === 1 &&
+      report.customers.activeCount === 1 &&
+      report.customers.returningCount === 0
+  );
+  check(
+    "روش پرداخت تفکیک می‌شود",
+    report.byMethod.find((m) => m.key === "CARD")?.revenue === 1_300_000 &&
+      report.byMethod.find((m) => m.key === "CASH")?.revenue === 500_000
+  );
+  check("روند روزانه برای نمودار", report.daily.length === 3);
+
+  await prisma.payment.deleteMany({ where: { customerId: rpCustomer.id } });
+  await prisma.appointment.deleteMany({ where: { customerId: rpCustomer.id } });
+  await prisma.customer.delete({ where: { id: rpCustomer.id } });
 
   await prisma.appointment.deleteMany({ where: { source: "smoke" } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });

@@ -57,3 +57,57 @@ export function AppointmentsChart({ data }: { data: ChartPoint[] }) {
     </div>
   );
 }
+
+export type RevenuePoint = { label: string; revenue: number; sessions: number };
+
+/** روند درآمد و تعداد جلسه در بازه‌ی گزارش */
+export function ReportTrendChart({ data }: { data: RevenuePoint[] }) {
+  return (
+    <div className="h-72 w-full" dir="ltr">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#b76e79" stopOpacity={0.45} />
+              <stop offset="100%" stopColor="#b76e79" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.12} vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 10, fontFamily: "inherit" }}
+            tickLine={false}
+            axisLine={false}
+            reversed
+            minTickGap={24}
+          />
+          <YAxis
+            tick={{ fontSize: 10, fontFamily: "inherit" }}
+            tickLine={false}
+            axisLine={false}
+            width={56}
+            orientation="right"
+            tickFormatter={(v: number) => toFa(Math.round(v / 1_000_000)) + "م"}
+          />
+          <Tooltip
+            contentStyle={{
+              borderRadius: "1rem",
+              border: "1px solid rgba(74,37,69,0.12)",
+              fontFamily: "inherit",
+              fontSize: 12,
+            }}
+            labelFormatter={(label) => toFa(String(label ?? ""))}
+            formatter={(value) => [`${toFa(Number(value).toLocaleString("en-US"))} تومان`, "درآمد"]}
+          />
+          <Area
+            type="monotone"
+            dataKey="revenue"
+            stroke="#b76e79"
+            strokeWidth={2}
+            fill="url(#fillRevenue)"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

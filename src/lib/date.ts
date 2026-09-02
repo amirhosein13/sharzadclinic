@@ -11,6 +11,8 @@ import {
   newDate,
   startOfDay,
   startOfMonth,
+  startOfYear,
+  endOfYear,
 } from "date-fns-jalali";
 import { faIR } from "date-fns-jalali/locale";
 import { toFa } from "./utils";
@@ -167,6 +169,16 @@ export function jalaliMonthRange(offsetMonths = 0): {
     label: `${JALALI_MONTHS[jMonth]} ${toFa(jYear)}`,
     key: `${jYear}-${String(jMonth + 1).padStart(2, "0")}`,
   };
+}
+
+/** بازه‌ی سال شمسی جاری */
+export function jalaliYearRange(): { from: Date; to: Date; label: string } {
+  const now = new Date();
+  const from = startOfYear(now);
+  from.setHours(0, 0, 0, 0);
+  const to = endOfYear(now);
+  to.setHours(23, 59, 59, 999);
+  return { from, to, label: `سال ${toFa(getYear(now))}` };
 }
 
 /** «۳ روز پیش» */
