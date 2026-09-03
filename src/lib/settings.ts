@@ -26,6 +26,10 @@ export const DEFAULT_SETTINGS = {
   followUpAfterDays: "28",
   /** پس از «انجام‌شده» شدن نوبت، پیامک نظرسنجی خودکار برود؟ "1" یا "0" */
   feedbackAutoSms: "1",
+  /** شماره‌ی مدیر برای گزارش شبانه. خالی یعنی از شماره‌ی موبایل کلینیک */
+  managerPhone: "",
+  /** گزارش شبانه‌ی پیامکی فعال باشد؟ "1" یا "0" */
+  dailyDigestSms: "1",
 } as const;
 
 export type SettingsMap = Record<string, string>;

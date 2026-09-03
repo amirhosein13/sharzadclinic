@@ -133,7 +133,9 @@ npm run import:legacy
       ```
       0 10 * * *  cd /path/to/app && npm run reminders >> /var/log/sharzad.log 2>&1
       0  3 * * *  cd /path/to/app && npm run backup    >> /var/log/sharzad.log 2>&1
+      0 21 * * *  cd /path/to/app && npm run digest    >> /var/log/sharzad.log 2>&1
       ```
+- [ ] **موبایل مدیر** را در تنظیمات بگذار تا گزارش شبانه برایش برود
 - [ ] **یک بار بازگردانی را تست کن** — پشتیبانی که بازگردانی‌اش را امتحان
       نکرده‌ای، پشتیبان نیست. روی یک دیتابیس آزمایشی:
       `npm run restore -- storage/backups/آخرین-فایل.zip --yes`

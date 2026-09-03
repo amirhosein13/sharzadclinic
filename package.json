@@ -24,7 +24,8 @@
     "backup": "tsx --conditions=react-server scripts/backup.ts",
     "restore": "tsx --conditions=react-server scripts/restore.ts",
     "test:smoke": "tsx --conditions=react-server scripts/smoke-test.ts",
-    "reminders": "tsx --conditions=react-server scripts/send-reminders.ts"
+    "reminders": "tsx --conditions=react-server scripts/send-reminders.ts",
+    "digest": "tsx --conditions=react-server scripts/daily-digest.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -35,6 +35,8 @@ const FIELDS: {
   { key: "depositPercent", label: "درصد بیعانه‌ی آنلاین", hint: "چند درصد از قیمت خدمت هنگام رزرو آنلاین پرداخت شود", ltr: true },
   { key: "followUpAfterDays", label: "فاصله‌ی پیگیری جلسه‌ی بعد (روز)", hint: "اگر مشتری این‌قدر روز نیامده باشد، در فهرست پیگیری منشی می‌آید", ltr: true },
   { key: "feedbackAutoSms", label: "پیامک نظرسنجی خودکار", hint: "۱ یعنی پس از «انجام‌شده» شدن هر نوبت، پیامک نظرسنجی برود. ۰ یعنی فقط دستی", ltr: true },
+  { key: "managerPhone", label: "موبایل مدیر (گزارش شبانه)", hint: "خلاصه‌ی هر روز به این شماره پیامک می‌شود. خالی یعنی همان موبایل کلینیک", ltr: true },
+  { key: "dailyDigestSms", label: "گزارش شبانه‌ی پیامکی", hint: "۱ یعنی فعال، ۰ یعنی خاموش", ltr: true },
 ];
 
 export function SettingsForm({ settings }: { settings: SettingsMap }) {

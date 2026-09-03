@@ -15,6 +15,8 @@ import { joinWaitlist } from "../src/app/actions/waitlist";
 import { matchesForSlot } from "../src/lib/waitlist";
 import { submitFeedback } from "../src/app/actions/feedback";
 import { buildSatisfaction, newFeedbackToken } from "../src/lib/feedback";
+import { buildDailyDigest } from "../src/lib/daily-digest";
+import { buildDaySchedule } from "../src/lib/day-schedule";
 
 const prisma = new PrismaClient();
 
@@ -515,6 +517,107 @@ async function main() {
   await prisma.feedback.deleteMany({ where: { customerId: fbCustomer.id } });
   await prisma.customer.delete({ where: { id: fbCustomer.id } });
   void untouched;
+
+  // ── گزارش شبانه و برنامه‌ی روز ──────────────────────────────
+  // روزی در گذشته‌ی دور، تا داده‌ی واقعی کلینیک قاطی نشود
+  const DG_PHONE = "09125559911";
+  const dgDay = new Date(2019, 5, 10, 0, 0, 0, 0);
+  const dgAt = (h: number, min = 0) => new Date(2019, 5, 10, h, min, 0, 0);
+
+  await prisma.payment.deleteMany({ where: { customer: { phone: DG_PHONE } } });
+  await prisma.feedback.deleteMany({ where: { customer: { phone: DG_PHONE } } });
+  await prisma.followUp.deleteMany({ where: { customer: { phone: DG_PHONE } } });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: DG_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: DG_PHONE } });
+
+  const dgCustomer = await prisma.customer.create({
+    data: { firstName: "تست", lastName: "گزارش‌شبانه", phone: DG_PHONE, createdAt: dgAt(9) },
+  });
+  const dgStaff = await prisma.staff.findFirstOrThrow();
+
+  const dgAppt = async (h: number, status: "DONE" | "CANCELLED" | "CONFIRMED", code: string) =>
+    prisma.appointment.create({
+      data: {
+        code,
+        customerId: dgCustomer.id,
+        serviceId: service.id,
+        staffId: dgStaff.id,
+        startsAt: dgAt(h),
+        endsAt: dgAt(h, 45),
+        status,
+        source: "smoke",
+      },
+    });
+
+  const dgDone = await dgAppt(10, "DONE", "SH-DG01");
+  await dgAppt(12, "DONE", "SH-DG02");
+  await dgAppt(14, "CANCELLED", "SH-DG03");
+  await dgAppt(16, "CONFIRMED", "SH-DG04"); // گذشته و تعیین‌تکلیف نشده ⇒ نیامد
+
+  await prisma.payment.create({
+    data: {
+      customerId: dgCustomer.id,
+      appointmentId: dgDone.id,
+      amount: 850_000,
+      method: "CARD",
+      status: "PAID",
+      paidAt: dgAt(11),
+    },
+  });
+  await prisma.feedback.create({
+    data: {
+      customerId: dgCustomer.id,
+      serviceId: service.id,
+      token: newFeedbackToken(),
+      rating: 2,
+      goodTags: [],
+      badTags: ["waiting"],
+      status: "SUBMITTED",
+      sentAt: dgAt(17),
+      submittedAt: dgAt(18),
+    },
+  });
+
+  const digest = await buildDailyDigest(dgDay);
+  check(
+    `گزارش شبانه: شمارش نوبت‌ها (${digest.appointments}/${digest.done}/${digest.noShow}/${digest.cancelled})`,
+    digest.appointments === 4 && digest.done === 2 && digest.noShow === 1 && digest.cancelled === 1
+  );
+  check(`گزارش شبانه: دریافتی (${digest.revenue})`, digest.revenue === 850_000);
+  check("گزارش شبانه: مشتری جدید و نظر ناراضی", digest.newCustomers === 1 && digest.unhappy === 1);
+  check(
+    "متن پیامک همه‌ی بخش‌ها را دارد",
+    digest.message.includes("نوبت:") &&
+      digest.message.includes("دریافتی:") &&
+      digest.message.includes("نظر ناراضی") &&
+      digest.message.includes("فردا:") &&
+      !digest.isEmpty
+  );
+
+  const emptyDigest = await buildDailyDigest(new Date(2018, 0, 15));
+  check("روز خالی پیامک نمی‌گیرد", emptyDigest.isEmpty);
+
+  // برنامه‌ی روز، همان داده را ستون‌بندی می‌کند
+  const board = await buildDaySchedule("2019-06-10");
+  const dgColumn = board.columns.find((c) => c.staffId === dgStaff.id);
+  check(
+    `برنامه‌ی روز، نوبت‌ها را زیر پرسنل می‌چیند (${dgColumn?.blocks.length ?? 0})`,
+    dgColumn?.blocks.length === 4
+  );
+  check(
+    "بلوک‌ها ساعت درست دارند",
+    dgColumn?.blocks[0]?.startMinute === 600 && dgColumn?.blocks[0]?.endMinute === 645
+  );
+  check(
+    "بازه‌ی نمایش، همه‌ی نوبت‌ها را در بر می‌گیرد",
+    board.fromMinute <= 600 && board.toMinute >= 16 * 60 + 45
+  );
+
+  await prisma.payment.deleteMany({ where: { customerId: dgCustomer.id } });
+  await prisma.feedback.deleteMany({ where: { customerId: dgCustomer.id } });
+  await prisma.followUp.deleteMany({ where: { customerId: dgCustomer.id } });
+  await prisma.appointment.deleteMany({ where: { customerId: dgCustomer.id } });
+  await prisma.customer.delete({ where: { id: dgCustomer.id } });
 
   await prisma.appointment.deleteMany({ where: { source: "smoke" } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });
