@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, CreditCard, DatabaseBackup, FileSignature, FileText, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, PhoneCall, Quote, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
+import { BarChart3, CalendarDays, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, PhoneCall, Quote, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -21,6 +21,7 @@ const NAV: {
   adminOnly?: boolean;
 }[] = [
   { href: "/admin", label: "داشبورد", icon: LayoutDashboard, permission: "dashboard", exact: true },
+  { href: "/admin/day", label: "برنامه‌ی روز", icon: CalendarRange, permission: "appointments.all" },
   { href: "/admin/appointments", label: "نوبت‌ها", icon: CalendarDays, permission: "appointments.all", badgeKey: "pendingAppointments" },
   { href: "/admin/my", label: "نوبت‌های من", icon: CalendarDays, permission: "appointments.own", exact: true },
   { href: "/admin/followups", label: "پیگیری مراجعین", icon: PhoneCall, permission: "appointments.all", badgeKey: "openFollowUps" },
