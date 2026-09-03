@@ -347,3 +347,48 @@ export const feedbackSchema = z.object({
   wouldRecommend: z.enum(["yes", "no", ""]).optional(),
   canPublish: z.boolean().optional(),
 });
+
+export const expenseSchema = z.object({
+  categoryId: z.string().min(1, "دسته را انتخاب کنید"),
+  staffId: z.string().trim().optional(),
+  title: z.string().trim().min(2, "عنوان هزینه را بنویسید").max(150),
+  amount: z
+    .union([z.string(), z.number()])
+    .transform((v) => Math.round(Number(toEn(String(v))) || 0))
+    .refine((v) => v > 0, "مبلغ را وارد کنید"),
+  spentAt: z
+    .string()
+    .trim()
+    .transform(toEn)
+    .refine((v) => /^\d{4}\/\d{1,2}\/\d{1,2}$/.test(v), "تاریخ را به شکل ۱۴۰۵/۰۶/۱۵ وارد کنید"),
+  note: z.string().trim().max(500).optional(),
+});
+
+const quantityField = z
+  .union([z.string(), z.number()])
+  .transform((v) => Number(toEn(String(v)).replace("٫", ".")))
+  .refine((v) => Number.isFinite(v) && v >= 0, "مقدار نامعتبر است");
+
+export const inventoryItemSchema = z.object({
+  name: z.string().trim().min(2, "نام قلم را بنویسید").max(120),
+  unit: z.string().trim().min(1, "واحد را انتخاب کنید").max(20),
+  minStock: quantityField.optional(),
+  unitCost: optionalInt,
+  supplier: z.string().trim().max(120).optional(),
+  note: z.string().trim().max(500).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const stockMovementSchema = z.object({
+  itemId: z.string().min(1),
+  kind: z.enum(["IN", "OUT", "ADJUST", "WASTE"]),
+  quantity: quantityField.refine((v) => v > 0, "مقدار باید بیشتر از صفر باشد"),
+  unitCost: optionalInt,
+  note: z.string().trim().max(300).optional(),
+});
+
+export const serviceMaterialSchema = z.object({
+  serviceId: z.string().min(1),
+  itemId: z.string().min(1, "قلم انبار را انتخاب کنید"),
+  quantity: quantityField.refine((v) => v > 0, "مقدار مصرف را وارد کنید"),
+});

@@ -158,6 +158,7 @@ model Service {
   packages     Package[]
   waitlist     WaitlistEntry[]
   feedbacks    Feedback[]
+  materials    ServiceMaterial[]
 
   @@index([categoryId, isActive])
   @@index([isFeatured])
@@ -206,6 +207,7 @@ model Staff {
   treatments     TreatmentRecord[]
   payrollPeriods PayrollPeriod[]
   feedbacks      Feedback[]
+  expenses       Expense[]
   user           User?
 
   @@map("staff")
@@ -634,6 +636,124 @@ enum FeedbackStatus {
   SEEN
   /// نارضایتی رسیدگی شد
   RESOLVED
+}
+
+/// دسته‌ی هزینه — اجاره، حقوق، مواد مصرفی، قبوض و...
+model ExpenseCategory {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  title    String
+  /// هزینه‌های این دسته از خرید مواد می‌آید و دستی ثبت نمی‌شود
+  isSystem Boolean @default(false)
+  order    Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  expenses Expense[]
+
+  @@map("expense_categories")
+}
+
+/// یک قلم هزینه‌ی کلینیک
+model Expense {
+  id         String          @id @default(cuid())
+  categoryId String
+  category   ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  /// اگر هزینه به یک پرسنل مربوط است (حقوق، پاداش)
+  staffId    String?
+  staff      Staff?          @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
+  title   String
+  /// مبلغ به تومان
+  amount  Int
+  /// تاریخی که پول خرج شده
+  spentAt DateTime
+  note    String?
+
+  /// هزینه‌ی خودکارِ ناشی از مصرف انبار — دستی قابل ویرایش نیست
+  stockMovementId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spentAt])
+  @@index([categoryId, spentAt])
+  @@map("expenses")
+}
+
+/// قلم انبار — ژل، سرسوزن، ویال بوتاکس و...
+model InventoryItem {
+  id       String  @id @default(cuid())
+  name     String
+  /// واحد شمارش: عدد، سی‌سی، میلی‌لیتر، بسته
+  unit     String  @default("عدد")
+  /// موجودی فعلی (می‌تواند اعشاری باشد، مثل ۲.۵ سی‌سی)
+  stock    Float   @default(0)
+  /// زیر این مقدار هشدار کمبود داده می‌شود
+  minStock Float   @default(0)
+  /// آخرین بهای خرید هر واحد به تومان — مبنای محاسبه‌ی سود
+  unitCost Int     @default(0)
+  supplier String?
+  note     String?
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements StockMovement[]
+  services  ServiceMaterial[]
+
+  @@index([isActive])
+  @@map("inventory_items")
+}
+
+/// هر ورود، خروج یا اصلاح موجودی
+model StockMovement {
+  id     String            @id @default(cuid())
+  itemId String
+  item   InventoryItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  kind   StockMovementKind
+
+  /// همیشه مثبت؛ جهتش را kind تعیین می‌کند
+  quantity Float
+  /// بهای هر واحد در همین حرکت (برای خرید)
+  unitCost Int   @default(0)
+
+  /// اگر مصرف بابت یک جلسه‌ی درمان بوده
+  treatmentId String?
+  note        String?
+
+  createdAt DateTime @default(now())
+
+  @@index([itemId, createdAt])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+enum StockMovementKind {
+  /// خرید و ورود به انبار
+  IN
+  /// مصرف
+  OUT
+  /// اصلاح موجودی پس از شمارش
+  ADJUST
+  /// ضایعات و خرابی
+  WASTE
+}
+
+/// مواد مصرفیِ استانداردِ هر خدمت — مبنای کسر خودکار و بهای تمام‌شده
+model ServiceMaterial {
+  id        String        @id @default(cuid())
+  serviceId String
+  service   Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  /// مقدار مصرف در هر جلسه
+  quantity Float
+
+  @@unique([serviceId, itemId])
+  @@map("service_materials")
 }
 
 enum FollowUpKind {

@@ -17,6 +17,8 @@ import { submitFeedback } from "../src/app/actions/feedback";
 import { buildSatisfaction, newFeedbackToken } from "../src/lib/feedback";
 import { buildDailyDigest } from "../src/lib/daily-digest";
 import { buildDaySchedule } from "../src/lib/day-schedule";
+import { buildProfit } from "../src/lib/expenses";
+import { consumeForService, lowStockItems, recordMovement } from "../src/lib/inventory";
 
 const prisma = new PrismaClient();
 
@@ -618,6 +620,141 @@ async function main() {
   await prisma.followUp.deleteMany({ where: { customerId: dgCustomer.id } });
   await prisma.appointment.deleteMany({ where: { customerId: dgCustomer.id } });
   await prisma.customer.delete({ where: { id: dgCustomer.id } });
+
+  // ── انبار، هزینه و سود ──────────────────────────────────────
+  await prisma.serviceMaterial.deleteMany({ where: { item: { name: { startsWith: "تست‌کالا" } } } });
+  await prisma.expense.deleteMany({ where: { title: { contains: "تست‌کالا" } } });
+  await prisma.stockMovement.deleteMany({ where: { item: { name: { startsWith: "تست‌کالا" } } } });
+  await prisma.inventoryItem.deleteMany({ where: { name: { startsWith: "تست‌کالا" } } });
+
+  const item = await prisma.inventoryItem.create({
+    data: { name: "تست‌کالا ژل", unit: "سی‌سی", minStock: 3, unitCost: 0 },
+  });
+
+  // خرید: موجودی بالا می‌رود، بهای واحد به‌روز می‌شود و هزینه ثبت می‌گردد
+  await recordMovement({ itemId: item.id, kind: "IN", quantity: 10, unitCost: 200_000 });
+  let stock = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
+  check(`خرید انبار موجودی و بهای واحد را به‌روز می‌کند (${stock.stock})`, stock.stock === 10 && stock.unitCost === 200_000);
+
+  const autoExpense = await prisma.expense.findFirst({
+    where: { title: { contains: "تست‌کالا" } },
+    include: { category: { select: { slug: true } } },
+  });
+  check(
+    `خرید انبار خودکار هزینه ثبت می‌کند (${autoExpense?.amount})`,
+    autoExpense?.amount === 2_000_000 && autoExpense.category.slug === "materials"
+  );
+
+  await recordMovement({ itemId: item.id, kind: "OUT", quantity: 2.5 });
+  stock = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
+  check(`مصرف از موجودی کم می‌کند (${stock.stock})`, stock.stock === 7.5);
+
+  // مصرف بیشتر از موجودی نباید منفی شود
+  await recordMovement({ itemId: item.id, kind: "OUT", quantity: 100 });
+  stock = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
+  check(`موجودی منفی نمی‌شود (${stock.stock})`, stock.stock === 0);
+
+  // اصلاح شمارش: عدد واردشده موجودیِ نهایی است
+  await recordMovement({ itemId: item.id, kind: "ADJUST", quantity: 0, absoluteStock: 4 });
+  stock = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
+  check(`اصلاح شمارش موجودی را روی عدد واقعی می‌گذارد (${stock.stock})`, stock.stock === 4);
+
+  // بالای مرز هشدار (۴ > ۳) نباید هشدار بدهد
+  const notLow = await lowStockItems();
+  check("بالای مرز هشدار، هشداری داده نمی‌شود", !notLow.some((i) => i.id === item.id));
+
+  // مصرف خودکار خدمت
+  await prisma.serviceMaterial.create({ data: { serviceId: service.id, itemId: item.id, quantity: 1.5 } });
+  const consumed = await consumeForService(service.id, "smoke-treatment-1");
+  stock = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: item.id } });
+  check(`مصرف خودکار خدمت از انبار کم می‌کند (${stock.stock})`, consumed === 1 && stock.stock === 2.5);
+
+  // حالا زیر مرز است (۲.۵ ≤ ۳) و باید هشدار بدهد
+  const lows = await lowStockItems();
+  check("زیر مرز هشدار، قلم در فهرست کمبود می‌آید", lows.some((i) => i.id === item.id));
+
+  // ── سود، روی داده‌ی کنترل‌شده ───────────────────────────────
+  const PR_PHONE = "09125553311";
+  const prFrom = new Date(2017, 2, 1, 0, 0, 0, 0);
+  const prTo = new Date(2017, 2, 31, 23, 59, 59, 999);
+  const prAt = (d: number) => new Date(2017, 2, d, 11, 0, 0, 0);
+
+  await prisma.payment.deleteMany({ where: { customer: { phone: PR_PHONE } } });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: PR_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: PR_PHONE } });
+  await prisma.expense.deleteMany({ where: { spentAt: { gte: prFrom, lte: prTo } } });
+
+  const prCustomer = await prisma.customer.create({
+    data: { firstName: "تست", lastName: "سود", phone: PR_PHONE },
+  });
+  const prStaff = await prisma.staff.findFirstOrThrow();
+  // درصد پورسانت واقعی می‌گذاریم تا این بخشِ تست تهی نباشد
+  const prevCommission = prStaff.commissionPercent;
+  await prisma.staff.update({ where: { id: prStaff.id }, data: { commissionPercent: 20 } });
+  await prisma.staffOnService.updateMany({
+    where: { staffId: prStaff.id, serviceId: service.id },
+    data: { commissionPercent: null },
+  });
+  const prAppt = await prisma.appointment.create({
+    data: {
+      code: "SH-PR01",
+      customerId: prCustomer.id,
+      serviceId: service.id,
+      staffId: prStaff.id,
+      startsAt: prAt(5),
+      endsAt: new Date(prAt(5).getTime() + 45 * 60_000),
+      status: "DONE",
+      source: "smoke",
+    },
+  });
+  await prisma.payment.create({
+    data: {
+      customerId: prCustomer.id,
+      appointmentId: prAppt.id,
+      amount: 1_000_000,
+      method: "CASH",
+      status: "PAID",
+      paidAt: prAt(5),
+    },
+  });
+
+  const rentCategory = await prisma.expenseCategory.findUniqueOrThrow({ where: { slug: "rent" } });
+  await prisma.expense.create({
+    data: { categoryId: rentCategory.id, title: "اجاره تست", amount: 400_000, spentAt: prAt(1) },
+  });
+
+  const profit = await buildProfit(prFrom, prTo);
+  check(
+    `سود = درآمد منهای هزینه (${profit.revenue} − ${profit.expenses} = ${profit.profit})`,
+    profit.revenue === 1_000_000 && profit.expenses === 400_000 && profit.profit === 600_000
+  );
+  check(`حاشیه‌ی سود (${profit.margin}٪)`, profit.margin === 60);
+
+  const profitRow = profit.byService.find((r) => r.serviceId === service.id);
+  // ۱.۵ سی‌سی × ۲۰۰٬۰۰۰ = ۳۰۰٬۰۰۰ بهای مواد
+  check(
+    `بهای مواد هر جلسه در سود خدمت می‌آید (${profitRow?.materialCost})`,
+    profitRow?.materialCost === 300_000 && profitRow.missingMaterials === false
+  );
+  check(
+    `پورسانت ۲۰٪ در سود خدمت کم می‌شود (${profitRow?.commission})`,
+    profitRow?.commission === 200_000
+  );
+  check(
+    `سود خدمت = درآمد − مواد − پورسانت (${profitRow?.profit})`,
+    profitRow?.profit === 1_000_000 - 300_000 - 200_000
+  );
+
+  await prisma.staff.update({ where: { id: prStaff.id }, data: { commissionPercent: prevCommission } });
+
+  await prisma.serviceMaterial.deleteMany({ where: { itemId: item.id } });
+  await prisma.expense.deleteMany({ where: { stockMovementId: { not: null } } });
+  await prisma.stockMovement.deleteMany({ where: { itemId: item.id } });
+  await prisma.inventoryItem.delete({ where: { id: item.id } });
+  await prisma.payment.deleteMany({ where: { customerId: prCustomer.id } });
+  await prisma.appointment.deleteMany({ where: { customerId: prCustomer.id } });
+  await prisma.customer.delete({ where: { id: prCustomer.id } });
+  await prisma.expense.deleteMany({ where: { spentAt: { gte: prFrom, lte: prTo } } });
 
   await prisma.appointment.deleteMany({ where: { source: "smoke" } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });

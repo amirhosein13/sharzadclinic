@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, PhoneCall, Quote, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
+import { BarChart3, Boxes, CalendarDays, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -31,6 +31,8 @@ const NAV: {
   { href: "/admin/staff", label: "پرسنل", icon: Users, permission: "staff" },
   { href: "/admin/payments", label: "پرداخت‌ها", icon: CreditCard, permission: "payroll" },
   { href: "/admin/payroll", label: "حقوق و دستمزد", icon: Wallet, permission: "payroll" },
+  { href: "/admin/expenses", label: "هزینه‌ها", icon: Receipt, permission: "payroll" },
+  { href: "/admin/inventory", label: "انبار مواد", icon: Boxes, permission: "payroll", badgeKey: "lowStock" },
   { href: "/admin/reports", label: "گزارش‌ها", icon: BarChart3, permission: "payroll" },
   { href: "/admin/my/earnings", label: "درآمد من", icon: Wallet, permission: "payroll.own" },
   { href: "/admin/consents", label: "رضایت‌نامه‌ها", icon: FileSignature, permission: "content" },
@@ -53,6 +55,7 @@ export type SidebarBadges = {
   openFollowUps?: number;
   waitingList?: number;
   openFeedback?: number;
+  lowStock?: number;
 };
 
 export function Sidebar({

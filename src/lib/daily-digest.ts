@@ -4,6 +4,7 @@ import { getSettings } from "./settings";
 import { formatJalaliWithWeekday } from "./date";
 import { formatToman, normalizePhone, toFa } from "./utils";
 import { UNHAPPY_THRESHOLD } from "./feedback";
+import { lowStockCount } from "./inventory";
 
 export type DailyDigest = {
   date: Date;
@@ -17,6 +18,7 @@ export type DailyDigest = {
   openFollowUps: number;
   tomorrow: number;
   waitlist: number;
+  lowStock: number;
   /** متن آماده‌ی پیامک */
   message: string;
   /** اگر هیچ اتفاقی نیفتاده، ارزش پیامک‌دادن ندارد */
@@ -36,7 +38,7 @@ export async function buildDailyDigest(day = new Date()): Promise<DailyDigest> {
   const now = new Date();
   const settings = await getSettings();
 
-  const [appointments, payments, newCustomers, unhappy, openFollowUps, tomorrow, waitlist] =
+  const [appointments, payments, newCustomers, unhappy, openFollowUps, tomorrow, waitlist, lowStock] =
     await Promise.all([
       prisma.appointment.findMany({
         where: { startsAt: { gte: start, lt: end } },
@@ -58,6 +60,7 @@ export async function buildDailyDigest(day = new Date()): Promise<DailyDigest> {
         where: { startsAt: { gte: end, lt: tomorrowEnd }, status: { in: ["PENDING", "CONFIRMED"] } },
       }),
       prisma.waitlistEntry.count({ where: { status: "WAITING" } }),
+      lowStockCount(),
     ]);
 
   const done = appointments.filter((a) => a.status === "DONE").length;
@@ -80,6 +83,7 @@ export async function buildDailyDigest(day = new Date()): Promise<DailyDigest> {
   if (unhappy > 0) lines.push(`⚠️ نظر ناراضی: ${toFa(unhappy)}`);
   if (openFollowUps > 0) lines.push(`پیگیری معوق: ${toFa(openFollowUps)}`);
   if (waitlist > 0) lines.push(`لیست انتظار: ${toFa(waitlist)}`);
+  if (lowStock > 0) lines.push(`⚠️ ${toFa(lowStock)} قلم انبار رو به اتمام`);
   lines.push(`فردا: ${toFa(tomorrow)} نوبت`);
 
   return {
@@ -94,6 +98,7 @@ export async function buildDailyDigest(day = new Date()): Promise<DailyDigest> {
     openFollowUps,
     tomorrow,
     waitlist,
+    lowStock,
     message: lines.join("\n"),
     isEmpty: appointments.length === 0 && revenue === 0 && tomorrow === 0 && unhappy === 0,
   };

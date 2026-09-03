@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { buildReport, isRangeKey, resolveRange } from "@/lib/reports";
 import { buildSatisfaction } from "@/lib/feedback";
+import { buildProfit } from "@/lib/expenses";
 import { toCsv } from "@/lib/csv";
 import { formatJalali } from "@/lib/date";
 import { toEn } from "@/lib/utils";
@@ -18,9 +19,10 @@ export async function GET(request: Request) {
 
   const key = new URL(request.url).searchParams.get("range") ?? "this-month";
   const range = resolveRange(isRangeKey(key) ? key : "this-month");
-  const [report, satisfaction] = await Promise.all([
+  const [report, satisfaction, profit] = await Promise.all([
     buildReport(range),
     buildSatisfaction(range.from, range.to),
+    buildProfit(range.from, range.to),
   ]);
 
   // اعداد را خام می‌نویسیم تا در اکسل قابل جمع‌زدن باشند
@@ -72,6 +74,33 @@ export async function GET(request: Request) {
       title: "مشتریان برتر",
       head: ["نام", "موبایل", "مراجعه", "مبلغ (تومان)"],
       rows: report.topCustomers.map((c) => [c.name, c.phone, c.visits, c.spent]),
+    },
+    {
+      title: "سود و هزینه",
+      head: ["شاخص", "مقدار (تومان)"],
+      rows: [
+        ["درآمد", profit.revenue],
+        ["هزینه", profit.expenses],
+        ["سود", profit.profit],
+        ["حاشیه‌ی سود (درصد)", profit.margin],
+      ],
+    },
+    {
+      title: "هزینه به تفکیک دسته",
+      head: ["دسته", "تعداد قلم", "مبلغ (تومان)"],
+      rows: profit.expensesByCategory.map((r) => [r.title, r.count, r.amount]),
+    },
+    {
+      title: "سود هر خدمت",
+      head: ["خدمت", "جلسه", "درآمد", "بهای مواد", "پورسانت", "سود"],
+      rows: profit.byService.map((r) => [
+        r.title + (r.missingMaterials ? " (بدون مواد تعریف‌شده)" : ""),
+        r.sessions,
+        r.revenue,
+        r.materialCost,
+        r.commission,
+        r.profit,
+      ]),
     },
     {
       title: "رضایت مشتری",

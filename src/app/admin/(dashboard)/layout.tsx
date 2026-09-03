@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/admin/sidebar";
 import { can } from "@/lib/permissions";
+import { lowStockCount } from "@/lib/inventory";
 
 export const metadata: Metadata = {
   title: { default: "پنل مدیریت", template: "%s | پنل مدیریت" },
@@ -15,7 +16,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/admin/login");
 
   // شمارنده‌های سایدبار فقط برای نقش‌هایی که آن بخش‌ها را می‌بینند
-  const [pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps, waitingList, openFeedback] =
+  const [pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps, waitingList, openFeedback, lowStock] =
     await Promise.all([
       can(user.role, "appointments.all") ? prisma.appointment.count({ where: { status: "PENDING" } }) : 0,
       can(user.role, "content") ? prisma.testimonial.count({ where: { isApproved: false } }) : 0,
@@ -31,6 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             where: { submittedAt: { not: null }, status: { in: ["SUBMITTED", "SEEN"] } },
           })
         : 0,
+      can(user.role, "payroll") ? lowStockCount() : 0,
     ]);
 
   return (
@@ -44,6 +46,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           openFollowUps,
           waitingList,
           openFeedback,
+          lowStock,
         }}
       />
       <div className="min-w-0 flex-1">

@@ -1,13 +1,14 @@
 import Link from "next/link";
 import {
-  BarChart3, CalendarX2, Download, Megaphone, MessageSquareHeart, Smile, Star,
-  TrendingUp, TriangleAlert, UserPlus, Users, Wallet,
+  BarChart3, CalendarX2, Download, Megaphone, MessageSquareHeart, Receipt, Smile, Star,
+  TrendingDown, TrendingUp, TriangleAlert, UserPlus, Users, Wallet,
 } from "lucide-react";
 import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ReportTrendChart } from "@/components/admin/revenue-chart";
 import { buildReport, isRangeKey, RANGE_PRESETS, resolveRange } from "@/lib/reports";
 import { buildSatisfaction } from "@/lib/feedback";
+import { buildProfit } from "@/lib/expenses";
 import { formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -62,9 +63,10 @@ export default async function ReportsPage({
   const { range: rangeParam } = await searchParams;
   const rangeKey = isRangeKey(rangeParam) ? rangeParam : "this-month";
   const range = resolveRange(rangeKey);
-  const [report, satisfaction] = await Promise.all([
+  const [report, satisfaction, profit] = await Promise.all([
     buildReport(range),
     buildSatisfaction(range.from, range.to),
+    buildProfit(range.from, range.to),
   ]);
 
   const maxService = Math.max(1, ...report.byService.map((r) => r.revenue));
@@ -307,6 +309,108 @@ export default async function ReportsPage({
               </Card>
             </div>
           </div>
+
+          {/* ── سود و هزینه ─────────────────────────────── */}
+          <div className="mt-10 mb-5 flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-lg font-extrabold">سود و هزینه</h2>
+            <Link
+              href="/admin/expenses"
+              className="text-sm font-medium text-rose-600 hover:underline dark:text-rose-300"
+            >
+              ثبت و مدیریت هزینه‌ها ←
+            </Link>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Stat
+              icon={Wallet}
+              label="درآمد"
+              value={formatToman(profit.revenue)}
+              hint="از پرداخت‌های ثبت‌شده"
+            />
+            <Stat
+              icon={Receipt}
+              label="هزینه"
+              value={formatToman(profit.expenses)}
+              hint={
+                profit.expenses === 0
+                  ? "هنوز هزینه‌ای ثبت نکرده‌اید"
+                  : `${toFa(profit.expensesByCategory.length)} دسته`
+              }
+            />
+            <Stat
+              icon={profit.profit >= 0 ? TrendingUp : TrendingDown}
+              label={profit.profit >= 0 ? "سود" : "زیان"}
+              value={formatToman(Math.abs(profit.profit))}
+              hint={`حاشیه‌ی سود ${toFa(profit.margin)}٪`}
+            />
+          </div>
+
+          {profit.expenses === 0 && (
+            <p className="mt-4 rounded-2xl border border-dashed border-[color:var(--line)] p-4 text-xs leading-7 text-[color:var(--fg-muted)]">
+              تا وقتی هزینه‌ها (اجاره، حقوق، مواد، قبض‌ها) را ثبت نکنید، «سود» همان
+              درآمد است و عدد واقعی نیست.
+            </p>
+          )}
+
+          {profit.byService.length > 0 && (
+            <Card className="mt-6" padded={false}>
+              <div className="border-b border-[color:var(--line)] p-6">
+                <h3 className="font-bold">سود هر خدمت</h3>
+                <p className="mt-1.5 text-xs leading-6 text-[color:var(--fg-muted)]">
+                  درآمد منهای بهای مواد و پورسانت پرسنل — پرسودترین‌ها اول.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-[color:var(--line)] text-right text-xs text-[color:var(--fg-muted)]">
+                    <tr>
+                      <th className="px-5 py-3 font-medium">خدمت</th>
+                      <th className="px-5 py-3 font-medium">جلسه</th>
+                      <th className="px-5 py-3 font-medium">درآمد</th>
+                      <th className="px-5 py-3 font-medium">مواد</th>
+                      <th className="px-5 py-3 font-medium">پورسانت</th>
+                      <th className="px-5 py-3 font-medium">سود</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[color:var(--line)]">
+                    {profit.byService.map((row) => (
+                      <tr key={row.serviceId}>
+                        <td className="px-5 py-4">
+                          <span className="font-medium">{row.title}</span>
+                          {row.missingMaterials && (
+                            <span
+                              title="برای این خدمت ماده‌ای تعریف نشده، پس بهای مواد صفر فرض شده"
+                              className="mr-2 text-xs text-amber-600 dark:text-amber-300"
+                            >
+                              (بدون مواد)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 tabular-nums">{toFa(row.sessions)}</td>
+                        <td className="px-5 py-4 tabular-nums">{formatToman(row.revenue, false)}</td>
+                        <td className="px-5 py-4 tabular-nums text-[color:var(--fg-muted)]">
+                          {formatToman(row.materialCost, false)}
+                        </td>
+                        <td className="px-5 py-4 tabular-nums text-[color:var(--fg-muted)]">
+                          {formatToman(row.commission, false)}
+                        </td>
+                        <td
+                          className={
+                            row.profit >= 0
+                              ? "px-5 py-4 font-bold tabular-nums text-emerald-700 dark:text-emerald-300"
+                              : "px-5 py-4 font-bold tabular-nums text-red-600 dark:text-red-300"
+                          }
+                        >
+                          {formatToman(row.profit, false)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
 
           {/* ── رضایت مشتری ─────────────────────────────── */}
           <div className="mt-10 mb-5 flex flex-wrap items-end justify-between gap-3">

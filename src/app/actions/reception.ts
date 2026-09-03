@@ -9,6 +9,7 @@ import {
 import { atTime, parseJalaliInput, parseYmdKey } from "@/lib/date";
 import { generateBookingCode } from "@/lib/utils";
 import { deletePrivateFile } from "@/lib/upload";
+import { consumeForService } from "@/lib/inventory";
 import type { FormResult } from "./content";
 
 const OK = (message: string): FormResult => ({ ok: true, message });
@@ -180,7 +181,14 @@ export async function saveTreatment(formData: FormData): Promise<FormResult> {
         await deletePrivateFile(before.afterPhoto);
       }
     } else {
-      await prisma.treatmentRecord.create({ data });
+      const created = await prisma.treatmentRecord.create({ data });
+      // مواد مصرفی این خدمت خودکار از انبار کم می‌شود
+      if (created.serviceId) {
+        await consumeForService(created.serviceId, created.id).catch((error) => {
+          // کسر انبار نباید جلوی ثبت پرونده‌ی درمانی را بگیرد
+          console.error("کسر خودکار انبار انجام نشد:", error);
+        });
+      }
     }
 
     revalidatePath(`/admin/customers/${v.customerId}`);

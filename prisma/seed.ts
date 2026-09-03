@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import {
   CATEGORIES, SERVICES, STAFF, POSTS, TESTIMONIALS, GALLERY, CONSENT_TEMPLATES,
 } from "./seed-data";
+import { DEFAULT_EXPENSE_CATEGORIES } from "../src/lib/expenses";
 
 const prisma = new PrismaClient();
 
@@ -228,6 +229,20 @@ async function main() {
       // متن موجود بازنویسی نمی‌شود تا ویرایش‌های کلینیک از بین نرود
       update: {},
       create: { slug: t.slug, title: t.title, body: t.body, order: t.order },
+    });
+  }
+
+  // ─── دسته‌های هزینه ──────────────────────────────────────
+  for (const cat of DEFAULT_EXPENSE_CATEGORIES) {
+    await prisma.expenseCategory.upsert({
+      where: { slug: cat.slug },
+      update: { title: cat.title, order: cat.order },
+      create: {
+        slug: cat.slug,
+        title: cat.title,
+        order: cat.order,
+        isSystem: "isSystem" in cat ? cat.isSystem : false,
+      },
     });
   }
 

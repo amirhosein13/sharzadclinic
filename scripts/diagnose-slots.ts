@@ -10,6 +10,7 @@ import { PrismaClient } from "@prisma/client";
 import { getAvailableSlots } from "../src/lib/availability";
 import { getSettings } from "../src/lib/settings";
 import { listBackups } from "../src/lib/backup";
+import { lowStockItems } from "../src/lib/inventory";
 import { formatJalali, jalaliWeekday, WEEKDAYS_FA, ymdKey } from "../src/lib/date";
 import { toFa } from "../src/lib/utils";
 
@@ -110,6 +111,16 @@ async function main() {
     if (days > 1) {
       problems.push(`${toFa(days)} روز است پشتیبان گرفته نشده — کرون شبانه را بررسی کن.`);
     }
+  }
+
+  /* ── انبار ───────────────────────────────────────────── */
+  const low = await lowStockItems();
+  if (low.length > 0) {
+    console.log("\n📦 انبار");
+    for (const item of low.slice(0, 8)) {
+      console.log(`   ${WARN}${item.name}: ${toFa(item.stock)} ${item.unit}${item.isOut ? " (تمام شد)" : ""}`);
+    }
+    problems.push(`${toFa(low.length)} قلم انبار رو به اتمام است — از پنل ← انبار مواد ببین.`);
   }
 
   /* ── ساعات کاری کلینیک ───────────────────────────────── */
