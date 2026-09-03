@@ -30,6 +30,10 @@ export const DEFAULT_SETTINGS = {
   managerPhone: "",
   /** گزارش شبانه‌ی پیامکی فعال باشد؟ "1" یا "0" */
   dailyDigestSms: "1",
+  /** پیامک تبریک تولد فعال باشد؟ "1" یا "0" */
+  birthdaySms: "0",
+  /** کد تخفیفی که در پیامک تولد معرفی می‌شود — خالی یعنی فقط تبریک */
+  birthdayDiscountCode: "",
 } as const;
 
 export type SettingsMap = Record<string, string>;

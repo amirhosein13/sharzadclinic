@@ -1,4 +1,5 @@
-import { CreditCard, Trash2, TriangleAlert, Wallet } from "lucide-react";
+import Link from "next/link";
+import { CreditCard, Printer, Trash2, TriangleAlert, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/guard";
 import { isZarinpalConfigured } from "@/lib/zarinpal";
@@ -152,6 +153,17 @@ export default async function PaymentsPage() {
                       {p.paidAt ? formatJalaliLong(p.paidAt) : timeAgoFa(p.createdAt)}
                     </td>
                     <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                      {p.status === "PAID" && (
+                        <Link
+                          href={`/admin/print/receipt/${p.id}`}
+                          target="_blank"
+                          title="رسید چاپی"
+                          className="grid size-8 place-items-center rounded-lg border border-[color:var(--line)] transition-colors hover:bg-[color:var(--bg-sunken)]"
+                        >
+                          <Printer className="size-3.5" />
+                        </Link>
+                      )}
                       <ActionButton
                         action={deletePayment.bind(null, p.id)}
                         confirm={`این پرداخت ${formatToman(p.amount)} حذف شود؟`}
@@ -160,6 +172,7 @@ export default async function PaymentsPage() {
                       >
                         <Trash2 className="size-3.5" />
                       </ActionButton>
+                      </div>
                     </td>
                   </tr>
                 ))}

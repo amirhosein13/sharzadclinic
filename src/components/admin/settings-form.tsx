@@ -37,6 +37,8 @@ const FIELDS: {
   { key: "feedbackAutoSms", label: "پیامک نظرسنجی خودکار", hint: "۱ یعنی پس از «انجام‌شده» شدن هر نوبت، پیامک نظرسنجی برود. ۰ یعنی فقط دستی", ltr: true },
   { key: "managerPhone", label: "موبایل مدیر (گزارش شبانه)", hint: "خلاصه‌ی هر روز به این شماره پیامک می‌شود. خالی یعنی همان موبایل کلینیک", ltr: true },
   { key: "dailyDigestSms", label: "گزارش شبانه‌ی پیامکی", hint: "۱ یعنی فعال، ۰ یعنی خاموش", ltr: true },
+  { key: "birthdaySms", label: "پیامک تبریک تولد", hint: "۱ یعنی فعال، ۰ یعنی خاموش. فقط برای مشتریانی که تاریخ تولدشان ثبت شده", ltr: true },
+  { key: "birthdayDiscountCode", label: "کد تخفیف تولد", hint: "اگر بگذارید، در پیامک تولد معرفی می‌شود. اول از بخش کد تخفیف بسازیدش", ltr: true },
 ];
 
 export function SettingsForm({ settings }: { settings: SettingsMap }) {

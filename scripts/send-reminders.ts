@@ -11,7 +11,9 @@
  */
 import "../src/lib/timezone";
 import { PrismaClient } from "@prisma/client";
-import { notifyBookingReminder } from "../src/lib/notifications";
+import { notifyBirthday, notifyBookingReminder } from "../src/lib/notifications";
+import { alreadyGreetedThisYear, birthdayMessage, todaysBirthdays } from "../src/lib/birthdays";
+import { getSettings } from "../src/lib/settings";
 import { generateFollowUps } from "../src/lib/followups";
 import { formatJalaliWithWeekday } from "../src/lib/date";
 import { toFa } from "../src/lib/utils";
@@ -84,8 +86,39 @@ async function buildFollowUps() {
   );
 }
 
+/** تبریک تولد مشتریانی که امروز تولدشان است */
+async function greetBirthdays() {
+  const settings = await getSettings();
+  if (settings.birthdaySms !== "1") return;
+
+  const people = await todaysBirthdays();
+  if (people.length === 0) {
+    console.log("\n🎂 امروز تولد کسی نیست.");
+    return;
+  }
+
+  console.log(`\n🎂 ${toFa(people.length)} نفر امروز تولدشان است.`);
+  let sent = 0;
+  for (const person of people) {
+    // اگر امسال قبلاً تبریک رفته (مثلاً اسکریپت دوبار اجرا شده) دوباره نمی‌رود
+    if (await alreadyGreetedThisYear(person.phone)) {
+      console.log(`  ↷ ${person.name} — امسال تبریک رفته است`);
+      continue;
+    }
+    const result = await notifyBirthday(person.phone, await birthdayMessage(person.name));
+    if (result.ok) {
+      sent++;
+      console.log(`  ✅ ${person.name}${result.simulated ? " (شبیه‌سازی)" : ""}`);
+    } else {
+      console.warn(`  ❌ ${person.name} — ${result.error ?? "ارسال ناموفق"}`);
+    }
+  }
+  if (sent > 0) console.log(`   ${toFa(sent)} تبریک ارسال شد.`);
+}
+
 main()
   .then(() => buildFollowUps())
+  .then(() => greetBirthdays())
   .catch((error) => {
     console.error("❌ خطا در ارسال یادآوری‌ها:", error);
     process.exit(1);

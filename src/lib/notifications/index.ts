@@ -158,6 +158,11 @@ export async function notifyBookingReminder(options: {
   return sendSms({ to: options.phone, template: "booking_reminder", message });
 }
 
+/** تبریک تولد مشتری */
+export async function notifyBirthday(phone: string, message: string): Promise<NotifyResult> {
+  return sendSms({ to: phone, template: "birthday", message });
+}
+
 /** گزارش شبانه‌ی خلاصه‌ی روز برای مدیر */
 export async function notifyDailyDigest(phone: string, message: string): Promise<NotifyResult> {
   return sendSms({ to: phone, template: "daily_digest", message });
