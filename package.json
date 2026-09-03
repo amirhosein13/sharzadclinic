@@ -25,7 +25,8 @@
     "restore": "tsx --conditions=react-server scripts/restore.ts",
     "test:smoke": "tsx --conditions=react-server scripts/smoke-test.ts",
     "reminders": "tsx --conditions=react-server scripts/send-reminders.ts",
-    "digest": "tsx --conditions=react-server scripts/daily-digest.ts"
+    "digest": "tsx --conditions=react-server scripts/daily-digest.ts",
+    "demo:feedback": "tsx --conditions=react-server scripts/demo-feedback.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
