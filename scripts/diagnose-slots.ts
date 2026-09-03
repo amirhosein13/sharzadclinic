@@ -105,7 +105,7 @@ async function main() {
   } else {
     const days = Math.floor((Date.now() - backups[0].createdAt.getTime()) / 86_400_000);
     console.log(
-      `   ${days <= 1 ? OK : WARN}آخرین پشتیبان: ${formatJalali(backups[0].createdAt)} (${toFa(days)} روز پیش) • ${toFa(backups.length)} نسخه`,
+      `   ${days <= 1 ? OK + " " : WARN}آخرین پشتیبان: ${formatJalali(backups[0].createdAt)} (${toFa(days)} روز پیش) • ${toFa(backups.length)} نسخه`,
     );
     if (days > 1) {
       problems.push(`${toFa(days)} روز است پشتیبان گرفته نشده — کرون شبانه را بررسی کن.`);
