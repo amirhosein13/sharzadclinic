@@ -215,6 +215,8 @@ export default async function CustomerDetailPage({
                   address: customer.address,
                   notes: customer.notes,
                   allergies: customer.allergies,
+                  referralSource: customer.referralSource,
+                  referralNote: customer.referralNote,
                 }}
               />
             </div>

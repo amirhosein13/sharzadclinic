@@ -56,6 +56,11 @@ export async function GET(request: Request) {
       rows: report.byStaff.map((r) => [r.label, r.sessions, r.revenue]),
     },
     {
+      title: "مشتری از کجا آمد",
+      head: ["کانال", "مشتری تازه", "سهم (درصد)", "درآمد این مشتری‌ها (تومان)"],
+      rows: report.bySource.map((r) => [r.label, r.newCustomers, r.share, r.revenue]),
+    },
+    {
       title: "روش پرداخت",
       head: ["روش", "تعداد", "مبلغ (تومان)"],
       rows: report.byMethod.map((r) => [r.label, r.count, r.revenue]),

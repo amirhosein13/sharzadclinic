@@ -86,6 +86,10 @@ model Customer {
   address      String?
   notes        String? // یادداشت پزشکی/پذیرش
   allergies    String?
+  /// «از کجا با ما آشنا شدید؟» — کلید از REFERRAL_SOURCES
+  referralSource String?
+  /// توضیح آزاد، مثلاً نام معرف
+  referralNote   String?
   isBlocked    Boolean   @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -104,6 +108,7 @@ model Customer {
 
   @@index([lastName, firstName])
   @@index([createdAt])
+  @@index([referralSource])
   @@map("customers")
 }
 

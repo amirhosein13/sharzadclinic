@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import {
   formatJalali, jalaliMonthRange, jalaliWeekday, jalaliYearRange, WEEKDAYS_FA,
 } from "./date";
+import { sourceLabel } from "./referral-sources";
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "نقدی",
@@ -32,6 +33,17 @@ export type Comparison = {
   label: string;
 };
 
+export type SourceRow = {
+  key: string;
+  label: string;
+  /** چند مشتری تازه در این بازه از این کانال آمدند */
+  newCustomers: number;
+  /** درصد از کل مشتریان تازه‌ی این بازه */
+  share: number;
+  /** پولی که همان مشتری‌ها تا امروز پرداخت کرده‌اند */
+  revenue: number;
+};
+
 export type ReportData = {
   range: ReportRange;
   previous: Comparison | null;
@@ -56,6 +68,8 @@ export type ReportData = {
   };
   byService: Breakdown[];
   byStaff: Breakdown[];
+  /** «مشتری از کجا آمد» — مبنای تصمیم تبلیغاتی */
+  bySource: SourceRow[];
   byMethod: { key: string; label: string; count: number; revenue: number }[];
   byWeekday: { label: string; sessions: number }[];
   byHour: { hour: number; sessions: number }[];
@@ -237,6 +251,8 @@ export async function buildReport(range: ReportRange): Promise<ReportData> {
   for (const p of payments) if (p.paidAt) bump(p.paidAt, { revenue: p.amount });
   for (const a of appointments) if (a.status === "DONE") bump(a.startsAt, { sessions: 1 });
 
+  const bySource = await sourceBreakdown(from, to);
+
   const daily = [...dailyMap.entries()]
     .map(([dateKey, row]) => ({ dateKey, label: dateKey, ...row }))
     .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
@@ -263,12 +279,56 @@ export async function buildReport(range: ReportRange): Promise<ReportData> {
     },
     byService: sortByRevenue([...services.values()]),
     byStaff: sortByRevenue([...staff.values()]),
+    bySource,
     byMethod: [...methods.values()].sort((a, b) => b.revenue - a.revenue),
     byWeekday,
     byHour,
     topCustomers,
     daily,
   };
+}
+
+/**
+ * «مشتری از کجا آمد؟»
+ *
+ * مبنا مشتریانی است که در این بازه پرونده‌شان ساخته شده — نه پرداخت‌ها —
+ * چون سؤال این است که کدام کانال آدم تازه می‌آورد. درآمد هر کانال، جمع
+ * پرداخت‌های همان آدم‌ها تا امروز است، حتی اگر بعد از این بازه پول داده
+ * باشند؛ ارزش یک مشتری در طول عمرش همین است.
+ */
+async function sourceBreakdown(from: Date, to: Date): Promise<SourceRow[]> {
+  const customers = await prisma.customer.findMany({
+    where: { createdAt: { gte: from, lte: to } },
+    select: {
+      referralSource: true,
+      payments: { where: { status: "PAID" }, select: { amount: true } },
+    },
+  });
+
+  if (customers.length === 0) return [];
+
+  const rows = new Map<string, SourceRow>();
+  for (const customer of customers) {
+    const key = customer.referralSource ?? "unknown";
+    const row = rows.get(key) ?? {
+      key,
+      label: key === "unknown" ? "نپرسیده‌ایم" : sourceLabel(key),
+      newCustomers: 0,
+      share: 0,
+      revenue: 0,
+    };
+    row.newCustomers += 1;
+    row.revenue += customer.payments.reduce((sum, p) => sum + p.amount, 0);
+    rows.set(key, row);
+  }
+
+  const total = customers.length;
+  return [...rows.values()]
+    .map((row) => ({ ...row, share: Math.round((row.newCustomers / total) * 100) }))
+    // «نپرسیده‌ایم» همیشه آخر می‌آید؛ کانال واقعی نیست
+    .sort((a, b) =>
+      a.key === "unknown" ? 1 : b.key === "unknown" ? -1 : b.newCustomers - a.newCustomers,
+    );
 }
 
 /* ── بازه‌های آماده ─────────────────────────────────────────── */

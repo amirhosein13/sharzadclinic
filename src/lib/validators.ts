@@ -26,6 +26,8 @@ export const bookingSchema = z.object({
   lastName: z.string().trim().min(2, "نام خانوادگی را وارد کنید").max(50),
   phone: phoneSchema,
   note: z.string().trim().max(500).optional(),
+  /// «از کجا با ما آشنا شدید؟» — فقط برای مراجع تازه پرسیده می‌شود
+  referralSource: z.string().trim().max(30).optional(),
 });
 export type BookingInput = z.infer<typeof bookingSchema>;
 
@@ -205,6 +207,8 @@ export const customerSchema = z.object({
   address: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(3000).optional(),
   allergies: z.string().trim().max(1000).optional(),
+  referralSource: z.string().trim().max(30).optional(),
+  referralNote: z.string().trim().max(200).optional(),
 });
 
 export const treatmentSchema = z.object({

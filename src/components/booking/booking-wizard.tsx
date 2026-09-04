@@ -12,7 +12,8 @@ import { createBooking } from "@/app/actions/booking";
 import { JalaliCalendar } from "./jalali-calendar";
 import { WaitlistPrompt } from "./waitlist-prompt";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { REFERRAL_SOURCES } from "@/lib/referral-sources";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDuration, formatPriceRange, formatToman, toFa } from "@/lib/utils";
 
@@ -387,6 +388,18 @@ export function BookingWizard({
                       dir="ltr"
                       className="text-right"
                     />
+                  </Field>
+
+                  {/* فقط از مراجع تازه پرسیده می‌شود و اختیاری است */}
+                  <Field label="از کجا با ما آشنا شدید؟" hint="اختیاری — کمک می‌کند بهتر خدمت کنیم">
+                    <Select name="referralSource" defaultValue="">
+                      <option value="">ترجیح می‌دهم نگویم</option>
+                      {REFERRAL_SOURCES.map((src) => (
+                        <option key={src.key} value={src.key}>
+                          {src.label}
+                        </option>
+                      ))}
+                    </Select>
                   </Field>
                 </>
               )}

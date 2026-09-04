@@ -9,7 +9,8 @@ import { getAvailableSlots } from "../src/lib/availability";
 import { createBooking, trackAppointment } from "../src/app/actions/booking";
 import { atTime, parseYmdKey } from "../src/lib/date";
 import { summarizePackages, activePackages } from "../src/lib/packages";
-import { buildReport } from "../src/lib/reports";
+import { buildReport, resolveRange } from "../src/lib/reports";
+import { normalizeSource, sourceLabel } from "../src/lib/referral-sources";
 import { checkDiscount, normalizeCode, redeemDiscount } from "../src/lib/discounts";
 import { joinWaitlist } from "../src/app/actions/waitlist";
 import { matchesForSlot } from "../src/lib/waitlist";
@@ -1085,6 +1086,107 @@ async function main() {
   await prisma.user.delete({ where: { id: resetUser.id } });
 
 
+
+
+  // ── «از کجا با ما آشنا شدید» ────────────────────────────────
+  const SRC_PHONES = ["09129990061", "09129990062", "09129990063", "09129990064"];
+  await prisma.payment.deleteMany({ where: { customer: { phone: { in: SRC_PHONES } } } });
+  await prisma.customer.deleteMany({ where: { phone: { in: SRC_PHONES } } });
+
+  check("منبع نامعتبر ذخیره نمی‌شود", normalizeSource("hacker-value") === null);
+  check("منبع معتبر پذیرفته می‌شود", normalizeSource("instagram") === "instagram");
+  check("برچسب فارسی منبع", sourceLabel("friend") === "معرفی دوست یا آشنا");
+  check("منبع خالی «نامشخص» می‌شود", sourceLabel(null) === "نامشخص");
+
+  const srcRange = resolveRange("this-month");
+  const srcMoment = new Date(Math.max(srcRange.from.getTime(), Date.now() - 3600_000));
+
+  // دو نفر از اینستاگرام، یکی از معرفی دوست، یکی بدون جواب
+  const srcCustomers = await Promise.all(
+    [
+      { phone: SRC_PHONES[0], referralSource: "instagram", pay: 1_000_000 },
+      { phone: SRC_PHONES[1], referralSource: "instagram", pay: 3_000_000 },
+      { phone: SRC_PHONES[2], referralSource: "friend", pay: 500_000 },
+      { phone: SRC_PHONES[3], referralSource: null, pay: 0 },
+    ].map(async (row) => {
+      const c = await prisma.customer.create({
+        data: {
+          firstName: "منبع",
+          lastName: "آزمایشی",
+          phone: row.phone,
+          referralSource: row.referralSource,
+          createdAt: srcMoment,
+        },
+      });
+      if (row.pay > 0) {
+        await prisma.payment.create({
+          data: {
+            customerId: c.id,
+            amount: row.pay,
+            method: "CASH",
+            status: "PAID",
+            paidAt: srcMoment,
+          },
+        });
+      }
+      return c;
+    }),
+  );
+
+  const srcReport = await buildReport(srcRange);
+  const instagram = srcReport.bySource.find((r) => r.key === "instagram");
+  const friend = srcReport.bySource.find((r) => r.key === "friend");
+  const srcUnknown = srcReport.bySource.find((r) => r.key === "unknown");
+
+  check("مشتریان هر کانال شمرده می‌شوند", instagram?.newCustomers === 2);
+  check(
+    `درآمد کانال جمع پرداخت‌های همان آدم‌هاست (${instagram?.revenue})`,
+    instagram?.revenue === 4_000_000
+  );
+  check("کانال دوم هم درست است", friend?.newCustomers === 1 && friend?.revenue === 500_000);
+  check(
+    "کسانی که نپرسیده‌ایم جدا شمرده می‌شوند",
+    (srcUnknown?.newCustomers ?? 0) >= 1
+  );
+  check("برچسب «نپرسیده‌ایم» می‌خورد", srcUnknown?.label === "نپرسیده‌ایم");
+  check(
+    "کانالِ پرمشتری‌تر بالاتر می‌آید",
+    srcReport.bySource[0]?.key === "instagram"
+  );
+  check(
+    "«نپرسیده‌ایم» همیشه آخر فهرست است",
+    srcReport.bySource[srcReport.bySource.length - 1]?.key === "unknown"
+  );
+  check(
+    "سهم درصدی جمعش صد است",
+    srcReport.bySource.reduce((sum, r) => sum + r.share, 0) === 100
+  );
+
+  // رزرو آنلاین باید منبع را روی پرونده‌ی تازه بنشاند
+  const srcSlots = await getAvailableSlots({ serviceId: service.id, dateKey });
+  const srcBooking = await createBooking(fd({
+    serviceId: service.id, dateKey, time: srcSlots[0].time,
+    firstName: "تازه", lastName: "وارد", phone: "09129990065",
+    referralSource: "google",
+  }));
+  check("رزرو با منبع ثبت می‌شود", srcBooking.ok);
+  const bookedCustomer = await prisma.customer.findUnique({ where: { phone: "09129990065" } });
+  check("منبع روی پرونده‌ی مشتری تازه نشست", bookedCustomer?.referralSource === "google");
+
+  // رزرو دوم نباید جواب اول را بازنویسی کند
+  const srcSlots2 = await getAvailableSlots({ serviceId: service.id, dateKey });
+  await createBooking(fd({
+    serviceId: service.id, dateKey, time: srcSlots2[0].time,
+    firstName: "تازه", lastName: "وارد", phone: "09129990065",
+    referralSource: "instagram",
+  }));
+  const srcAfterSecond = await prisma.customer.findUnique({ where: { phone: "09129990065" } });
+  check("رزرو بعدی جواب اولیه را عوض نمی‌کند", srcAfterSecond?.referralSource === "google");
+
+  await prisma.appointment.deleteMany({ where: { customer: { phone: "09129990065" } } });
+  await prisma.customer.deleteMany({ where: { phone: "09129990065" } });
+  await prisma.payment.deleteMany({ where: { customerId: { in: srcCustomers.map((c) => c.id) } } });
+  await prisma.customer.deleteMany({ where: { id: { in: srcCustomers.map((c) => c.id) } } });
 
   // ── بستن صندوق ──────────────────────────────────────────────
   const CASH_PHONE = "09129990055";

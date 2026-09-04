@@ -5,6 +5,7 @@ import { CrudDialog } from "@/components/admin/crud-dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { saveCustomer } from "@/app/actions/reception";
+import { REFERRAL_SOURCES } from "@/lib/referral-sources";
 
 export type CustomerFormValues = {
   id: string;
@@ -18,6 +19,8 @@ export type CustomerFormValues = {
   address: string | null;
   notes: string | null;
   allergies: string | null;
+  referralSource: string | null;
+  referralNote: string | null;
 };
 
 export function CustomerForm({ customer }: { customer?: CustomerFormValues }) {
@@ -105,6 +108,26 @@ export function CustomerForm({ customer }: { customer?: CustomerFormValues }) {
           >
             <Textarea name="allergies" rows={2} defaultValue={customer?.allergies ?? ""} />
           </Field>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field
+              label="از کجا با ما آشنا شد؟"
+              error={errors.referralSource}
+              hint="برای اینکه بدانیم تبلیغات کجا جواب داده"
+            >
+              <Select name="referralSource" defaultValue={customer?.referralSource ?? ""}>
+                <option value="">نپرسیدیم / نمی‌دانم</option>
+                {REFERRAL_SOURCES.map((src) => (
+                  <option key={src.key} value={src.key}>
+                    {src.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="توضیح" error={errors.referralNote} hint="مثلاً نام معرف">
+              <Input name="referralNote" defaultValue={customer?.referralNote ?? ""} />
+            </Field>
+          </div>
 
           <Field label="یادداشت پذیرش" error={errors.notes}>
             <Textarea name="notes" rows={3} defaultValue={customer?.notes ?? ""} />

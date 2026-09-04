@@ -7,6 +7,7 @@ import {
   customerSchema, fieldErrors, timeOffSchema, treatmentSchema, walkInSchema,
 } from "@/lib/validators";
 import { atTime, parseJalaliInput, parseYmdKey } from "@/lib/date";
+import { normalizeSource } from "@/lib/referral-sources";
 import { generateBookingCode } from "@/lib/utils";
 import { deletePrivateFile } from "@/lib/upload";
 import { consumeForService } from "@/lib/inventory";
@@ -55,6 +56,8 @@ export async function saveCustomer(formData: FormData): Promise<FormResult> {
       address: text(formData.get("address")),
       notes: text(formData.get("notes")),
       allergies: text(formData.get("allergies")),
+      referralSource: text(formData.get("referralSource")),
+      referralNote: text(formData.get("referralNote")),
     });
     if (!parsed.success) return FAIL("ورودی‌ها را بررسی کنید.", fieldErrors(parsed.error));
 
@@ -79,6 +82,8 @@ export async function saveCustomer(formData: FormData): Promise<FormResult> {
       address: nullable(v.address),
       notes: nullable(v.notes),
       allergies: nullable(v.allergies),
+      referralSource: normalizeSource(v.referralSource),
+      referralNote: nullable(v.referralNote),
     };
 
     // شماره‌ی تکراری را پیش از نوشتن می‌گیریم تا پیام روشن‌تری بدهیم

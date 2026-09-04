@@ -9,7 +9,7 @@ import { ReportTrendChart } from "@/components/admin/revenue-chart";
 import { buildReport, isRangeKey, RANGE_PRESETS, resolveRange } from "@/lib/reports";
 import { buildSatisfaction } from "@/lib/feedback";
 import { buildProfit } from "@/lib/expenses";
-import { formatToman, toFa } from "@/lib/utils";
+import { cn, formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -121,6 +121,8 @@ export default async function ReportsPage({
   const maxStaff = Math.max(1, ...report.byStaff.map((r) => r.revenue));
   const maxWeekday = Math.max(1, ...report.byWeekday.map((r) => r.sessions));
   const maxHour = Math.max(1, ...report.byHour.map((r) => r.sessions));
+  const maxSource = Math.max(1, ...report.bySource.map((r) => r.newCustomers));
+  const unknownShare = report.bySource.find((r) => r.key === "unknown")?.share ?? 0;
   const hasData = report.paymentCount > 0 || report.appointments.total > 0;
 
   return (
@@ -270,6 +272,54 @@ export default async function ReportsPage({
               </ul>
             </Card>
           </div>
+
+          {report.bySource.length > 0 && (
+            <Card padded={false} className="mt-6">
+              <div className="border-b border-[color:var(--line)] p-6">
+                <h2 className="font-bold">مشتری از کجا آمد؟</h2>
+                <p className="mt-1.5 text-xs leading-6 text-[color:var(--fg-muted)]">
+                  از مشتریانی که در این بازه پرونده‌شان ساخته شده. «درآمد» یعنی پولی که همان
+                  آدم‌ها تا امروز داده‌اند — پس ارزش واقعی هر کانال را نشان می‌دهد، نه فقط تعدادش.
+                  {unknownShare >= 40 && (
+                    <b className="mt-1 block text-amber-700 dark:text-amber-300">
+                      از {toFa(unknownShare)}٪ مراجعین نپرسیده‌ایم — تا این عدد پایین نیاید، مقایسه‌ی
+                      کانال‌ها دقیق نیست.
+                    </b>
+                  )}
+                </p>
+              </div>
+              <ul className="divide-y divide-[color:var(--line)]">
+                {report.bySource.map((row) => (
+                  <li key={row.key} className="p-5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span
+                        className={cn(
+                          "truncate text-sm font-medium",
+                          row.key === "unknown" && "text-[color:var(--fg-muted)]",
+                        )}
+                      >
+                        {row.label}
+                      </span>
+                      <span className="shrink-0 text-sm font-bold">
+                        {toFa(row.newCustomers)} نفر
+                        <span className="mr-1.5 text-xs font-normal text-[color:var(--fg-muted)]">
+                          ({toFa(row.share)}٪)
+                        </span>
+                      </span>
+                    </div>
+                    <p className="mt-1 mb-2.5 text-xs text-[color:var(--fg-muted)]">
+                      {row.revenue > 0
+                        ? `${formatToman(row.revenue)} — میانگین ${formatToman(
+                            Math.round(row.revenue / row.newCustomers),
+                          )} برای هر نفر`
+                        : "هنوز پرداختی ثبت نشده"}
+                    </p>
+                    <Share value={row.newCustomers} max={maxSource} />
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             <Card>

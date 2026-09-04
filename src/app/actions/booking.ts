@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { bookingSchema, fieldErrors, trackSchema } from "@/lib/validators";
+import { normalizeSource } from "@/lib/referral-sources";
 import { getAvailableSlots, releaseExpiredHolds } from "@/lib/availability";
 import { atTime, formatJalaliDateTime, parseYmdKey } from "@/lib/date";
 import { generateBookingCode } from "@/lib/utils";
@@ -38,6 +39,7 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
     lastName: existingCustomer?.lastName ?? formData.get("lastName"),
     phone: existingCustomer?.phone ?? formData.get("phone"),
     note: formData.get("note") ?? "",
+    referralSource: formData.get("referralSource") ?? "",
   });
 
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
@@ -75,10 +77,18 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
       return { ok: false, message: "امکان ثبت نوبت آنلاین برای این شماره وجود ندارد. لطفاً تماس بگیرید." };
     }
 
+    // «از کجا آشنا شدید» فقط یک بار، هنگام ساخت پرونده، ثبت می‌شود؛ جواب
+    // اولین بار درست‌ترین جواب است و رزروهای بعدی نباید بازنویسی‌اش کنند
+    const referralSource = normalizeSource(input.referralSource);
     const customer = await prisma.customer.upsert({
       where: { phone: input.phone },
       update: { firstName: input.firstName, lastName: input.lastName },
-      create: { firstName: input.firstName, lastName: input.lastName, phone: input.phone },
+      create: {
+        firstName: input.firstName,
+        lastName: input.lastName,
+        phone: input.phone,
+        referralSource,
+      },
     });
 
     // اگر همین مشتری برای همین ساعت نوبت دارد، تکراری نسازیم
