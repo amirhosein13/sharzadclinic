@@ -7,7 +7,7 @@ import { feedbackSchema, fieldErrors } from "@/lib/validators";
 import {
   newFeedbackToken, sanitizeAspects, UNHAPPY_THRESHOLD,
 } from "@/lib/feedback";
-import { notifyFeedbackRequest } from "@/lib/notifications";
+import { notifyFeedbackRequest, notifyTicketReply } from "@/lib/notifications";
 import { safeRevalidate } from "@/lib/revalidate";
 import type { FormResult } from "./content";
 
@@ -194,9 +194,30 @@ export async function saveFeedbackNote(formData: FormData): Promise<FormResult> 
   return guardManager(async () => {
     const id = text(formData.get("id"));
     const note = text(formData.get("managerNote")).trim();
-    await prisma.feedback.update({ where: { id }, data: { managerNote: note || null } });
-    revalidatePath("/admin/feedback");
-    return OK("یادداشت ذخیره شد.");
+    // پاسخ به مشتری جداست: یادداشت داخلی می‌ماند، این یکی در حساب مشتری دیده می‌شود
+    const reply = text(formData.get("replyToCustomer")).trim();
+
+    const before = await prisma.feedback.findUniqueOrThrow({
+      where: { id },
+      select: { replyToCustomer: true, customer: { select: { firstName: true, lastName: true, phone: true } } },
+    });
+
+    await prisma.feedback.update({
+      where: { id },
+      data: { managerNote: note || null, replyToCustomer: reply || null },
+    });
+
+    // اگر پاسخ تازه‌ای برای مشتری نوشته شده، خبرش کنیم
+    if (reply && reply !== before.replyToCustomer) {
+      await notifyTicketReply({
+        phone: before.customer.phone,
+        customerName: `${before.customer.firstName} ${before.customer.lastName}`,
+        subject: "نظری که ثبت کرده بودید",
+      }).catch(() => undefined);
+    }
+
+    safeRevalidate("/admin/feedback", "/account");
+    return OK(reply ? "یادداشت ذخیره و پاسخ برای مشتری ارسال شد." : "یادداشت ذخیره شد.");
   }) as Promise<FormResult>;
 }
 

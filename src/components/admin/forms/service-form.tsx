@@ -20,6 +20,7 @@ export type ServiceFormValues = {
   bufferMinutes: number;
   slotStepMinutes: number | null;
   depositAmount: number | null;
+  followUpDays: number;
   sessionsNeeded: string | null;
   preparation: string | null;
   aftercare: string | null;
@@ -136,6 +137,20 @@ export function ServiceForm({
               />
             </Field>
           </div>
+
+          <Field
+            label="پیگیری پس از درمان (روز)"
+            error={errors.followUpDays}
+            hint="مثلاً ۳ یعنی سه روز بعد از هر جلسه، پیگیری «حالتان چطور است؟» در فهرست منشی می‌آید. صفر یا خالی = خاموش"
+          >
+            <Input
+              name="followUpDays"
+              defaultValue={service?.followUpDays ?? ""}
+              inputMode="numeric"
+              dir="ltr"
+              className="text-right"
+            />
+          </Field>
 
           <Field label="تعداد جلسات پیشنهادی" error={errors.sessionsNeeded} hint="مثلاً «۴ تا ۸ جلسه»">
             <Input name="sessionsNeeded" defaultValue={service?.sessionsNeeded ?? ""} />

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Boxes, CalendarDays, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
+import { BarChart3, Boxes, CalendarDays, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -41,6 +41,7 @@ const NAV: {
   { href: "/admin/blog", label: "مجله", icon: FileText, permission: "content" },
   { href: "/admin/feedback", label: "نظر مشتری‌ها", icon: MessageSquareHeart, permission: "content", badgeKey: "openFeedback" },
   { href: "/admin/testimonials", label: "نظرات", icon: Quote, permission: "content", badgeKey: "pendingTestimonials" },
+  { href: "/admin/tickets", label: "گفت‌وگو با مشتری", icon: MessagesSquare, permission: "messages", badgeKey: "openTickets" },
   { href: "/admin/messages", label: "پیام‌ها", icon: MessageSquare, permission: "messages", badgeKey: "unreadMessages" },
   { href: "/admin/users", label: "کاربران", icon: Users, permission: "users" },
   { href: "/admin/notifications", label: "پیامک و ایمیل", icon: Send, permission: "notifications" },
@@ -56,6 +57,7 @@ export type SidebarBadges = {
   waitingList?: number;
   openFeedback?: number;
   lowStock?: number;
+  openTickets?: number;
 };
 
 export function Sidebar({

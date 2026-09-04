@@ -39,6 +39,8 @@ model User {
 
   auditLogs AuditLog[]
 
+  ticketMessages TicketMessage[]
+
   @@map("users")
 }
 
@@ -90,6 +92,7 @@ model Customer {
   followUps    FollowUp[]
   consents     ConsentSignature[]
   feedbacks    Feedback[]
+  tickets      SupportTicket[]
   discountUses DiscountUse[]
   waitlist     WaitlistEntry[]
 
@@ -136,6 +139,8 @@ model Service {
   /// مبلغ ثابت رزرو (بیعانه) به تومان. اگر تعیین شود، رزرو آنلاین فقط
   /// پس از پرداخت این مبلغ قطعی می‌شود.
   depositAmount    Int?
+  /// پس از این تعداد روز از جلسه، پیگیری «حالتان چطور است؟» ساخته شود. صفر یعنی خاموش
+  followUpDays     Int      @default(0)
   sessionsNeeded   String? // مثلا «۴ تا ۶ جلسه»
   preparation      String? // آمادگی قبل از انجام
   aftercare        String? // مراقبت‌های بعد از انجام
@@ -611,10 +616,12 @@ model Feedback {
   /// اجازه‌ی انتشار متن نظر در سایت
   canPublish     Boolean  @default(false)
 
-  status      FeedbackStatus @default(NEW)
-  /// یادداشت مدیر هنگام رسیدگی به نارضایتی
-  managerNote String?
-  handledAt   DateTime?
+  status          FeedbackStatus @default(NEW)
+  /// یادداشت مدیر هنگام رسیدگی — داخلی، مشتری نمی‌بیند
+  managerNote     String?
+  /// پاسخی که به خود مشتری نشان داده می‌شود
+  replyToCustomer String?
+  handledAt       DateTime?
 
   sentAt      DateTime?
   submittedAt DateTime?
@@ -754,6 +761,65 @@ model ServiceMaterial {
 
   @@unique([serviceId, itemId])
   @@map("service_materials")
+}
+
+/// تیکت پشتیبانی — گفت‌وگوی دوطرفه‌ی مشتری با کلینیک
+model SupportTicket {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  subject  String
+  category String       @default("other")
+  status   TicketStatus @default(OPEN)
+
+  /// آخرین پیام مال کیست — مبنای «منتظر پاسخ ما» یا «منتظر پاسخ مشتری»
+  lastSender       TicketSender @default(CUSTOMER)
+  /// پیام خوانده‌نشده‌ی مشتری برای کارکنان
+  unreadByStaff    Boolean      @default(true)
+  /// پاسخ خوانده‌نشده‌ی کارکنان برای مشتری
+  unreadByCustomer Boolean      @default(false)
+
+  closedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  messages TicketMessage[]
+
+  @@index([status, updatedAt])
+  @@index([customerId])
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id       String        @id @default(cuid())
+  ticketId String
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  sender TicketSender
+  /// اگر پاسخ از سمت کلینیک است، چه کسی نوشته
+  userId String?
+  user   User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_messages")
+}
+
+enum TicketStatus {
+  /// منتظر پاسخ کلینیک
+  OPEN
+  /// کلینیک پاسخ داده، منتظر مشتری
+  ANSWERED
+  /// بسته شده
+  CLOSED
+}
+
+enum TicketSender {
+  CUSTOMER
+  STAFF
 }
 
 enum FollowUpKind {

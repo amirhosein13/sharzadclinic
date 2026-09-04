@@ -39,6 +39,10 @@ const FIELDS: {
   { key: "dailyDigestSms", label: "گزارش شبانه‌ی پیامکی", hint: "۱ یعنی فعال، ۰ یعنی خاموش", ltr: true },
   { key: "birthdaySms", label: "پیامک تبریک تولد", hint: "۱ یعنی فعال، ۰ یعنی خاموش. فقط برای مشتریانی که تاریخ تولدشان ثبت شده", ltr: true },
   { key: "birthdayDiscountCode", label: "کد تخفیف تولد", hint: "اگر بگذارید، در پیامک تولد معرفی می‌شود. اول از بخش کد تخفیف بسازیدش", ltr: true },
+  { key: "postCareSms", label: "پیامک خودکار پس از درمان", hint: "۱ یعنی فعال. برای خدماتی که در فرم خدمت «پیگیری پس از درمان» برایشان تنظیم شده", ltr: true },
+  { key: "winBackAfterMonths", label: "بازگردانی مشتری غایب (ماه)", hint: "بعد از این مدت نیامدن، مشتری در فهرست پیگیری می‌آید", ltr: true },
+  { key: "winBackSms", label: "پیامک خودکار بازگردانی", hint: "۱ یعنی فعال، ۰ یعنی فقط در فهرست منشی بماند", ltr: true },
+  { key: "winBackDiscountCode", label: "کد تخفیف بازگردانی", hint: "اگر بگذارید، در پیامک بازگردانی معرفی می‌شود", ltr: true },
 ];
 
 export function SettingsForm({ settings }: { settings: SettingsMap }) {

@@ -24,6 +24,7 @@ export type FeedbackView = {
   statusLabel: string;
   statusTone: "amber" | "plum" | "green" | "neutral";
   managerNote: string | null;
+  replyToCustomer: string | null;
   serviceTitle: string | null;
   staffName: string | null;
   submittedLabel: string | null;
@@ -121,7 +122,13 @@ export function FeedbackCard({ item }: { item: FeedbackView }) {
 
       {item.managerNote && !noteOpen && (
         <p className="mt-3 rounded-2xl border border-dashed border-[color:var(--line)] p-3.5 text-xs leading-7 text-[color:var(--fg-muted)]">
-          یادداشت مدیر: {item.managerNote}
+          یادداشت داخلی: {item.managerNote}
+        </p>
+      )}
+
+      {item.replyToCustomer && !noteOpen && (
+        <p className="mt-2 rounded-2xl bg-emerald-50 p-3.5 text-xs leading-7 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">
+          پاسخ داده‌شده به مشتری: {item.replyToCustomer}
         </p>
       )}
 
@@ -138,12 +145,25 @@ export function FeedbackCard({ item }: { item: FeedbackView }) {
           className="mt-4 space-y-3"
         >
           <input type="hidden" name="id" value={item.id} />
-          <Textarea
-            name="managerNote"
-            rows={3}
-            defaultValue={item.managerNote ?? ""}
-            placeholder="چه کاری انجام شد؟ با مشتری تماس گرفته شد؟ چه چیزی در کلینیک اصلاح شد؟"
-          />
+          <div>
+            <label className="mb-1.5 block text-xs font-medium">یادداشت داخلی</label>
+            <Textarea
+              name="managerNote"
+              rows={3}
+              defaultValue={item.managerNote ?? ""}
+              placeholder="چه کاری انجام شد؟ با مشتری تماس گرفته شد؟ چه چیزی در کلینیک اصلاح شد؟"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium">پاسخ به خود مشتری</label>
+            <Textarea
+              name="replyToCustomer"
+              rows={3}
+              defaultValue={item.replyToCustomer ?? ""}
+              placeholder="این متن در حساب کاربری مشتری دیده می‌شود و برایش پیامک اطلاع می‌رود."
+            />
+          </div>
           <div className="flex gap-2">
             <button type="submit" disabled={pending} className={BTN}>
               ذخیره‌ی یادداشت
@@ -165,7 +185,7 @@ export function FeedbackCard({ item }: { item: FeedbackView }) {
 
         {!noteOpen && (
           <button type="button" onClick={() => setNoteOpen(true)} className={BTN} disabled={pending}>
-            {item.managerNote ? "ویرایش یادداشت" : "افزودن یادداشت"}
+            {item.managerNote || item.replyToCustomer ? "ویرایش یادداشت و پاسخ" : "یادداشت / پاسخ به مشتری"}
           </button>
         )}
 

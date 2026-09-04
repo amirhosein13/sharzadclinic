@@ -97,6 +97,7 @@ export const serviceSchema = z.object({
   bufferMinutes: requiredInt(0, 120, "بافر باید بین ۰ تا ۱۲۰ دقیقه باشد"),
   slotStepMinutes: optionalInt,
   depositAmount: optionalInt,
+  followUpDays: optionalInt,
   sessionsNeeded: z.string().trim().max(120).optional(),
   preparation: z.string().trim().max(2000).optional(),
   aftercare: z.string().trim().max(2000).optional(),
@@ -391,4 +392,15 @@ export const serviceMaterialSchema = z.object({
   serviceId: z.string().min(1),
   itemId: z.string().min(1, "قلم انبار را انتخاب کنید"),
   quantity: quantityField.refine((v) => v > 0, "مقدار مصرف را وارد کنید"),
+});
+
+export const ticketSchema = z.object({
+  subject: z.string().trim().min(3, "موضوع را بنویسید").max(150),
+  category: z.string().trim().min(1),
+  body: z.string().trim().min(5, "متن پیام را بنویسید").max(4000),
+});
+
+export const ticketReplySchema = z.object({
+  ticketId: z.string().min(1),
+  body: z.string().trim().min(1, "متن پاسخ را بنویسید").max(4000),
 });

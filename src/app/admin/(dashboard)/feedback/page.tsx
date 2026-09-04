@@ -87,6 +87,7 @@ export default async function AdminFeedbackPage({
       statusLabel: meta.label,
       statusTone: meta.tone,
       managerNote: f.managerNote,
+      replyToCustomer: f.replyToCustomer,
       serviceTitle: f.service?.title ?? null,
       staffName: f.staff?.name ?? null,
       submittedLabel: f.submittedAt

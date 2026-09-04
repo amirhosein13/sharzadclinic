@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { CalendarHeart, CalendarPlus, FileSignature, FileText, LogOut, Package as PackageIcon, Sparkles, User, Wallet } from "lucide-react";
+import { CalendarHeart, CalendarPlus, FileSignature, FileText, LogOut, Package as PackageIcon, Sparkles, Star, User, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCustomerSession } from "@/lib/customer-auth";
 import { activePackages } from "@/lib/packages";
@@ -15,8 +15,12 @@ import { AppointmentActions } from "@/components/site/appointment-actions";
 import { DepositButton } from "@/components/site/deposit-button";
 import { ProfileForm } from "@/components/site/profile-form";
 import { CasePhotos } from "@/components/case-photos";
+import { TicketPanel } from "@/components/site/ticket-panel";
+import { TICKET_CATEGORIES, TICKET_STATUS_META, ticketCategoryLabel } from "@/lib/tickets";
 import { STATUS_META } from "@/lib/appointment-status";
-import { formatJalaliLong, formatJalaliWithWeekday, formatTime } from "@/lib/date";
+import {
+  formatJalaliDateTime, formatJalaliLong, formatJalaliWithWeekday, formatTime, timeAgoFa,
+} from "@/lib/date";
 import { formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +57,22 @@ export default async function AccountPage() {
       consents: {
         include: { template: { select: { title: true } } },
         orderBy: { signedAt: "desc" },
+      },
+      feedbacks: {
+        where: { submittedAt: { not: null } },
+        include: { service: { select: { title: true } } },
+        orderBy: { submittedAt: "desc" },
+        take: 10,
+      },
+      tickets: {
+        include: {
+          messages: {
+            include: { user: { select: { name: true } } },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 20,
       },
     },
   });
@@ -113,6 +133,27 @@ export default async function AccountPage() {
         badge: { label: "نوبت انجام‌شده", tone: "plum" as const },
       })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  const ticketViews = customer.tickets.map((t) => {
+    const meta = TICKET_STATUS_META[t.status];
+    return {
+      id: t.id,
+      subject: t.subject,
+      categoryLabel: ticketCategoryLabel(t.category),
+      status: t.status,
+      statusLabel: meta.label,
+      statusTone: meta.tone,
+      hasUnread: t.unreadByCustomer,
+      updatedLabel: timeAgoFa(t.updatedAt),
+      messages: t.messages.map((m) => ({
+        id: m.id,
+        fromClinic: m.sender === "STAFF",
+        body: m.body,
+        timeLabel: formatJalaliDateTime(m.createdAt),
+        authorName: m.user?.name ?? null,
+      })),
+    };
+  });
 
   return (
     <>
@@ -269,6 +310,8 @@ export default async function AccountPage() {
               </section>
             )}
 
+            <TicketPanel tickets={ticketViews} categories={[...TICKET_CATEGORIES]} />
+
             {/* خط زمانی مراجعات */}
             {visits.length > 0 && (
               <section>
@@ -335,6 +378,55 @@ export default async function AccountPage() {
                 phone={customer.phone}
               />
             </div>
+
+            {customer.feedbacks.length > 0 && (
+              <div className="rounded-4xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-7 shadow-soft">
+                <h2 className="mb-2 font-bold">نظرهای من</h2>
+                <p className="mb-5 text-xs leading-6 text-[color:var(--fg-muted)]">
+                  آنچه ثبت کرده‌اید و اینکه کلینیک با آن چه کرده است.
+                </p>
+                <ul className="space-y-4">
+                  {customer.feedbacks.map((f) => (
+                    <li key={f.id} className="rounded-2xl border border-[color:var(--line)] p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-medium">
+                          {f.service?.title ?? "مراجعه"}
+                        </span>
+                        <span className="flex gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={
+                                i < (f.rating ?? 0)
+                                  ? "size-3.5 fill-gold-400 text-gold-400"
+                                  : "size-3.5 text-[color:var(--line)]"
+                              }
+                            />
+                          ))}
+                        </span>
+                      </div>
+
+                      <p className="mt-1.5 text-xs text-[color:var(--fg-muted)]">
+                        {f.submittedAt ? formatJalaliLong(f.submittedAt) : ""}
+                        {" • "}
+                        {f.status === "RESOLVED"
+                          ? "رسیدگی شد"
+                          : f.status === "SEEN"
+                            ? "دیده شد"
+                            : "ثبت شد"}
+                      </p>
+
+                      {f.replyToCustomer && (
+                        <p className="mt-3 rounded-xl bg-[color:var(--bg-sunken)] p-3 text-xs leading-7">
+                          <span className="font-medium">پاسخ کلینیک: </span>
+                          {f.replyToCustomer}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {customer.consents.length > 0 && (
               <div className="rounded-4xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-7 shadow-soft">

@@ -168,6 +168,7 @@ export default async function AdminServicesPage() {
                                 bufferMinutes: service.bufferMinutes,
                                 slotStepMinutes: service.slotStepMinutes,
                                 depositAmount: service.depositAmount,
+                                followUpDays: service.followUpDays,
                                 sessionsNeeded: service.sessionsNeeded,
                                 preparation: service.preparation,
                                 aftercare: service.aftercare,

@@ -11,7 +11,9 @@
  */
 import "../src/lib/timezone";
 import { PrismaClient } from "@prisma/client";
-import { notifyBirthday, notifyBookingReminder } from "../src/lib/notifications";
+import {
+  notifyBirthday, notifyBookingReminder, notifyPostCare, notifyWinBack,
+} from "../src/lib/notifications";
 import { alreadyGreetedThisYear, birthdayMessage, todaysBirthdays } from "../src/lib/birthdays";
 import { getSettings } from "../src/lib/settings";
 import { generateFollowUps } from "../src/lib/followups";
@@ -78,12 +80,72 @@ async function main() {
 /** فهرست پیگیری منشی را هم روزانه به‌روز می‌کند */
 async function buildFollowUps() {
   const result = await generateFollowUps();
-  const total = result.noShow + result.nextSession;
+  const total = result.noShow + result.nextSession + result.postCare + result.winBack;
+  if (total === 0) {
+    console.log("\n🔎 پیگیری جدیدی لازم نبود.");
+    return;
+  }
   console.log(
-    total === 0
-      ? "\n🔎 پیگیری جدیدی لازم نبود."
-      : `\n🔎 ${toFa(total)} پیگیری جدید ساخته شد (${toFa(result.noShow)} مراجعه‌نکرده، ${toFa(result.nextSession)} جلسه‌ی بعد).`
+    `\n🔎 ${toFa(total)} پیگیری جدید: ${toFa(result.noShow)} مراجعه‌نکرده، ` +
+      `${toFa(result.nextSession)} جلسه‌ی بعد، ${toFa(result.postCare)} پس از درمان، ` +
+      `${toFa(result.winBack)} بازگردانی.`
   );
+}
+
+/**
+ * پیامک خودکار پیگیری — بارِ تماس گرفتن را از دوش منشی برمی‌دارد.
+ * فقط برای پیگیری‌های بازی که هنوز پیامکی برایشان نرفته.
+ */
+async function sendFollowUpSms() {
+  const settings = await getSettings();
+  const postCareOn = settings.postCareSms === "1";
+  const winBackOn = settings.winBackSms === "1";
+  if (!postCareOn && !winBackOn) return;
+
+  const kinds: ("POST_CARE" | "CUSTOM")[] = [];
+  if (postCareOn) kinds.push("POST_CARE");
+  if (winBackOn) kinds.push("CUSTOM");
+
+  const items = await prisma.followUp.findMany({
+    where: { status: "OPEN", kind: { in: kinds }, note: null },
+    include: {
+      customer: { select: { firstName: true, lastName: true, phone: true } },
+      appointment: { include: { service: { select: { title: true } } } },
+    },
+    take: 100,
+  });
+
+  if (items.length === 0) return;
+  console.log(`\n💬 ${toFa(items.length)} پیگیری آماده‌ی پیامک خودکار.`);
+
+  const months = Number(settings.winBackAfterMonths) || 6;
+  let sent = 0;
+
+  for (const item of items) {
+    const name = `${item.customer.firstName} ${item.customer.lastName}`;
+    const result =
+      item.kind === "POST_CARE"
+        ? await notifyPostCare({
+            phone: item.customer.phone,
+            customerName: name,
+            serviceTitle: item.appointment?.service.title ?? "درمان",
+          })
+        : await notifyWinBack({ phone: item.customer.phone, customerName: name, monthsAway: months });
+
+    if (result.ok) {
+      // note پر می‌شود تا دفعه‌ی بعد دوباره پیامک نرود
+      await prisma.followUp.update({
+        where: { id: item.id },
+        data: { note: "پیامک خودکار ارسال شد" },
+      });
+      sent++;
+      console.log(`  ✅ ${name}${result.simulated ? " (شبیه‌سازی)" : ""}`);
+    } else {
+      console.warn(`  ❌ ${name} — ${result.error ?? "ارسال ناموفق"}`);
+    }
+  }
+
+  if (sent > 0) console.log(`   ${toFa(sent)} پیامک پیگیری ارسال شد.`);
 }
 
 /** تبریک تولد مشتریانی که امروز تولدشان است */
@@ -118,6 +180,7 @@ async function greetBirthdays() {
 
 main()
   .then(() => buildFollowUps())
+  .then(() => sendFollowUpSms())
   .then(() => greetBirthdays())
   .catch((error) => {
     console.error("❌ خطا در ارسال یادآوری‌ها:", error);

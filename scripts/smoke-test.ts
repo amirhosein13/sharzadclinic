@@ -18,6 +18,9 @@ import { buildSatisfaction, newFeedbackToken } from "../src/lib/feedback";
 import { buildDailyDigest } from "../src/lib/daily-digest";
 import { buildDaySchedule } from "../src/lib/day-schedule";
 import { buildProfit } from "../src/lib/expenses";
+import { openTicket, replyAsCustomer } from "../src/app/actions/tickets";
+import { customerUnreadCount, isUrgent } from "../src/lib/tickets";
+import { generateFollowUps } from "../src/lib/followups";
 import { consumeForService, lowStockItems, recordMovement } from "../src/lib/inventory";
 
 const prisma = new PrismaClient();
@@ -755,6 +758,115 @@ async function main() {
   await prisma.appointment.deleteMany({ where: { customerId: prCustomer.id } });
   await prisma.customer.delete({ where: { id: prCustomer.id } });
   await prisma.expense.deleteMany({ where: { spentAt: { gte: prFrom, lte: prTo } } });
+
+  // ── پیگیری خودکار: پس از درمان و بازگردانی ──────────────────
+  const FU_PHONE = "09125554477";
+  await prisma.followUp.deleteMany({ where: { customer: { phone: FU_PHONE } } });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: FU_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: FU_PHONE } });
+
+  const fuCustomer = await prisma.customer.create({
+    data: { firstName: "تست", lastName: "پیگیری", phone: FU_PHONE },
+  });
+  const fuStaff = await prisma.staff.findFirstOrThrow();
+  const prevFollowUpDays = service.followUpDays;
+  await prisma.service.update({ where: { id: service.id }, data: { followUpDays: 3 } });
+
+  // جلسه‌ای که ۳ روز پیش انجام شده ⇒ باید پیگیری پس از درمان بسازد
+  const threeDaysAgo = new Date();
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  threeDaysAgo.setHours(11, 0, 0, 0);
+  await prisma.appointment.create({
+    data: {
+      code: "SH-FU01",
+      customerId: fuCustomer.id,
+      serviceId: service.id,
+      staffId: fuStaff.id,
+      startsAt: threeDaysAgo,
+      endsAt: new Date(threeDaysAgo.getTime() + 45 * 60_000),
+      status: "DONE",
+      source: "smoke",
+    },
+  });
+
+  const fu1 = await generateFollowUps();
+  const postCareRows = await prisma.followUp.count({
+    where: { customerId: fuCustomer.id, kind: "POST_CARE" },
+  });
+  check(`پیگیری پس از درمان ساخته شد (${fu1.postCare})`, postCareRows === 1);
+
+  // اجرای دوباره نباید تکراری بسازد
+  await generateFollowUps();
+  const afterSecond = await prisma.followUp.count({
+    where: { customerId: fuCustomer.id, kind: "POST_CARE" },
+  });
+  check("پیگیری پس از درمان تکراری ساخته نمی‌شود", afterSecond === 1);
+
+  await prisma.service.update({ where: { id: service.id }, data: { followUpDays: prevFollowUpDays } });
+  await prisma.followUp.deleteMany({ where: { customerId: fuCustomer.id } });
+  await prisma.appointment.deleteMany({ where: { customerId: fuCustomer.id } });
+  await prisma.customer.delete({ where: { id: fuCustomer.id } });
+
+  // ── تیکت ────────────────────────────────────────────────────
+  const TK_PHONE = "09125556644";
+  await prisma.supportTicket.deleteMany({ where: { customer: { phone: TK_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: TK_PHONE } });
+
+  const tkCustomer = await prisma.customer.create({
+    data: { firstName: "تست", lastName: "تیکت", phone: TK_PHONE },
+  });
+
+  // بدون ورود مشتری نباید بشود تیکت باز کرد
+  const anonymous = await openTicket(fd({ subject: "تست", category: "other", body: "سلام سلام" }));
+  check("بدون ورود، تیکت باز نمی‌شود", !anonymous.ok);
+
+  const ticket = await prisma.supportTicket.create({
+    data: {
+      customerId: tkCustomer.id,
+      subject: "سؤال درباره‌ی مراقبت",
+      category: "aftercare",
+      messages: { create: { sender: "CUSTOMER", body: "بعد از لیزر می‌توانم استخر بروم؟" } },
+    },
+  });
+  check(
+    "تیکت تازه منتظر پاسخ ماست",
+    ticket.status === "OPEN" && ticket.unreadByStaff && !ticket.unreadByCustomer
+  );
+
+  // پاسخ کارکنان به نشست ادمین نیاز دارد و در تست مرورگر بررسی می‌شود؛
+  // این‌جا فقط چیزهایی را می‌سنجیم که به نشست وابسته نیستند.
+  await prisma.$transaction([
+    prisma.ticketMessage.create({
+      data: { ticketId: ticket.id, sender: "STAFF", body: "تا ۴۸ ساعت بهتر است نروید." },
+    }),
+    prisma.supportTicket.update({
+      where: { id: ticket.id },
+      data: { status: "ANSWERED", lastSender: "STAFF", unreadByStaff: false, unreadByCustomer: true },
+    }),
+  ]);
+
+  check(
+    "شمارنده‌ی «منتظر پاسخ ما» تیکتِ پاسخ‌داده‌شده را نمی‌شمارد",
+    !(await prisma.supportTicket.findMany({ where: { unreadByStaff: true, status: { not: "CLOSED" } } }))
+      .some((t) => t.id === ticket.id)
+  );
+  check("شمارنده‌ی خوانده‌نشده‌ی مشتری", (await customerUnreadCount(tkCustomer.id)) === 1);
+  check("شکایتِ باز فوری علامت می‌خورد", isUrgent("complaint", "OPEN") && !isUrgent("other", "OPEN"));
+
+  const messageCount = await prisma.ticketMessage.count({ where: { ticketId: ticket.id } });
+  check(`گفت‌وگو دو پیام دارد (${messageCount})`, messageCount === 2);
+
+  await prisma.supportTicket.update({
+    where: { id: ticket.id },
+    data: { status: "CLOSED", closedAt: new Date() },
+  });
+
+  // مشتری در گفت‌وگوی بسته نباید بتواند بنویسد
+  const closedReply = await replyAsCustomer(fd({ ticketId: ticket.id, body: "یک سؤال دیگر" }));
+  check("در گفت‌وگوی بسته پاسخ ثبت نمی‌شود", !closedReply.ok);
+
+  await prisma.supportTicket.deleteMany({ where: { customerId: tkCustomer.id } });
+  await prisma.customer.delete({ where: { id: tkCustomer.id } });
 
   await prisma.appointment.deleteMany({ where: { source: "smoke" } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });

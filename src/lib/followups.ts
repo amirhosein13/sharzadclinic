@@ -45,7 +45,12 @@ export type FollowUpItem = {
  * پیگیری‌های خودکار را می‌سازد. idempotent است: اگر برای همان نوبت یا
  * همان مشتری پیگیری باز وجود داشته باشد، دوباره ساخته نمی‌شود.
  */
-export async function generateFollowUps(): Promise<{ noShow: number; nextSession: number }> {
+export async function generateFollowUps(): Promise<{
+  noShow: number;
+  nextSession: number;
+  postCare: number;
+  winBack: number;
+}> {
   const settings = await getSettings();
   const nextSessionDays = Number(settings.followUpAfterDays) || DEFAULT_NEXT_SESSION_DAYS;
 
@@ -135,7 +140,84 @@ export async function generateFollowUps(): Promise<{ noShow: number; nextSession
       .catch(() => undefined);
   }
 
-  return { noShow, nextSession };
+  // ─── ۳. پیگیری پس از درمان، بر اساس تنظیم هر خدمت ───
+  // خدمت‌هایی مثل تزریق که چند روز بعدش باید حال مشتری پرسیده شود
+  const postCareServices = await prisma.service.findMany({
+    where: { followUpDays: { gt: 0 } },
+    select: { id: true, title: true, followUpDays: true },
+  });
+
+  let postCare = 0;
+  for (const svc of postCareServices) {
+    const due = new Date(now);
+    due.setDate(due.getDate() - svc.followUpDays);
+    // پنجره‌ی چندروزه، تا اگر یک روز اجرا نشد از قلم نیفتد
+    const windowStart = new Date(due);
+    windowStart.setDate(windowStart.getDate() - 3);
+
+    const sessions = await prisma.appointment.findMany({
+      where: {
+        serviceId: svc.id,
+        status: "DONE",
+        startsAt: { gte: windowStart, lte: due },
+        followUps: { none: { kind: "POST_CARE" } },
+        customer: { isBlocked: false },
+      },
+      select: { id: true, customerId: true, startsAt: true },
+      take: 200,
+    });
+
+    for (const session of sessions) {
+      await prisma.followUp
+        .create({
+          data: {
+            customerId: session.customerId,
+            appointmentId: session.id,
+            kind: "POST_CARE",
+            dueAt: now,
+            reason: `${toFa(svc.followUpDays)} روز از ${svc.title} گذشته — حالش را بپرسید`,
+          },
+        })
+        .then(() => postCare++)
+        .catch(() => undefined);
+    }
+  }
+
+  // ─── ۴. مشتریانی که خیلی وقت است نیامده‌اند ───
+  const winBackMonths = Number(settings.winBackAfterMonths) || 6;
+  const winBackCutoff = new Date(now);
+  winBackCutoff.setMonth(winBackCutoff.getMonth() - winBackMonths);
+
+  const dormant = await prisma.customer.findMany({
+    where: {
+      isBlocked: false,
+      appointments: {
+        some: { status: "DONE" },
+        // هیچ نوبتی — نه انجام‌شده نه آینده — بعد از این تاریخ نداشته باشد
+        none: { startsAt: { gte: winBackCutoff } },
+      },
+      followUps: { none: { status: "OPEN" } },
+    },
+    select: { id: true },
+    take: 100,
+  });
+
+  let winBack = 0;
+  for (const customer of dormant) {
+    await prisma.followUp
+      .create({
+        data: {
+          customerId: customer.id,
+          kind: "CUSTOM",
+          dueAt: now,
+          reason: `بیش از ${toFa(winBackMonths)} ماه است مراجعه نکرده — برای بازگشت تماس بگیرید`,
+        },
+      })
+      .then(() => winBack++)
+      .catch(() => undefined);
+  }
+
+  return { noShow, nextSession, postCare, winBack };
 }
 
 /** فهرست پیگیری‌های باز، مرتب‌شده بر اساس فوریت */

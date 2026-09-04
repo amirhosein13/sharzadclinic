@@ -34,6 +34,14 @@ export const DEFAULT_SETTINGS = {
   birthdaySms: "0",
   /** کد تخفیفی که در پیامک تولد معرفی می‌شود — خالی یعنی فقط تبریک */
   birthdayDiscountCode: "",
+  /** پیامک خودکار «حالتان چطور است؟» پس از درمان — "1" یا "0" */
+  postCareSms: "0",
+  /** پس از چند ماه نیامدن، مشتری در فهرست بازگردانی بیاید */
+  winBackAfterMonths: "6",
+  /** پیامک خودکار بازگردانی مشتری غایب — "1" یا "0" */
+  winBackSms: "0",
+  /** کد تخفیفی که در پیامک بازگردانی معرفی می‌شود */
+  winBackDiscountCode: "",
 } as const;
 
 export type SettingsMap = Record<string, string>;

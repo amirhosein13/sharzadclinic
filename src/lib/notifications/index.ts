@@ -158,6 +158,53 @@ export async function notifyBookingReminder(options: {
   return sendSms({ to: options.phone, template: "booking_reminder", message });
 }
 
+/** خبر دادن به مشتری که به تیکتش پاسخ داده شده */
+export async function notifyTicketReply(options: {
+  phone: string;
+  customerName: string;
+  subject: string;
+}): Promise<NotifyResult> {
+  const settings = await getSettings();
+  const message =
+    `${options.customerName} عزیز، به پیام شما («${options.subject}») پاسخ داده شد.\n` +
+    `برای دیدنش وارد حساب کاربری‌تان شوید.\n${settings.clinicName}`;
+
+  return sendSms({ to: options.phone, template: "ticket_reply", message });
+}
+
+/** پیگیری خودکار پس از درمان */
+export async function notifyPostCare(options: {
+  phone: string;
+  customerName: string;
+  serviceTitle: string;
+}): Promise<NotifyResult> {
+  const settings = await getSettings();
+  const message =
+    `${options.customerName} عزیز، چند روز از ${options.serviceTitle} شما می‌گذرد.\n` +
+    `حالتان چطور است؟ اگر سؤالی دارید همین‌جا جواب دهید یا تماس بگیرید: ${settings.phone}\n` +
+    settings.clinicName;
+
+  return sendSms({ to: options.phone, template: "post_care", message });
+}
+
+/** دعوت مشتری غایب برای برگشتن */
+export async function notifyWinBack(options: {
+  phone: string;
+  customerName: string;
+  monthsAway: number;
+}): Promise<NotifyResult> {
+  const settings = await getSettings();
+  const code = (settings.winBackDiscountCode || "").trim();
+  const lines = [
+    `${options.customerName} عزیز، مدتی است شما را ندیده‌ایم.`,
+    code ? `کد تخفیف «${code}» برای بازگشت شما فعال است.` : "",
+    `برای رزرو نوبت: ${settings.phone}`,
+    settings.clinicName,
+  ].filter(Boolean);
+
+  return sendSms({ to: options.phone, template: "win_back", message: lines.join("\n") });
+}
+
 /** تبریک تولد مشتری */
 export async function notifyBirthday(phone: string, message: string): Promise<NotifyResult> {
   return sendSms({ to: phone, template: "birthday", message });
