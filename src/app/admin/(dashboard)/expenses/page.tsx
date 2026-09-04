@@ -149,6 +149,7 @@ export default async function ExpensesPage({
                           amount: expense.amount,
                           spentAt: toJalaliInput(expense.spentAt),
                           note: expense.note,
+                          paidFromCash: expense.paidFromCash,
                         }}
                       />
                       <ActionButton

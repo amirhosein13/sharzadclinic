@@ -1,7 +1,7 @@
 "use client";
 
 import { Pencil, Receipt } from "lucide-react";
-import { CrudDialog } from "@/components/admin/crud-dialog";
+import { CrudDialog, Check } from "@/components/admin/crud-dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { saveExpense } from "@/app/actions/finance";
@@ -14,6 +14,7 @@ export type ExpenseFormValues = {
   amount: number;
   spentAt: string;
   note: string | null;
+  paidFromCash: boolean;
 };
 
 export function ExpenseForm({
@@ -109,6 +110,13 @@ export function ExpenseForm({
           <Field label="توضیح" error={errors.note}>
             <Textarea name="note" rows={2} defaultValue={expense?.note ?? ""} />
           </Field>
+
+          <Check
+            name="paidFromCash"
+            label="از صندوق (کشوی نقد) پرداخت شد"
+            defaultChecked={expense?.paidFromCash ?? false}
+            hint="آخر شب موقع بستن صندوق، از پول نقد کم می‌شود"
+          />
         </>
       )}
     </CrudDialog>

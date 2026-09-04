@@ -60,8 +60,8 @@ export const AUDIT_GROUPS: AuditGroup[] = [
   {
     key: "finance",
     label: "مالی و انبار",
-    actions: ["payroll.save", "stock.in", "stock.out", "stock.adjust"],
-    entities: ["Payment", "Expense", "InventoryItem", "PayrollPeriod", "discountCode"],
+    actions: ["payroll.save", "stock.in", "stock.out", "stock.adjust", "cash.close", "cash.reopen"],
+    entities: ["Payment", "Expense", "InventoryItem", "PayrollPeriod", "discountCode", "CashClose"],
   },
   {
     key: "content",
@@ -97,6 +97,8 @@ const ACTION_LABELS: Record<string, string> = {
   "stock.in": "ورود کالا به انبار",
   "stock.out": "خروج کالا از انبار",
   "stock.adjust": "اصلاح موجودی انبار",
+  "cash.close": "بستن صندوق",
+  "cash.reopen": "بازکردن دوباره‌ی صندوق",
   "backup.create": "گرفتن نسخه‌ی پشتیبان",
   "backup.download": "دانلود نسخه‌ی پشتیبان",
   "backup.restore": "بازگردانی از پشتیبان",
@@ -126,6 +128,7 @@ const ENTITY_LABELS: Record<string, string> = {
   Feedback: "نظر مشتری",
   Setting: "تنظیمات",
   Backup: "پشتیبان",
+  CashClose: "صندوق",
   FollowUp: "پیگیری",
 };
 
@@ -153,6 +156,7 @@ export function toneOf(action: string): "red" | "amber" | "plain" {
   if (action.startsWith("backup.")) return "amber";
   if (action === "delete" || action.endsWith(".delete")) return "red";
   if (action === "customer.block") return "amber";
+  if (action === "cash.reopen") return "amber";
   return "plain";
 }
 

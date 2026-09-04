@@ -43,6 +43,8 @@ model User {
 
   ticketMessages TicketMessage[]
 
+  cashCloses CashClose[]
+
   @@map("users")
 }
 
@@ -682,6 +684,9 @@ model Expense {
   spentAt DateTime
   note    String?
 
+  /// پول این هزینه از صندوق (کشوی نقد) برداشته شده؛ در بستن صندوق کم می‌شود
+  paidFromCash Boolean @default(false)
+
   /// هزینه‌ی خودکارِ ناشی از مصرف انبار — دستی قابل ویرایش نیست
   stockMovementId String? @unique
 
@@ -1000,4 +1005,38 @@ model WaitlistEntry {
 
   @@index([status, fromDate])
   @@map("waitlist_entries")
+}
+
+// ─── بستن صندوق آخر شب ─────────────────────────────────────────
+
+/// شمارش واقعی کشوی نقد در پایان هر روز، کنار آنچه سیستم انتظار دارد.
+/// اختلاف همان‌جا دیده می‌شود، نه آخر ماه.
+model CashClose {
+  id String @id @default(cuid())
+
+  /// روزِ صندوق، ساعت ۰۰:۰۰ به وقت تهران
+  day DateTime @unique
+
+  /// عکس لحظه‌ی بستن — بعداً اگر پرداختی با تاریخ گذشته ثبت شود، این عدد
+  /// عوض نمی‌شود تا معلوم بماند آن شب چه چیزی شمرده شده
+  expectedCash   Int
+  expectedCard   Int
+  expectedOnline Int
+  expectedOther  Int
+  /// هزینه‌هایی که همان روز از صندوق پرداخت شده‌اند
+  cashExpenses   Int @default(0)
+
+  /// آنچه واقعاً در کشو شمرده شد
+  countedCash Int
+  /// شمرده منهای انتظار — منفی یعنی کسری
+  difference  Int
+
+  note String?
+
+  closedById String?
+  closedBy   User?   @relation(fields: [closedById], references: [id], onDelete: SetNull)
+  closedAt   DateTime @default(now())
+
+  @@index([day])
+  @@map("cash_closes")
 }

@@ -365,6 +365,8 @@ export const expenseSchema = z.object({
     .transform(toEn)
     .refine((v) => /^\d{4}\/\d{1,2}\/\d{1,2}$/.test(v), "تاریخ را به شکل ۱۴۰۵/۰۶/۱۵ وارد کنید"),
   note: z.string().trim().max(500).optional(),
+  /// پولش از کشوی نقد برداشته شده — در بستن صندوق کم می‌شود
+  paidFromCash: z.coerce.boolean().optional(),
 });
 
 const quantityField = z

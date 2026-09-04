@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { getSettings } from "./settings";
 import { lowStockCount } from "./inventory";
 import { listBackups } from "./backup";
+import { unclosedDays } from "./cash";
 import { UNHAPPY_THRESHOLD } from "./feedback";
 import { recentFailedLogins } from "./login-guard";
 import type { Role } from "@prisma/client";
@@ -45,6 +46,7 @@ export async function getAttentionItems(role: Role): Promise<AttentionItem[]> {
     lowStock,
     backups,
     failedLogins,
+    unclosedCash,
     todayUnfinished,
   ] = await Promise.all([
     canAppointments ? prisma.appointment.count({ where: { status: "PENDING" } }) : 0,
@@ -68,6 +70,7 @@ export async function getAttentionItems(role: Role): Promise<AttentionItem[]> {
     canFinance ? lowStockCount() : 0,
     canFinance ? listBackups() : [],
     can(role, "audit") ? recentFailedLogins(24) : 0,
+    canFinance ? unclosedDays(14) : [],
     canAppointments
       ? prisma.appointment.count({
           where: {
@@ -161,6 +164,15 @@ export async function getAttentionItems(role: Role): Promise<AttentionItem[]> {
     label: "نظر در انتظار تأیید",
     hint: "تا تأیید نشوند در سایت دیده نمی‌شوند.",
     href: "/admin/testimonials",
+    severity: "medium",
+  });
+
+  push({
+    key: "cash",
+    count: unclosedCash.length,
+    label: "روز که صندوقش بسته نشده",
+    hint: "پول گرفته شده ولی کشو شمرده نشده. هرچه دیرتر، سخت‌تر یادتان می‌آید.",
+    href: "/admin/cash",
     severity: "medium",
   });
 

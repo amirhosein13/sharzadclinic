@@ -45,6 +45,7 @@ export async function saveExpense(formData: FormData): Promise<FormResult> {
       amount: text(formData.get("amount")),
       spentAt: text(formData.get("spentAt")),
       note: text(formData.get("note")),
+      paidFromCash: formData.get("paidFromCash") === "on",
     });
     if (!parsed.success) return FAIL("ورودی‌ها را بررسی کنید.", fieldErrors(parsed.error));
 
@@ -66,6 +67,7 @@ export async function saveExpense(formData: FormData): Promise<FormResult> {
       amount: v.amount,
       spentAt,
       note: v.note?.trim() || null,
+      paidFromCash: !!v.paidFromCash,
     };
 
     const saved = id
@@ -75,6 +77,7 @@ export async function saveExpense(formData: FormData): Promise<FormResult> {
     await logAction({ action: id ? "update" : "create", entity: "Expense", entityId: saved.id });
     revalidatePath("/admin/expenses");
     revalidatePath("/admin/reports");
+    revalidatePath("/admin/cash");
     return OK(id ? "هزینه به‌روزرسانی شد." : "هزینه ثبت شد.");
   }) as Promise<FormResult>;
 }

@@ -31,6 +31,7 @@ import { consumeForService, lowStockItems, recordMovement } from "../src/lib/inv
 import { toFa } from "../src/lib/utils";
 import { missingConsents } from "../src/lib/consents";
 import { listAudit } from "../src/lib/audit";
+import { buildCashDay, closeCashDay, recentCloses, unclosedDays } from "../src/lib/cash";
 
 const prisma = new PrismaClient();
 
@@ -1083,6 +1084,123 @@ async function main() {
   await prisma.auditLog.deleteMany({ where: { detail: RESET_EMAIL } });
   await prisma.user.delete({ where: { id: resetUser.id } });
 
+
+
+  // ── بستن صندوق ──────────────────────────────────────────────
+  const CASH_PHONE = "09129990055";
+  await prisma.payment.deleteMany({ where: { customer: { phone: CASH_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: CASH_PHONE } });
+  await prisma.expense.deleteMany({ where: { title: { startsWith: "SMOKE-CASH" } } });
+
+  // یک روز مشخص در گذشته، تا با داده‌ی واقعیِ دیگر قاطی نشود
+  const cashDate = new Date();
+  cashDate.setDate(cashDate.getDate() - 3);
+  const cashKey = `${cashDate.getFullYear()}-${String(cashDate.getMonth() + 1).padStart(2, "0")}-${String(cashDate.getDate()).padStart(2, "0")}`;
+  const cashNoon = atTime(parseYmdKey(cashKey), "12:00");
+  await prisma.cashClose.deleteMany({ where: { day: atTime(parseYmdKey(cashKey), "00:00") } });
+
+  const cashCustomer = await prisma.customer.create({
+    data: { firstName: "صندوق", lastName: "آزمایشی", phone: CASH_PHONE },
+  });
+
+  // ۵۰۰ هزار نقد + ۳۰۰ هزار کارت + ۲۰۰ هزار آنلاین
+  await prisma.payment.createMany({
+    data: [
+      { customerId: cashCustomer.id, amount: 300_000, method: "CASH", status: "PAID", paidAt: cashNoon },
+      { customerId: cashCustomer.id, amount: 200_000, method: "CASH", status: "PAID", paidAt: cashNoon },
+      { customerId: cashCustomer.id, amount: 300_000, method: "CARD", status: "PAID", paidAt: cashNoon },
+      { customerId: cashCustomer.id, amount: 200_000, method: "ONLINE", status: "PAID", paidAt: cashNoon },
+      // پرداخت نافرجام نباید شمرده شود
+      { customerId: cashCustomer.id, amount: 900_000, method: "ONLINE", status: "FAILED", paidAt: cashNoon },
+    ],
+  });
+
+  const cashCategory = await prisma.expenseCategory.findFirstOrThrow();
+  await prisma.expense.create({
+    data: {
+      categoryId: cashCategory.id,
+      title: "SMOKE-CASH خرید از صندوق",
+      amount: 120_000,
+      spentAt: cashNoon,
+      paidFromCash: true,
+    },
+  });
+  await prisma.expense.create({
+    data: {
+      categoryId: cashCategory.id,
+      title: "SMOKE-CASH پرداخت با کارت",
+      amount: 500_000,
+      spentAt: cashNoon,
+      paidFromCash: false,
+    },
+  });
+
+  const cashDay = await buildCashDay(cashKey);
+  check(
+    `نقدی روز درست جمع می‌شود (${cashDay.expectedCash})`,
+    cashDay.expectedCash === 500_000
+  );
+  check(
+    "پرداخت ناموفق در صندوق شمرده نمی‌شود",
+    (cashDay.lines.find((l) => l.method === "ONLINE")?.amount ?? 0) === 200_000
+  );
+  check(`جمع کل دریافتی درست است (${cashDay.total})`, cashDay.total === 1_000_000);
+  check(
+    "فقط هزینه‌ی «از صندوق» کم می‌شود",
+    cashDay.cashExpenses === 120_000 && cashDay.cashExpenseRows.length === 1
+  );
+  check(
+    `انتظارِ کشو = نقدی منهای هزینه‌ی صندوق (${cashDay.expectedInDrawer})`,
+    cashDay.expectedInDrawer === 380_000
+  );
+  check("روز هنوز بسته نشده", cashDay.closed === null);
+
+  // این روز باید در فهرست «بسته‌نشده» بیاید
+  const openBefore = await unclosedDays(14);
+  check("روزِ نبسته در فهرست هشدار می‌آید", openBefore.includes(cashKey));
+
+  // کسری
+  const short = await closeCashDay({ dateKey: cashKey, countedCash: 350_000 });
+  check(
+    `کسری درست حساب می‌شود (${short.ok ? short.difference : "خطا"})`,
+    short.ok && short.difference === -30_000
+  );
+
+  const closedDay = await buildCashDay(cashKey);
+  check("پس از بستن، شمارش در همان روز دیده می‌شود", closedDay.closed?.countedCash === 350_000);
+  check("روزِ بسته دیگر در فهرست هشدار نیست", !(await unclosedDays(14)).includes(cashKey));
+
+  // اصلاح شمارش — همان روز دوباره بسته می‌شود، نه ردیف تازه
+  const exact = await closeCashDay({ dateKey: cashKey, countedCash: 380_000, note: "اشتباه شمرده بودم" });
+  check("شمارش اصلاح‌شده اختلاف را صفر می‌کند", exact.ok && exact.difference === 0);
+  const closeRows = await prisma.cashClose.count({
+    where: { day: atTime(parseYmdKey(cashKey), "00:00") },
+  });
+  check("برای هر روز فقط یک ردیف می‌ماند", closeRows === 1);
+
+  // مبلغ منفی و روز آینده رد می‌شوند
+  const negative = await closeCashDay({ dateKey: cashKey, countedCash: -5 });
+  check("مبلغ منفی رد می‌شود", !negative.ok);
+
+  const future = new Date();
+  future.setDate(future.getDate() + 3);
+  const futureKey = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, "0")}-${String(future.getDate()).padStart(2, "0")}`;
+  const futureClose = await closeCashDay({ dateKey: futureKey, countedCash: 1000 });
+  check("روز نیامده بسته نمی‌شود", !futureClose.ok);
+
+  // تاریخچه
+  const closeHistory = await recentCloses(20);
+  const historyRow = closeHistory.find((r) => r.dateKey === cashKey);
+  check(
+    "تاریخچه‌ی صندوق روز را با کارت‌خوان و آنلاینش نگه می‌دارد",
+    historyRow?.cardTotal === 300_000 && historyRow?.onlineTotal === 200_000
+  );
+  check("یادداشت اصلاح ذخیره شده", historyRow?.note === "اشتباه شمرده بودم");
+
+  await prisma.cashClose.deleteMany({ where: { day: atTime(parseYmdKey(cashKey), "00:00") } });
+  await prisma.expense.deleteMany({ where: { title: { startsWith: "SMOKE-CASH" } } });
+  await prisma.payment.deleteMany({ where: { customerId: cashCustomer.id } });
+  await prisma.customer.delete({ where: { id: cashCustomer.id } });
 
   // ── گزارش فعالیت ────────────────────────────────────────────
   await prisma.auditLog.deleteMany({ where: { detail: { startsWith: "SMOKE-AUDIT" } } });

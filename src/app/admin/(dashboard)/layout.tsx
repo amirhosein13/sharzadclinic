@@ -7,6 +7,7 @@ import { GlobalSearch } from "@/components/admin/global-search";
 import { can } from "@/lib/permissions";
 import { lowStockCount } from "@/lib/inventory";
 import { openTicketCount } from "@/lib/tickets";
+import { unclosedDays } from "@/lib/cash";
 
 export const metadata: Metadata = {
   title: { default: "پنل مدیریت", template: "%s | پنل مدیریت" },
@@ -18,7 +19,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/admin/login");
 
   // شمارنده‌های سایدبار فقط برای نقش‌هایی که آن بخش‌ها را می‌بینند
-  const [pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps, waitingList, openFeedback, lowStock, openTickets] =
+  const [pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps, waitingList, openFeedback, lowStock, openTickets, unclosed] =
     await Promise.all([
       can(user.role, "appointments.all") ? prisma.appointment.count({ where: { status: "PENDING" } }) : 0,
       can(user.role, "content") ? prisma.testimonial.count({ where: { isApproved: false } }) : 0,
@@ -36,6 +37,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         : 0,
       can(user.role, "payroll") ? lowStockCount() : 0,
       can(user.role, "messages") ? openTicketCount() : 0,
+      can(user.role, "payroll") ? unclosedDays(14) : [],
     ]);
 
   return (
@@ -51,6 +53,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           openFeedback,
           lowStock,
           openTickets,
+          unclosedDays: unclosed.length,
         }}
       />
       <div className="min-w-0 flex-1">
