@@ -10,7 +10,10 @@ const COOKIE_NAME = "sharzad_session";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/admin/login") return NextResponse.next();
+  // صفحه‌های ورود و بازیابی رمز باید بدون نشست باز شوند
+  if (pathname === "/admin/login" || pathname === "/admin/forgot") {
+    return NextResponse.next();
+  }
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
   const secret = process.env.AUTH_SECRET;

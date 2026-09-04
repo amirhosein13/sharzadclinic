@@ -177,6 +177,8 @@ export const paymentSchema = z.object({
 export const userSchema = z.object({
   name: z.string().trim().min(2, "نام را وارد کنید").max(80),
   email: z.string().trim().toLowerCase().email("ایمیل معتبر نیست"),
+  // برای بازیابی رمز عبور — اختیاری، ولی بدونش این حساب راه برگشتی ندارد
+  phone: z.union([z.literal(""), phoneSchema]).optional(),
   role: z.enum(["ADMIN", "MANAGER", "RECEPTION", "OPERATOR"]),
   staffId: z.string().trim().optional(),
   password: z.union([z.literal(""), z.string().min(8, "رمز عبور حداقل ۸ کاراکتر باشد")]).optional(),

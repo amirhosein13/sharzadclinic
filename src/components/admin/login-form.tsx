@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { useFormStatus } from "react-dom";
 import { Eye, EyeOff, LogIn, TriangleAlert } from "lucide-react";
 import { login, type LoginState } from "@/app/actions/auth";
@@ -55,6 +56,13 @@ export function LoginForm({ next }: { next?: string }) {
       )}
 
       <SubmitButton />
+
+      <Link
+        href="/admin/forgot"
+        className="block text-center text-xs text-[color:var(--fg-muted)] transition-colors hover:text-rose-500"
+      >
+        رمز عبورم را فراموش کرده‌ام
+      </Link>
     </form>
   );
 }

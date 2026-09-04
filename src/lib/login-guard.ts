@@ -80,6 +80,20 @@ export async function recordFailedLogin(email: string): Promise<void> {
     .catch(() => undefined);
 }
 
+/**
+ * قفل ورود این ایمیل را برمی‌دارد.
+ *
+ * بعد از بازیابی رمز لازم است: کسی که رمزش را فراموش کرده حتماً چند بار
+ * اشتباه زده، و اگر قفل بماند با رمز تازه‌اش هم نمی‌تواند وارد شود.
+ */
+export async function clearLoginAttempts(email: string): Promise<void> {
+  const key = email.toLowerCase().trim();
+  if (!key) return;
+  await prisma.auditLog
+    .deleteMany({ where: { action: FAILED, detail: key } })
+    .catch(() => undefined);
+}
+
 /** چند تلاش ناموفق تازه داشته‌ایم؟ برای نمایش در گزارش امنیتی */
 export async function recentFailedLogins(hours = 24): Promise<number> {
   return prisma.auditLog.count({

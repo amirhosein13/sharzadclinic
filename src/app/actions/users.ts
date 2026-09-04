@@ -37,6 +37,7 @@ export async function saveUser(formData: FormData): Promise<FormResult> {
     const parsed = userSchema.safeParse({
       name: text(formData.get("name")),
       email: text(formData.get("email")),
+      phone: text(formData.get("phone")),
       role: text(formData.get("role")),
       staffId: text(formData.get("staffId")),
       password: text(formData.get("password")),
@@ -50,6 +51,7 @@ export async function saveUser(formData: FormData): Promise<FormResult> {
     const data = {
       name: v.name,
       email: v.email,
+      phone: v.phone || null,
       role: v.role,
       staffId: v.role === "OPERATOR" ? (v.staffId || null) : null,
       isActive: !!v.isActive,

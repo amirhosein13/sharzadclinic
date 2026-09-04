@@ -90,6 +90,16 @@ export async function notifyOtp(phone: string, code: string): Promise<NotifyResu
   });
 }
 
+/** کد بازیابی رمز عبور پنل */
+export async function notifyPasswordReset(phone: string, code: string): Promise<NotifyResult> {
+  return sendSms({
+    to: phone,
+    template: "password-reset",
+    message: `کد بازیابی رمز پنل: ${code}`,
+    otpCode: code,
+  });
+}
+
 /** پیامک هنگام ثبت نوبت */
 export async function notifyBookingCreated(options: {
   phone: string;

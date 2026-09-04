@@ -15,6 +15,7 @@ export type UserFormValues = {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   role: Role;
   staffId: string | null;
   isActive: boolean;
@@ -81,6 +82,21 @@ function Fields({
           <Input name="email" type="email" defaultValue={user?.email} dir="ltr" className="text-right" />
         </Field>
       </div>
+
+      <Field
+        label="موبایل"
+        error={errors.phone}
+        hint="برای بازیابی رمز عبور — بدون آن، اگر رمز فراموش شود راه برگشتی از سایت نیست"
+      >
+        <Input
+          name="phone"
+          defaultValue={user?.phone ?? ""}
+          inputMode="numeric"
+          placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+          dir="ltr"
+          className="text-right"
+        />
+      </Field>
 
       <Field
         label="رمز عبور"

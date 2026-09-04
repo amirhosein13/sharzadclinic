@@ -89,6 +89,7 @@ export default async function AdminUsersPage() {
                             id: user.id,
                             name: user.name,
                             email: user.email,
+                            phone: user.phone,
                             role: user.role,
                             staffId: user.staffId,
                             isActive: user.isActive,

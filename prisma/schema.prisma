@@ -27,6 +27,8 @@ model User {
   email        String    @unique
   name         String
   passwordHash String
+  /// موبایل کاربر پنل — برای بازیابی رمز عبور با کد پیامکی
+  phone        String?
   role         Role      @default(RECEPTION)
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?

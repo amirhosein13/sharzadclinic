@@ -36,6 +36,7 @@ export async function getSetupStatus(): Promise<SetupStatus> {
     consentTemplates,
     backups,
     realCustomers,
+    usersWithPhone,
   ] = await Promise.all([
     prisma.staff.count({
       where: { isActive: true, acceptsBookings: true, schedules: { some: { isActive: true } } },
@@ -51,6 +52,7 @@ export async function getSetupStatus(): Promise<SetupStatus> {
     prisma.consentTemplate.count({ where: { isActive: true } }),
     listBackups(),
     prisma.customer.count(),
+    prisma.user.count({ where: { isActive: true, phone: { not: null } } }),
   ]);
 
   const smsProvider = (process.env.SMS_PROVIDER ?? "console").toLowerCase();
@@ -115,6 +117,14 @@ export async function getSetupStatus(): Promise<SetupStatus> {
       href: "/admin/settings",
       done: !!settings.managerPhone?.trim(),
       critical: false,
+    },
+    {
+      key: "recovery",
+      title: "برای حساب‌های پنل موبایل ثبت کنید",
+      why: "اگر رمز پنل فراموش شود، بدون موبایل هیچ راه بازگشتی از خود سایت نیست.",
+      href: "/admin/users",
+      done: usersWithPhone > 0,
+      critical: true,
     },
     {
       key: "backup",

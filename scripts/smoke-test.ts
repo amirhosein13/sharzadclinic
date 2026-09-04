@@ -22,6 +22,8 @@ import { openTicket, replyAsCustomer } from "../src/app/actions/tickets";
 import { customerUnreadCount, isUrgent } from "../src/lib/tickets";
 import { generateFollowUps } from "../src/lib/followups";
 import { checkLoginAllowed, recordFailedLogin, MAX_ATTEMPTS } from "../src/lib/login-guard";
+import { issueResetCode, resetPasswordWithCode } from "../src/lib/password-reset";
+import bcrypt from "bcryptjs";
 import { searchEverything } from "../src/lib/search";
 import { getSetupStatus } from "../src/lib/setup-status";
 import { getAttentionItems } from "../src/lib/attention";
@@ -1008,6 +1010,77 @@ async function main() {
   await prisma.auditLog.deleteMany({
     where: { action: { in: ["login", "login.failed"] }, detail: LG_EMAIL },
   });
+
+
+  // ── بازیابی رمز پنل ─────────────────────────────────────────
+  const RESET_EMAIL = "smoke-reset@example.com";
+  const RESET_PHONE = "09129990044";
+  await prisma.user.deleteMany({ where: { email: RESET_EMAIL } });
+  await prisma.otpCode.deleteMany({ where: { phone: RESET_PHONE } });
+  await prisma.auditLog.deleteMany({
+    where: { action: { in: ["login", "login.failed"] }, detail: RESET_EMAIL },
+  });
+
+  const resetUser = await prisma.user.create({
+    data: {
+      email: RESET_EMAIL,
+      name: "کاربر آزمایشی بازیابی",
+      phone: RESET_PHONE,
+      passwordHash: await bcrypt.hash("OldPassword123", 12),
+      role: "RECEPTION",
+    },
+  });
+
+  // ایمیلی که وجود ندارد نباید تفاوتی نشان بدهد
+  const unknown = await issueResetCode("definitely-not-here@example.com");
+  check("ایمیل ناشناس هم پاسخ یکسان می‌گیرد", unknown.ok && unknown.maskedPhone === null);
+
+  const issued = await issueResetCode(RESET_EMAIL);
+  check("کد بازیابی صادر می‌شود", issued.ok && !!issued.code);
+  check(
+    "شماره‌ی مقصد ماسک‌شده نشان داده می‌شود",
+    issued.ok && !!issued.maskedPhone && issued.maskedPhone.includes("***")
+  );
+  check(
+    "شماره‌ی کامل لو نمی‌رود",
+    issued.ok && !issued.maskedPhone?.includes(toFa("999004"))
+  );
+
+  const code = issued.ok ? issued.code! : "";
+
+  // کد اشتباه رد می‌شود و رمز عوض نمی‌شود
+  const wrong = await resetPasswordWithCode(RESET_EMAIL, "000000", "BrandNewPass1");
+  check("کد اشتباه رمز را عوض نمی‌کند", !wrong.ok);
+  const stillOld = await prisma.user.findUniqueOrThrow({ where: { id: resetUser.id } });
+  check(
+    "رمز قدیمی هنوز معتبر است",
+    await bcrypt.compare("OldPassword123", stillOld.passwordHash)
+  );
+
+  // حساب قفل‌شده باید بعد از بازیابی باز شود
+  for (let i = 0; i < MAX_ATTEMPTS; i++) await recordFailedLogin(RESET_EMAIL);
+  check("پیش از بازیابی، حساب قفل است", !(await checkLoginAllowed(RESET_EMAIL)).allowed);
+
+  const done = await resetPasswordWithCode(RESET_EMAIL, code, "BrandNewPass1");
+  check("با کد درست رمز عوض می‌شود", done.ok);
+
+  const updated = await prisma.user.findUniqueOrThrow({ where: { id: resetUser.id } });
+  check("رمز تازه نشسته است", await bcrypt.compare("BrandNewPass1", updated.passwordHash));
+  check("رمز قدیمی دیگر کار نمی‌کند", !(await bcrypt.compare("OldPassword123", updated.passwordHash)));
+  check("بازیابی رمز، قفل ورود را برمی‌دارد", (await checkLoginAllowed(RESET_EMAIL)).allowed);
+
+  // همان کد نباید دوباره کار کند
+  const replay = await resetPasswordWithCode(RESET_EMAIL, code, "AnotherPass123");
+  check("کد مصرف‌شده دوباره کار نمی‌کند", !replay.ok);
+
+  // کاربر بدون موبایل نباید کد بگیرد
+  await prisma.user.update({ where: { id: resetUser.id }, data: { phone: null } });
+  const noPhone = await issueResetCode(RESET_EMAIL);
+  check("کاربر بدون موبایل کد نمی‌گیرد", noPhone.ok && noPhone.maskedPhone === null);
+
+  await prisma.otpCode.deleteMany({ where: { phone: RESET_PHONE } });
+  await prisma.auditLog.deleteMany({ where: { detail: RESET_EMAIL } });
+  await prisma.user.delete({ where: { id: resetUser.id } });
 
   // ── جستجوی سراسری ───────────────────────────────────────────
   const SR_PHONE = "09125558822";

@@ -21,6 +21,7 @@
     "setup": "npm run db:up && node scripts/wait-for-db.mjs && prisma migrate deploy && prisma generate && npm run db:seed",
     "import:legacy": "tsx scripts/import-legacy.ts",
     "doctor": "tsx --conditions=react-server scripts/diagnose-slots.ts",
+    "reset-password": "tsx --conditions=react-server scripts/reset-password.ts",
     "backup": "tsx --conditions=react-server scripts/backup.ts",
     "restore": "tsx --conditions=react-server scripts/restore.ts",
     "test:smoke": "tsx --conditions=react-server scripts/smoke-test.ts",
