@@ -14,10 +14,17 @@ import { buildDailyDigest, digestRecipient } from "../src/lib/daily-digest";
 import { notifyDailyDigest } from "../src/lib/notifications";
 import { getSettings } from "../src/lib/settings";
 import { prisma } from "../src/lib/prisma";
+import { qualifyReferrals } from "../src/lib/referrals";
 
 async function main() {
   const dry = process.argv.includes("--dry");
   const force = process.argv.includes("--force");
+
+  // اگر هدیه‌ی معرفی‌ای از قلم افتاده باشد، همین‌جا جبران می‌شود
+  const referrals = await qualifyReferrals().catch(() => ({ rewarded: 0, skipped: 0 }));
+  if (referrals.rewarded > 0) {
+    console.log(`🎁 ${referrals.rewarded} هدیه‌ی معرفی صادر شد.`);
+  }
 
   const digest = await buildDailyDigest();
   console.log("─".repeat(46));

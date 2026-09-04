@@ -8,6 +8,7 @@ import { getSettings, setSettings } from "@/lib/settings";
 import { testimonialSchema } from "@/lib/validators";
 import { notifyBookingCancelled, notifyBookingConfirmed } from "@/lib/notifications";
 import { matchesForSlot } from "@/lib/waitlist";
+import { qualifyReferrals } from "@/lib/referrals";
 import { ensureFeedbackInvite, sendFeedbackRequest } from "./feedback";
 import { toFa } from "@/lib/utils";
 import { formatJalaliDateTime } from "@/lib/date";
@@ -82,6 +83,12 @@ export async function updateAppointmentStatus(
           await sendFeedbackRequest(appointment.id);
         })
         .catch(() => undefined); // نظرسنجی نباید جلوی ثبت وضعیت نوبت را بگیرد
+    }
+
+    // اگر جلسه انجام شد، معرفی‌های در انتظار ممکن است واجد هدیه شده باشند.
+    // خطایش نباید جلوی ثبت وضعیت نوبت را بگیرد.
+    if (status === "DONE") {
+      qualifyReferrals().catch(() => undefined);
     }
 
     await logAction({

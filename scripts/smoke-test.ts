@@ -11,6 +11,9 @@ import { atTime, parseYmdKey } from "../src/lib/date";
 import { summarizePackages, activePackages } from "../src/lib/packages";
 import { buildReport, resolveRange } from "../src/lib/reports";
 import { normalizeSource, sourceLabel } from "../src/lib/referral-sources";
+import {
+  attachReferral, ensureReferralCode, qualifyReferrals, referralSummary, topReferrers,
+} from "../src/lib/referrals";
 import { checkDiscount, normalizeCode, redeemDiscount } from "../src/lib/discounts";
 import { joinWaitlist } from "../src/app/actions/waitlist";
 import { matchesForSlot } from "../src/lib/waitlist";
@@ -1187,6 +1190,144 @@ async function main() {
   await prisma.customer.deleteMany({ where: { phone: "09129990065" } });
   await prisma.payment.deleteMany({ where: { customerId: { in: srcCustomers.map((c) => c.id) } } });
   await prisma.customer.deleteMany({ where: { id: { in: srcCustomers.map((c) => c.id) } } });
+
+
+  // ── کد معرف ─────────────────────────────────────────────────
+  const REF_PHONES = ["09129990071", "09129990072", "09129990073"];
+  await prisma.referral.deleteMany({
+    where: { OR: [{ referrer: { phone: { in: REF_PHONES } } }, { referred: { phone: { in: REF_PHONES } } }] },
+  });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: { in: REF_PHONES } } } });
+  await prisma.customer.deleteMany({ where: { phone: { in: REF_PHONES } } });
+  await prisma.discountCode.deleteMany({ where: { note: { contains: "هدیه‌ی" } } });
+
+  const prevReferral = await prisma.setting.findUnique({ where: { key: "referralEnabled" } });
+  await prisma.setting.upsert({
+    where: { key: "referralEnabled" },
+    create: { key: "referralEnabled", value: "1" },
+    update: { value: "1" },
+  });
+
+  const referrer = await prisma.customer.create({
+    data: { firstName: "معرف", lastName: "آزمایشی", phone: REF_PHONES[0] },
+  });
+  const referred = await prisma.customer.create({
+    data: { firstName: "معرفی‌شده", lastName: "آزمایشی", phone: REF_PHONES[1] },
+  });
+  const oldCustomer = await prisma.customer.create({
+    data: { firstName: "قدیمی", lastName: "آزمایشی", phone: REF_PHONES[2] },
+  });
+
+  const refCode = await ensureReferralCode(referrer.id);
+  check(`کد معرف ساخته می‌شود (${refCode})`, /^SH[A-Z0-9]{5}$/.test(refCode));
+  check("کد معرف ثابت می‌ماند", (await ensureReferralCode(referrer.id)) === refCode);
+
+  // کد خودش را نمی‌تواند استفاده کند
+  const selfUse = await attachReferral({ referredId: referrer.id, code: refCode });
+  check("کد معرف خودی رد می‌شود", !selfUse.ok);
+
+  // کد نامعتبر
+  const badCode = await attachReferral({ referredId: referred.id, code: "SHZZZZZ" });
+  check("کد معرف نامعتبر رد می‌شود", !badCode.ok);
+
+  // مشتری قدیمی (که سابقه‌ی مراجعه دارد) نباید معرفی‌شده حساب شود
+  const oldStart = new Date(Date.now() - 10 * 86_400_000);
+  await prisma.appointment.create({
+    data: {
+      code: "SMOKE-REF-OLD",
+      customerId: oldCustomer.id,
+      serviceId: service.id,
+      startsAt: oldStart,
+      endsAt: new Date(oldStart.getTime() + 3_600_000),
+      status: "DONE",
+      source: "smoke",
+    },
+  });
+  const oldAttach = await attachReferral({ referredId: oldCustomer.id, code: refCode });
+  check("مشتری با سابقه‌ی مراجعه معرفی‌شده حساب نمی‌شود", !oldAttach.ok);
+
+  // معرفی معتبر
+  const good = await attachReferral({ referredId: referred.id, code: refCode });
+  check("معرفی معتبر ثبت می‌شود", good.ok);
+
+  // دوباره نمی‌شود
+  const twice = await attachReferral({ referredId: referred.id, code: refCode });
+  check("یک نفر دو بار معرفی‌شده نمی‌شود", !twice.ok);
+
+  // تا جلسه انجام نشده، هدیه‌ای صادر نمی‌شود
+  const early = await qualifyReferrals();
+  check("پیش از انجام جلسه هدیه صادر نمی‌شود", early.rewarded === 0);
+  const stillPending = await prisma.referral.findUniqueOrThrow({ where: { referredId: referred.id } });
+  check("وضعیت هنوز «در انتظار» است", stillPending.status === "PENDING");
+
+  // حالا جلسه انجام می‌شود
+  const refStart = new Date(Date.now() - 86_400_000);
+  await prisma.appointment.create({
+    data: {
+      code: "SMOKE-REF-DONE",
+      customerId: referred.id,
+      serviceId: service.id,
+      startsAt: refStart,
+      endsAt: new Date(refStart.getTime() + 3_600_000),
+      status: "DONE",
+      source: "smoke",
+    },
+  });
+
+  const qualified = await qualifyReferrals();
+  check(`پس از اولین جلسه، هدیه صادر می‌شود (${qualified.rewarded})`, qualified.rewarded === 1);
+
+  const rewarded = await prisma.referral.findUniqueOrThrow({ where: { referredId: referred.id } });
+  check("وضعیت به «هدیه صادر شد» می‌رود", rewarded.status === "REWARDED");
+  check("کد هدیه‌ی معرف ساخته شد", !!rewarded.referrerRewardCode);
+  check("کد هدیه‌ی معرفی‌شده هم ساخته شد", !!rewarded.referredRewardCode);
+
+  // کد هدیه باید واقعاً کار کند و یک‌بارمصرف باشد
+  const gift = await prisma.discountCode.findUniqueOrThrow({
+    where: { code: rewarded.referrerRewardCode! },
+  });
+  check("کد هدیه یک‌بارمصرف است", gift.maxUses === 1);
+  check("کد هدیه تاریخ انقضا دارد", !!gift.expiresAt && gift.expiresAt > new Date());
+  const giftCheck = await checkDiscount({ code: gift.code, amount: 2_000_000 });
+  check("کد هدیه واقعاً تخفیف می‌دهد", giftCheck.ok && giftCheck.discount === gift.value);
+
+  // اجرای دوباره نباید هدیه‌ی تکراری بدهد
+  const refAgain = await qualifyReferrals();
+  check("اجرای دوباره هدیه‌ی تکراری نمی‌دهد", refAgain.rewarded === 0);
+
+  // خلاصه‌ی معرف
+  const summary = await referralSummary(referrer.id);
+  check("خلاصه‌ی معرف درست است", summary?.total === 1 && summary?.rewarded === 1);
+  check("متن دعوت شامل کد است", !!summary?.shareText.includes(refCode));
+
+  // معرف‌های برتر
+  const leaders = await topReferrers(10);
+  check(
+    "معرف در فهرست معرف‌های برتر می‌آید",
+    leaders.some((l) => l.id === referrer.id && l.rewarded === 1)
+  );
+
+  // وقتی خاموش است، هیچ‌کدام کار نمی‌کنند
+  await prisma.setting.update({ where: { key: "referralEnabled" }, data: { value: "0" } });
+  const offAttach = await attachReferral({ referredId: oldCustomer.id, code: refCode });
+  check("وقتی خاموش است معرفی ثبت نمی‌شود", !offAttach.ok);
+  check("وقتی خاموش است خلاصه‌ای نشان داده نمی‌شود", (await referralSummary(referrer.id)) === null);
+
+  if (prevReferral) {
+    await prisma.setting.update({ where: { key: "referralEnabled" }, data: { value: prevReferral.value } });
+  } else {
+    await prisma.setting.deleteMany({ where: { key: "referralEnabled" } });
+  }
+  await prisma.discountCode.deleteMany({
+    where: { code: { in: [rewarded.referrerRewardCode!, rewarded.referredRewardCode!] } },
+  });
+  await prisma.referral.deleteMany({ where: { referrerId: referrer.id } });
+  await prisma.appointment.deleteMany({
+    where: { customerId: { in: [referrer.id, referred.id, oldCustomer.id] } },
+  });
+  await prisma.customer.deleteMany({
+    where: { id: { in: [referrer.id, referred.id, oldCustomer.id] } },
+  });
 
   // ── بستن صندوق ──────────────────────────────────────────────
   const CASH_PHONE = "09129990055";

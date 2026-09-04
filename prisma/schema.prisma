@@ -88,6 +88,8 @@ model Customer {
   allergies    String?
   /// «از کجا با ما آشنا شدید؟» — کلید از REFERRAL_SOURCES
   referralSource String?
+  /// کد اختصاصی این مشتری برای معرفی دوستان. با اولین نیاز ساخته می‌شود.
+  referralCode   String? @unique
   /// توضیح آزاد، مثلاً نام معرف
   referralNote   String?
   isBlocked    Boolean   @default(false)
@@ -105,6 +107,9 @@ model Customer {
   tickets      SupportTicket[]
   discountUses DiscountUse[]
   waitlist     WaitlistEntry[]
+
+  referralsMade     Referral[] @relation("Referrer")
+  referralReceived  Referral?  @relation("Referred")
 
   @@index([lastName, firstName])
   @@index([createdAt])
@@ -1044,4 +1049,43 @@ model CashClose {
 
   @@index([day])
   @@map("cash_closes")
+}
+
+// ─── کد معرف ───────────────────────────────────────────────────
+
+enum ReferralStatus {
+  /// معرفی ثبت شده، ولی معرفی‌شده هنوز جلسه‌ای انجام نداده
+  PENDING
+  /// اولین جلسه انجام شد و هدیه‌ها صادر شدند
+  REWARDED
+  /// باطل شد (مثلاً معرفی‌شده هیچ‌وقت نیامد یا تقلبی بود)
+  VOID
+}
+
+/// «چه کسی چه کسی را آورد».
+/// هدیه فقط وقتی صادر می‌شود که معرفی‌شده واقعاً یک جلسه انجام داده باشد،
+/// وگرنه با ثبت‌نام‌های الکی قابل سوءاستفاده است.
+model Referral {
+  id String @id @default(cuid())
+
+  referrerId String
+  referrer   Customer @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+
+  /// هر مشتری فقط یک بار می‌تواند «معرفی‌شده» باشد
+  referredId String   @unique
+  referred   Customer @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+
+  status ReferralStatus @default(PENDING)
+
+  /// کدهای هدیه‌ای که هنگام واجدشرایط‌شدن صادر شدند
+  referrerRewardCode String?
+  referredRewardCode String?
+  rewardAmount       Int?
+
+  createdAt  DateTime  @default(now())
+  rewardedAt DateTime?
+
+  @@index([referrerId])
+  @@index([status])
+  @@map("referrals")
 }

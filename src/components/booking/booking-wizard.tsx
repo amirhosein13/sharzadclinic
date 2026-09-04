@@ -53,12 +53,15 @@ export function BookingWizard({
   staff,
   initialServiceSlug,
   customer,
+  referralEnabled = false,
 }: {
   services: WizardService[];
   staff: WizardStaff[];
   initialServiceSlug?: string;
   /** اگر مشتری وارد حساب شده باشد، مرحله‌ی اطلاعات تماس رد می‌شود */
   customer?: WizardCustomer | null;
+  /** «کد معرف» فقط وقتی نشان داده می‌شود که در تنظیمات روشن باشد */
+  referralEnabled?: boolean;
 }) {
   const initial = services.find((s) => s.slug === initialServiceSlug) ?? null;
 
@@ -389,6 +392,20 @@ export function BookingWizard({
                       className="text-right"
                     />
                   </Field>
+
+                  {referralEnabled && (
+                    <Field
+                      label="کد معرف"
+                      hint="اگر دوستی شما را معرفی کرده، کدش را این‌جا بزنید تا هر دو هدیه بگیرید"
+                    >
+                      <Input
+                        name="referralCode"
+                        placeholder="مثلاً SH4K7M2"
+                        dir="ltr"
+                        className="text-right uppercase"
+                      />
+                    </Field>
+                  )}
 
                   {/* فقط از مراجع تازه پرسیده می‌شود و اختیاری است */}
                   <Field label="از کجا با ما آشنا شدید؟" hint="اختیاری — کمک می‌کند بهتر خدمت کنیم">

@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { getCustomerSession } from "@/lib/customer-auth";
 import { activePackages } from "@/lib/packages";
 import { getSettings } from "@/lib/settings";
+import { referralSummary } from "@/lib/referrals";
+import { ReferralCard } from "@/components/site/referral-card";
 import { isZarinpalConfigured } from "@/lib/zarinpal";
 import { customerLogout } from "@/app/actions/customer";
 import { PageHero } from "@/components/site/page-hero";
@@ -35,6 +37,7 @@ export default async function AccountPage() {
   if (!session) redirect("/login");
 
   const settings = await getSettings();
+  const referral = await referralSummary(session.id);
   const depositPercent = Number(settings.depositPercent) || 30;
   const gatewayReady = isZarinpalConfigured();
 
@@ -366,6 +369,13 @@ export default async function AccountPage() {
 
           {/* ستون کناری */}
           <aside className="space-y-6 lg:sticky lg:top-28 lg:self-start">
+            {referral && (
+              <ReferralCard
+                summary={referral}
+                referredReward={Number(settings.referredReward) || 0}
+              />
+            )}
+
             <div className="rounded-4xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-7 shadow-soft">
               <h2 className="mb-5 flex items-center gap-2 font-bold">
                 <User className="size-4 text-rose-500" />

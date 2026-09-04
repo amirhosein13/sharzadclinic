@@ -65,6 +65,7 @@ export default async function BookingPage({
         <BookingWizard
           initialServiceSlug={service}
           customer={customer}
+          referralEnabled={settings.referralEnabled === "1"}
           services={services.map((s) => ({
             id: s.id,
             slug: s.slug,

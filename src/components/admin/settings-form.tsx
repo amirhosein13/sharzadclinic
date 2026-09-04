@@ -43,6 +43,10 @@ const FIELDS: {
   { key: "winBackAfterMonths", label: "بازگردانی مشتری غایب (ماه)", hint: "بعد از این مدت نیامدن، مشتری در فهرست پیگیری می‌آید", ltr: true },
   { key: "winBackSms", label: "پیامک خودکار بازگردانی", hint: "۱ یعنی فعال، ۰ یعنی فقط در فهرست منشی بماند", ltr: true },
   { key: "winBackDiscountCode", label: "کد تخفیف بازگردانی", hint: "اگر بگذارید، در پیامک بازگردانی معرفی می‌شود", ltr: true },
+  { key: "referralEnabled", label: "سیستم کد معرف", hint: "۱ یعنی فعال. تا فعال نشود، کد معرف در رزرو و پنل مشتری دیده نمی‌شود", ltr: true },
+  { key: "referrerReward", label: "هدیه‌ی معرف (تومان)", hint: "وقتی معرفی‌شده اولین جلسه‌اش را انجام داد، این مبلغ به شکل کد تخفیف برای معرف پیامک می‌شود", ltr: true },
+  { key: "referredReward", label: "هدیه‌ی معرفی‌شده (تومان)", hint: "هدیه‌ی خوش‌آمد کسی که با کد معرف آمده", ltr: true },
+  { key: "referralRewardDays", label: "اعتبار هدیه‌ی معرفی (روز)", hint: "کدهای هدیه بعد از این مدت منقضی می‌شوند", ltr: true },
 ];
 
 export function SettingsForm({ settings }: { settings: SettingsMap }) {

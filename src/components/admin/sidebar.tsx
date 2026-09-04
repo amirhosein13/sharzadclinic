@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Boxes, CalendarDays, Coins, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
+import { BarChart3, Boxes, CalendarDays, Coins, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Gift, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -27,6 +27,7 @@ const NAV: {
   { href: "/admin/followups", label: "پیگیری مراجعین", icon: PhoneCall, permission: "appointments.all", badgeKey: "openFollowUps" },
   { href: "/admin/customers", label: "مشتریان", icon: Users, permission: "customers" },
   { href: "/admin/waitlist", label: "لیست انتظار", icon: Hourglass, permission: "appointments.all", badgeKey: "waitingList" },
+  { href: "/admin/referrals", label: "کد معرف", icon: Gift, permission: "customers" },
   { href: "/admin/services", label: "خدمات", icon: Sparkles, permission: "content" },
   { href: "/admin/staff", label: "پرسنل", icon: Users, permission: "staff" },
   { href: "/admin/payments", label: "پرداخت‌ها", icon: CreditCard, permission: "payroll" },

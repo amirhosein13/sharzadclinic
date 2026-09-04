@@ -3,7 +3,7 @@ import { prisma } from "../prisma";
 import { getSmsDriver, smsRecipient } from "./sms";
 import { emailTemplate, sendEmail } from "./email";
 import { formatJalaliDateTime } from "../date";
-import { toFa } from "../utils";
+import { formatToman, toFa } from "../utils";
 import { DEFAULT_SETTINGS, getSettings } from "../settings";
 
 export type NotifyResult = { ok: boolean; simulated?: boolean; error?: string };
@@ -97,6 +97,33 @@ export async function notifyPasswordReset(phone: string, code: string): Promise<
     template: "password-reset",
     message: `کد بازیابی رمز پنل: ${code}`,
     otpCode: code,
+  });
+}
+
+/** هدیه‌ی کد معرف — هم برای معرف، هم برای معرفی‌شده */
+export async function notifyReferralReward(options: {
+  phone: string;
+  name: string;
+  code: string;
+  amount: number;
+  days: number;
+  asReferrer: boolean;
+}): Promise<NotifyResult> {
+  const settings = await getSettings();
+  const intro = options.asReferrer
+    ? `${options.name} عزیز، دوستی که معرفی کردید به ما سر زد. هدیه‌ی شما:`
+    : `${options.name} عزیز، به خاطر معرفی دوستتان، هدیه‌ی خوش‌آمد شما:`;
+
+  return sendSms({
+    to: options.phone,
+    template: "referral-reward",
+    message: [
+      intro,
+      `${formatToman(options.amount)} تخفیف`,
+      `کد: ${options.code}`,
+      `تا ${toFa(options.days)} روز آینده معتبر است.`,
+      settings.clinicName,
+    ].join("\n"),
   });
 }
 

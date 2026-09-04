@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { bookingSchema, fieldErrors, trackSchema } from "@/lib/validators";
 import { normalizeSource } from "@/lib/referral-sources";
+import { attachReferral } from "@/lib/referrals";
 import { getAvailableSlots, releaseExpiredHolds } from "@/lib/availability";
 import { atTime, formatJalaliDateTime, parseYmdKey } from "@/lib/date";
 import { generateBookingCode } from "@/lib/utils";
@@ -40,6 +41,7 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
     phone: existingCustomer?.phone ?? formData.get("phone"),
     note: formData.get("note") ?? "",
     referralSource: formData.get("referralSource") ?? "",
+    referralCode: formData.get("referralCode") ?? "",
   });
 
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
@@ -90,6 +92,13 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
         referralSource,
       },
     });
+
+    // کد معرف: خطایش نباید جلوی ثبت نوبت را بگیرد — نوبت مهم‌تر از هدیه است
+    if (input.referralCode && !before) {
+      await attachReferral({ referredId: customer.id, code: input.referralCode }).catch(
+        () => undefined,
+      );
+    }
 
     // اگر همین مشتری برای همین ساعت نوبت دارد، تکراری نسازیم
     const duplicate = await prisma.appointment.findFirst({

@@ -42,6 +42,14 @@ export const DEFAULT_SETTINGS = {
   winBackSms: "0",
   /** کد تخفیفی که در پیامک بازگردانی معرفی می‌شود */
   winBackDiscountCode: "",
+  /** سیستم «کد معرف» فعال باشد؟ "1" یا "0" */
+  referralEnabled: "0",
+  /** هدیه‌ی معرف، به تومان — وقتی معرفی‌شده اولین جلسه‌اش را انجام داد */
+  referrerReward: "200000",
+  /** هدیه‌ی معرفی‌شده، به تومان */
+  referredReward: "200000",
+  /** هدیه‌ها چند روز اعتبار دارند */
+  referralRewardDays: "90",
 } as const;
 
 export type SettingsMap = Record<string, string>;

@@ -28,6 +28,8 @@ export const bookingSchema = z.object({
   note: z.string().trim().max(500).optional(),
   /// «از کجا با ما آشنا شدید؟» — فقط برای مراجع تازه پرسیده می‌شود
   referralSource: z.string().trim().max(30).optional(),
+  /// کد معرفِ دوستی که این مشتری را فرستاده
+  referralCode: z.string().trim().max(20).optional(),
 });
 export type BookingInput = z.infer<typeof bookingSchema>;
 
