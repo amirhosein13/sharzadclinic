@@ -10,6 +10,7 @@ import { notifyBookingCancelled, notifyBookingConfirmed } from "@/lib/notificati
 import { matchesForSlot } from "@/lib/waitlist";
 import { ensureFeedbackInvite, sendFeedbackRequest } from "./feedback";
 import { toFa } from "@/lib/utils";
+import { formatJalaliDateTime } from "@/lib/date";
 import type { AppointmentStatus } from "@prisma/client";
 
 export type ActionResult = { ok: boolean; message: string };
@@ -111,7 +112,13 @@ export async function updateAppointmentNote(id: string, adminNote: string): Prom
   return guarded(async () => {
     const user = await requireRole("ADMIN", "MANAGER", "RECEPTION");
     await prisma.appointment.update({ where: { id }, data: { adminNote: adminNote || null } });
-    await logAction({ userId: user.id, action: "appointment.note", entity: "Appointment", entityId: id });
+    await logAction({
+      userId: user.id,
+      action: "appointment.note",
+      entity: "Appointment",
+      entityId: id,
+      detail: adminNote ? adminNote.slice(0, 120) : "یادداشت پاک شد",
+    });
     revalidatePath("/admin/appointments");
     return OK("یادداشت ذخیره شد.");
   });
@@ -120,8 +127,25 @@ export async function updateAppointmentNote(id: string, adminNote: string): Prom
 export async function deleteAppointment(id: string): Promise<ActionResult> {
   return guarded(async () => {
     const user = await requireRole("ADMIN", "MANAGER");
+    // پیش از حذف، مشخصاتش را برمی‌داریم؛ بعد از حذف، شناسه‌ی تنها به درد
+    // هیچ‌کس نمی‌خورد و گزارش فعالیت بی‌فایده می‌شود
+    const doomed = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        customer: { select: { firstName: true, lastName: true, phone: true } },
+        service: { select: { title: true } },
+      },
+    });
     await prisma.appointment.delete({ where: { id } });
-    await logAction({ userId: user.id, action: "appointment.delete", entity: "Appointment", entityId: id });
+    await logAction({
+      userId: user.id,
+      action: "appointment.delete",
+      entity: "Appointment",
+      entityId: id,
+      detail: doomed
+        ? `${doomed.code} — ${doomed.customer.firstName} ${doomed.customer.lastName} (${doomed.customer.phone}) — ${doomed.service.title} — ${formatJalaliDateTime(doomed.startsAt)}`
+        : null,
+    });
     revalidatePath("/admin/appointments");
     return OK("نوبت حذف شد.");
   });
@@ -143,7 +167,15 @@ export async function toggleCustomerBlock(id: string): Promise<ActionResult> {
     const user = await requireRole("ADMIN", "MANAGER", "RECEPTION");
     const customer = await prisma.customer.findUniqueOrThrow({ where: { id } });
     await prisma.customer.update({ where: { id }, data: { isBlocked: !customer.isBlocked } });
-    await logAction({ userId: user.id, action: "customer.block", entity: "Customer", entityId: id });
+    await logAction({
+      userId: user.id,
+      action: "customer.block",
+      entity: "Customer",
+      entityId: id,
+      detail: `${customer.firstName} ${customer.lastName} (${customer.phone}) — ${
+        customer.isBlocked ? "محدودیت برداشته شد" : "محدود شد"
+      }`,
+    });
     revalidatePath("/admin/customers");
     return OK(customer.isBlocked ? "محدودیت مشتری برداشته شد." : "مشتری محدود شد.");
   });

@@ -12,10 +12,12 @@ export const PERMISSIONS = {
   ADMIN: [
     "dashboard", "appointments.all", "appointments.write", "customers", "customers.write",
     "content", "staff", "payroll", "payroll.write", "users", "settings", "notifications", "messages",
+    "audit",
   ],
   MANAGER: [
     "dashboard", "appointments.all", "appointments.write", "customers", "customers.write",
     "content", "staff", "payroll", "payroll.write", "settings", "notifications", "messages",
+    "audit",
   ],
   RECEPTION: [
     "dashboard", "appointments.all", "appointments.write", "customers", "customers.write", "messages",

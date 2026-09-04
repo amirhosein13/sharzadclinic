@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Boxes, CalendarDays, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
+import { BarChart3, Boxes, CalendarDays, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -47,6 +47,7 @@ const NAV: {
   { href: "/admin/notifications", label: "پیامک و ایمیل", icon: Send, permission: "notifications" },
   { href: "/admin/settings", label: "تنظیمات", icon: Settings, permission: "settings" },
   { href: "/admin/backup", label: "پشتیبان‌گیری", icon: DatabaseBackup, permission: "settings", adminOnly: true },
+  { href: "/admin/audit", label: "گزارش فعالیت", icon: History, permission: "audit" },
 ];
 
 export type SidebarBadges = {

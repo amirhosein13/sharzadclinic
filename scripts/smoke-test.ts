@@ -30,6 +30,7 @@ import { getAttentionItems } from "../src/lib/attention";
 import { consumeForService, lowStockItems, recordMovement } from "../src/lib/inventory";
 import { toFa } from "../src/lib/utils";
 import { missingConsents } from "../src/lib/consents";
+import { listAudit } from "../src/lib/audit";
 
 const prisma = new PrismaClient();
 
@@ -1081,6 +1082,65 @@ async function main() {
   await prisma.otpCode.deleteMany({ where: { phone: RESET_PHONE } });
   await prisma.auditLog.deleteMany({ where: { detail: RESET_EMAIL } });
   await prisma.user.delete({ where: { id: resetUser.id } });
+
+
+  // ── گزارش فعالیت ────────────────────────────────────────────
+  await prisma.auditLog.deleteMany({ where: { detail: { startsWith: "SMOKE-AUDIT" } } });
+  const auditUser = await prisma.user.findFirstOrThrow();
+
+  await prisma.auditLog.createMany({
+    data: [
+      { userId: auditUser.id, action: "appointment.delete", entity: "Appointment", detail: "SMOKE-AUDIT حذف نوبت" },
+      { userId: auditUser.id, action: "settings.save", entity: "Setting", detail: "SMOKE-AUDIT تنظیمات" },
+      { action: "login.failed", entity: "User", detail: "SMOKE-AUDIT-attacker@example.com" },
+    ],
+  });
+
+  const auditAll = await listAudit({ days: 1, perPage: 200 });
+  const auditMine = auditAll.rows.filter((r) => r.detail?.startsWith("SMOKE-AUDIT"));
+  check("گزارش فعالیت رویدادها را برمی‌گرداند", auditMine.length === 3);
+
+  const deleteRow = auditMine.find((r) => r.action === "appointment.delete");
+  check("عمل به فارسی توضیح داده می‌شود", deleteRow?.description === "حذف نوبت");
+  check("حذف با رنگ قرمز علامت می‌خورد", deleteRow?.tone === "red");
+  check("نام انجام‌دهنده می‌آید", deleteRow?.who === auditUser.name);
+
+  const failedRow = auditMine.find((r) => r.action === "login.failed");
+  check("تلاش ناموفق ورود کاربر ندارد", failedRow?.who === "—");
+  check("تلاش ناموفق قرمز است", failedRow?.tone === "red");
+
+  // فیلتر دسته‌بندی
+  const securityOnly = await listAudit({ days: 1, group: "security", perPage: 200 });
+  const secDetails = securityOnly.rows.filter((r) => r.detail?.startsWith("SMOKE-AUDIT"));
+  check(
+    "فیلتر «امنیت» فقط رویدادهای امنیتی را می‌آورد",
+    secDetails.length === 1 && secDetails[0].action === "login.failed"
+  );
+
+  const settingsOnly = await listAudit({ days: 1, group: "settings", perPage: 200 });
+  check(
+    "فیلتر «تنظیمات» درست کار می‌کند",
+    settingsOnly.rows.filter((r) => r.detail?.startsWith("SMOKE-AUDIT")).length === 1
+  );
+
+  // فیلتر کاربر و جستجو
+  const byUser = await listAudit({ days: 1, userId: auditUser.id, perPage: 200 });
+  check(
+    "فیلتر کاربر، رویدادِ بی‌کاربر را نمی‌آورد",
+    !byUser.rows.some((r) => r.detail === "SMOKE-AUDIT-attacker@example.com")
+  );
+
+  const searched = await listAudit({ days: 1, q: "SMOKE-AUDIT-attacker", perPage: 200 });
+  check("جستجو در جزئیات کار می‌کند", searched.rows.length === 1);
+
+  // صفحه‌بندی
+  const paged = await listAudit({ days: 1, perPage: 10, page: 1 });
+  check(
+    "صفحه‌بندی درست شمرده می‌شود",
+    paged.rows.length <= 10 && paged.pages === Math.max(1, Math.ceil(paged.total / 10))
+  );
+
+  await prisma.auditLog.deleteMany({ where: { detail: { startsWith: "SMOKE-AUDIT" } } });
 
   // ── جستجوی سراسری ───────────────────────────────────────────
   const SR_PHONE = "09125558822";

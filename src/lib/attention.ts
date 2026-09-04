@@ -4,6 +4,7 @@ import { getSettings } from "./settings";
 import { lowStockCount } from "./inventory";
 import { listBackups } from "./backup";
 import { UNHAPPY_THRESHOLD } from "./feedback";
+import { recentFailedLogins } from "./login-guard";
 import type { Role } from "@prisma/client";
 import { can } from "./permissions";
 
@@ -43,6 +44,7 @@ export async function getAttentionItems(role: Role): Promise<AttentionItem[]> {
     pendingTestimonials,
     lowStock,
     backups,
+    failedLogins,
     todayUnfinished,
   ] = await Promise.all([
     canAppointments ? prisma.appointment.count({ where: { status: "PENDING" } }) : 0,
@@ -65,6 +67,7 @@ export async function getAttentionItems(role: Role): Promise<AttentionItem[]> {
     canContent ? prisma.testimonial.count({ where: { isApproved: false } }) : 0,
     canFinance ? lowStockCount() : 0,
     canFinance ? listBackups() : [],
+    can(role, "audit") ? recentFailedLogins(24) : 0,
     canAppointments
       ? prisma.appointment.count({
           where: {
@@ -160,6 +163,19 @@ export async function getAttentionItems(role: Role): Promise<AttentionItem[]> {
     href: "/admin/testimonials",
     severity: "medium",
   });
+
+  // تلاش‌های ناموفق ورود: تک‌وتوک یعنی کسی رمزش را اشتباه زده و مهم نیست؛
+  // انبوهش یعنی یک نفر دارد رمز را حدس می‌زند
+  if (failedLogins >= 10) {
+    items.push({
+      key: "failedLogins",
+      count: failedLogins,
+      label: "تلاش ناموفق ورود در ۲۴ ساعت",
+      hint: "ممکن است کسی در حال حدس‌زدن رمز باشد. گزارش فعالیت را ببینید.",
+      href: "/admin/audit?group=security&days=1",
+      severity: "high",
+    });
+  }
 
   // پشتیبان‌گیری: نبودش یا کهنه‌بودنش هر دو مهم است
   if (canFinance) {
