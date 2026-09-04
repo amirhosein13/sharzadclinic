@@ -166,6 +166,7 @@ model Service {
   waitlist     WaitlistEntry[]
   feedbacks    Feedback[]
   materials    ServiceMaterial[]
+  consents     ConsentTemplateService[]
 
   @@index([categoryId, isActive])
   @@index([isFeatured])
@@ -878,8 +879,22 @@ model ConsentTemplate {
   updatedAt DateTime @updatedAt
 
   signatures ConsentSignature[]
+  services   ConsentTemplateService[]
 
   @@map("consent_templates")
+}
+
+/// کدام رضایت‌نامه به کدام خدمت مربوط است.
+/// اگر یک قالب هیچ خدمتی نداشته باشد، عمومی است و برای همه پیشنهاد می‌شود.
+model ConsentTemplateService {
+  templateId String
+  serviceId  String
+  template   ConsentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  service    Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([templateId, serviceId])
+  @@index([serviceId])
+  @@map("consent_template_services")
 }
 
 model ConsentSignature {

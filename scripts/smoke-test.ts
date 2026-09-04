@@ -27,6 +27,7 @@ import { getSetupStatus } from "../src/lib/setup-status";
 import { getAttentionItems } from "../src/lib/attention";
 import { consumeForService, lowStockItems, recordMovement } from "../src/lib/inventory";
 import { toFa } from "../src/lib/utils";
+import { missingConsents } from "../src/lib/consents";
 
 const prisma = new PrismaClient();
 
@@ -783,18 +784,21 @@ async function main() {
   const prevFollowUpDays = service.followUpDays;
   await prisma.service.update({ where: { id: service.id }, data: { followUpDays: 3 } });
 
-  // جلسه‌ای که ۳ روز پیش انجام شده ⇒ باید پیگیری پس از درمان بسازد
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-  threeDaysAgo.setHours(11, 0, 0, 0);
+  // جلسه‌ای که ۴ روز پیش انجام شده ⇒ باید پیگیری پس از درمان بسازد.
+  // پنجره‌ی جست‌وجو [۶ روز پیش تا ۳ روز پیش] است و «۳ روز پیش» یعنی همین ساعت
+  // در آن روز؛ پس اگر جلسه را دقیقاً ۳ روز پیش ساعت ۱۱ بگذاریم، هر شب بین
+  // نیمه‌شب و ۱۱ صبح بیرون از پنجره می‌افتد و تست بی‌دلیل قرمز می‌شود.
+  const fourDaysAgo = new Date();
+  fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
+  fourDaysAgo.setHours(11, 0, 0, 0);
   await prisma.appointment.create({
     data: {
       code: "SH-FU01",
       customerId: fuCustomer.id,
       serviceId: service.id,
       staffId: fuStaff.id,
-      startsAt: threeDaysAgo,
-      endsAt: new Date(threeDaysAgo.getTime() + 45 * 60_000),
+      startsAt: fourDaysAgo,
+      endsAt: new Date(fourDaysAgo.getTime() + 45 * 60_000),
       status: "DONE",
       source: "smoke",
     },
@@ -878,6 +882,97 @@ async function main() {
 
   await prisma.supportTicket.deleteMany({ where: { customerId: tkCustomer.id } });
   await prisma.customer.delete({ where: { id: tkCustomer.id } });
+
+
+  // ── رضایت‌نامه‌ی مخصوص خدمت ─────────────────────────────────
+  const CS_PHONE = "09129990033";
+  await prisma.consentSignature.deleteMany({ where: { customer: { phone: CS_PHONE } } });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: CS_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: CS_PHONE } });
+  await prisma.consentTemplate.deleteMany({ where: { slug: { startsWith: "smoke-consent" } } });
+
+  const csCustomer = await prisma.customer.create({
+    data: { firstName: "رضایت", lastName: "آزمایشی", phone: CS_PHONE },
+  });
+  const otherService = await prisma.service.findFirstOrThrow({
+    where: { slug: "botox" },
+  });
+
+  // یکی مخصوص همان خدمتی که مشتری نوبت دارد، یکی مخصوص خدمت دیگر، یکی عمومی
+  const tplLaser = await prisma.consentTemplate.create({
+    data: {
+      slug: "smoke-consent-laser",
+      title: "رضایت‌نامه‌ی آزمایشی لیزر",
+      body: "متن {{نام}}",
+      services: { create: [{ serviceId: service.id }] },
+    },
+  });
+  const tplOther = await prisma.consentTemplate.create({
+    data: {
+      slug: "smoke-consent-other",
+      title: "رضایت‌نامه‌ی آزمایشی تزریق",
+      body: "متن {{نام}}",
+      services: { create: [{ serviceId: otherService.id }] },
+    },
+  });
+  const tplGeneral = await prisma.consentTemplate.create({
+    data: { slug: "smoke-consent-general", title: "رضایت‌نامه‌ی عمومی آزمایشی", body: "متن" },
+  });
+
+  const csStart = new Date(Date.now() + 2 * 86_400_000);
+  const csAppt = await prisma.appointment.create({
+    data: {
+      code: "SMOKE-CS",
+      customerId: csCustomer.id,
+      serviceId: service.id,
+      startsAt: csStart,
+      endsAt: new Date(csStart.getTime() + 3_600_000),
+      status: "CONFIRMED",
+      source: "smoke",
+    },
+  });
+
+  const miss1 = await missingConsents(csCustomer.id);
+  check(
+    "رضایت‌نامه‌ی مخصوص خدمتِ همین مشتری به‌عنوان امضانشده می‌آید",
+    miss1.some((m) => m.templateId === tplLaser.id)
+  );
+  check(
+    "رضایت‌نامه‌ی خدمتِ دیگر هشدار نمی‌سازد",
+    !miss1.some((m) => m.templateId === tplOther.id)
+  );
+  check(
+    "رضایت‌نامه‌ی عمومی هشدار نمی‌سازد",
+    !miss1.some((m) => m.templateId === tplGeneral.id)
+  );
+  check("نوبت پیش‌رو علامت فوریت می‌خورد", miss1.find((m) => m.templateId === tplLaser.id)!.upcoming);
+
+  // پس از امضا دیگر نباید هشدار بدهد
+  await prisma.consentSignature.create({
+    data: {
+      templateId: tplLaser.id,
+      customerId: csCustomer.id,
+      fullName: "رضایت آزمایشی",
+      bodySnapshot: "متن رضایت آزمایشی",
+    },
+  });
+  const miss2 = await missingConsents(csCustomer.id);
+  check("پس از امضا هشدار برداشته می‌شود", !miss2.some((m) => m.templateId === tplLaser.id));
+
+  // تخته‌ی روز هم باید همین را بداند
+  const csKey = `${csStart.getFullYear()}-${String(csStart.getMonth() + 1).padStart(2, "0")}-${String(csStart.getDate()).padStart(2, "0")}`;
+  await prisma.consentSignature.deleteMany({ where: { customerId: csCustomer.id } });
+  const csDay = await buildDaySchedule(csKey);
+  const csBlock = csDay.columns.flatMap((c) => c.blocks).find((b) => b.id === csAppt.id);
+  check(
+    "تخته‌ی روز رضایت‌نامه‌ی امضانشده را نشان می‌دهد",
+    !!csBlock && csBlock.needsConsent.includes("رضایت‌نامه‌ی آزمایشی لیزر")
+  );
+
+  await prisma.consentSignature.deleteMany({ where: { customerId: csCustomer.id } });
+  await prisma.appointment.deleteMany({ where: { customerId: csCustomer.id } });
+  await prisma.customer.delete({ where: { id: csCustomer.id } });
+  await prisma.consentTemplate.deleteMany({ where: { slug: { startsWith: "smoke-consent" } } });
 
   // ── قفل ورود پس از تلاش‌های ناموفق ──────────────────────────
   const LG_EMAIL = "smoke-login@example.com";

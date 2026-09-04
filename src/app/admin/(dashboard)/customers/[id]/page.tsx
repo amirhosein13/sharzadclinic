@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, CalendarDays, FileSignature, FileText, Package as PackageIcon, Phone, Star, Trash2, Wallet } from "lucide-react";
+import { ArrowRight, CalendarDays, FileSignature, FileText, Package as PackageIcon, Phone, Star, Trash2, TriangleAlert, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
@@ -17,7 +17,7 @@ import { PackageForm } from "@/components/admin/forms/package-form";
 import { PackageCard } from "@/components/admin/package-card";
 import { CasePhotos } from "@/components/case-photos";
 import { summarizePackages } from "@/lib/packages";
-import { renderConsentBody } from "@/lib/consents";
+import { missingConsents, renderConsentBody } from "@/lib/consents";
 import { aspectLabel } from "@/lib/feedback";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_META } from "@/lib/appointment-status";
@@ -76,10 +76,17 @@ export default async function CustomerDetailPage({
     prisma.consentTemplate.findMany({
       where: { isActive: true },
       orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-      select: { id: true, title: true, body: true },
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        services: { select: { serviceId: true, service: { select: { title: true } } } },
+      },
     }),
     getSession(),
   ]);
+
+  const unsignedConsents = await missingConsents(customer.id);
 
   const packageOptions = packages
     .filter((p) => !p.isFinished && !p.isExpired)
@@ -99,15 +106,32 @@ export default async function CustomerDetailPage({
 
   // متن هر قالب با نام و تاریخ امروز آماده می‌شود تا منشی همان چیزی را
   // ببیند که امضا می‌شود
+  // خدماتی که این مشتری واقعاً گرفته — مبنای «کدام رضایت‌نامه به کارش می‌آید»
+  const customerServiceIds = new Set(
+    customer.appointments
+      .filter((a) => a.status !== "CANCELLED" && a.status !== "NO_SHOW")
+      .map((a) => a.serviceId),
+  );
+  const signedTemplateIds = new Set(customer.consents.map((c) => c.templateId));
+
   const consentOptions = await Promise.all(
     consentTemplates.map(async (t) => ({
       id: t.id,
       title: t.title,
+      // عمومی (بدون خدمت) همیشه در دسترس است؛ مخصوص، فقط وقتی به کار این مشتری می‌آید
+      relevant:
+        t.services.length === 0 || t.services.some((x) => customerServiceIds.has(x.serviceId)),
+      serviceTitles: t.services.map((x) => x.service.title),
+      signed: signedTemplateIds.has(t.id),
       preview: await renderConsentBody(t.body, {
         fullName,
         nationalCode: customer.nationalCode,
       }),
     })),
+  );
+  // مربوط‌ها اول، و بینشان امضانشده‌ها جلوتر
+  consentOptions.sort(
+    (a, b) => Number(b.relevant) - Number(a.relevant) || Number(a.signed) - Number(b.signed),
   );
 
   const totalPaid = customer.payments
@@ -380,6 +404,23 @@ export default async function CustomerDetailPage({
                 />
               )}
             </div>
+
+            {unsignedConsents.length > 0 && (
+              <div className="border-b border-[color:var(--line)] bg-amber-50 p-5 dark:bg-amber-500/10">
+                <p className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-200">
+                  <TriangleAlert className="size-4 shrink-0" />
+                  رضایت‌نامه‌ی امضانشده
+                </p>
+                <ul className="mt-2.5 space-y-1.5">
+                  {unsignedConsents.map((m) => (
+                    <li key={m.templateId} className="text-xs leading-6 text-amber-800 dark:text-amber-200">
+                      «{m.templateTitle}» برای {m.serviceTitles.join("، ")}
+                      {m.upcoming && <b> — نوبت پیش‌رو دارد</b>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {customer.consents.length === 0 ? (
               <div className="p-6">

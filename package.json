@@ -16,7 +16,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "tsx --conditions=react-server prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "setup": "npm run db:up && node scripts/wait-for-db.mjs && prisma migrate deploy && prisma generate && npm run db:seed",
     "import:legacy": "tsx scripts/import-legacy.ts",

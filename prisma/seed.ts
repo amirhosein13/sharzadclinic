@@ -224,12 +224,26 @@ async function main() {
 
   // ─── رضایت‌نامه‌ها ────────────────────────────────────────
   for (const t of CONSENT_TEMPLATES) {
-    await prisma.consentTemplate.upsert({
+    const template = await prisma.consentTemplate.upsert({
       where: { slug: t.slug },
       // متن موجود بازنویسی نمی‌شود تا ویرایش‌های کلینیک از بین نرود
       update: {},
       create: { slug: t.slug, title: t.title, body: t.body, order: t.order },
     });
+
+    // اتصال به خدمات فقط اگر هنوز چیزی وصل نشده — انتخاب‌های کلینیک پاک نشود
+    const linked = await prisma.consentTemplateService.count({
+      where: { templateId: template.id },
+    });
+    if (linked === 0 && t.serviceSlugs.length > 0) {
+      const ids = t.serviceSlugs
+        .map((slug) => serviceIds.get(slug))
+        .filter((id): id is string => !!id);
+      await prisma.consentTemplateService.createMany({
+        data: ids.map((serviceId) => ({ templateId: template.id, serviceId })),
+        skipDuplicates: true,
+      });
+    }
   }
 
   // ─── دسته‌های هزینه ──────────────────────────────────────

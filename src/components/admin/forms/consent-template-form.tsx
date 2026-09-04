@@ -1,7 +1,7 @@
 "use client";
 
 import { FilePlus2, Pencil } from "lucide-react";
-import { CrudDialog } from "@/components/admin/crud-dialog";
+import { CrudDialog, MultiCheck } from "@/components/admin/crud-dialog";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { saveConsentTemplate } from "@/app/actions/consents";
@@ -13,7 +13,10 @@ export type ConsentTemplateValues = {
   body: string;
   order: number;
   isActive: boolean;
+  serviceIds: string[];
 };
+
+export type ConsentServiceOption = { id: string; title: string };
 
 const PLACEHOLDERS = [
   { key: "{{نام}}", label: "نام مراجعه‌کننده" },
@@ -22,7 +25,13 @@ const PLACEHOLDERS = [
   { key: "{{کلینیک}}", label: "نام کلینیک" },
 ];
 
-export function ConsentTemplateForm({ template }: { template?: ConsentTemplateValues }) {
+export function ConsentTemplateForm({
+  template,
+  services,
+}: {
+  template?: ConsentTemplateValues;
+  services: ConsentServiceOption[];
+}) {
   const editing = !!template;
 
   return (
@@ -96,6 +105,19 @@ export function ConsentTemplateForm({ template }: { template?: ConsentTemplateVa
               فعال — در فهرست امضا نشان داده شود
             </label>
           </div>
+
+          <MultiCheck
+            name="serviceIds"
+            label="مربوط به کدام خدمات است؟"
+            options={services.map((s) => ({ id: s.id, label: s.title }))}
+            selected={template?.serviceIds ?? []}
+            emptyHint="اول از بخش خدمات، خدمات کلینیک را ثبت کنید."
+          />
+          <p className="-mt-2 text-xs leading-6 text-[color:var(--fg-muted)]">
+            اگر هیچ خدمتی را انتخاب نکنید، این رضایت‌نامه <b>عمومی</b> است و برای همه پیشنهاد می‌شود.
+            اگر خدمتی را انتخاب کنید، برای مشتریِ آن خدمت پیشنهاد می‌شود و اگر امضا نشده باشد در
+            پرونده‌اش هشدار داده می‌شود.
+          </p>
         </>
       )}
     </CrudDialog>

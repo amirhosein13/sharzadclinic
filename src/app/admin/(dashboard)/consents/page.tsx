@@ -13,17 +13,27 @@ export const dynamic = "force-dynamic";
 export default async function AdminConsentsPage() {
   await guardPage("content");
 
-  const templates = await prisma.consentTemplate.findMany({
-    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-    include: { _count: { select: { signatures: true } } },
-  });
+  const [templates, services] = await Promise.all([
+    prisma.consentTemplate.findMany({
+      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+      include: {
+        _count: { select: { signatures: true } },
+        services: { select: { service: { select: { id: true, title: true } } } },
+      },
+    }),
+    prisma.service.findMany({
+      where: { isActive: true },
+      select: { id: true, title: true },
+      orderBy: { order: "asc" },
+    }),
+  ]);
 
   return (
     <>
       <AdminPageHeader
         title="رضایت‌نامه‌ها"
         description="متن‌هایی که پیش از درمان امضا می‌شوند. امضا در پرونده‌ی هر مشتری گرفته می‌شود."
-        action={<ConsentTemplateForm />}
+        action={<ConsentTemplateForm services={services} />}
       />
 
       {templates.length === 0 ? (
@@ -49,6 +59,23 @@ export default async function AdminConsentsPage() {
                       ? `${toFa(t._count.signatures)} بار امضا شده`
                       : "هنوز امضا نشده"}
                   </p>
+
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    {t.services.length === 0 ? (
+                      <span className="text-xs text-[color:var(--fg-muted)]">
+                        عمومی — برای همه‌ی مراجعین پیشنهاد می‌شود
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-xs text-[color:var(--fg-muted)]">مخصوص:</span>
+                        {t.services.map((x) => (
+                          <Badge key={x.service.id} tone="rose">
+                            {x.service.title}
+                          </Badge>
+                        ))}
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
@@ -60,7 +87,9 @@ export default async function AdminConsentsPage() {
                       body: t.body,
                       order: t.order,
                       isActive: t.isActive,
+                      serviceIds: t.services.map((x) => x.service.id),
                     }}
+                    services={services}
                   />
                   <ActionButton
                     action={toggleConsentTemplate.bind(null, t.id)}

@@ -20,6 +20,8 @@ export type DayBlock = {
   timeLabel: string;
   paidTotal: number;
   hasPaid: boolean;
+  /** رضایت‌نامه‌ی مخصوص این خدمت را امضا نکرده است */
+  needsConsent: string[];
 };
 
 export type DayOff = {
@@ -92,6 +94,9 @@ export async function buildDaySchedule(dateKey: string): Promise<DaySchedule> {
     }),
   ]);
 
+  // رضایت‌نامه‌های امضانشده‌ی مراجعین امروز — منشی باید پیش از شروع کار ببیند
+  const needsConsentByAppointment = await unsignedConsentsForDay(appointments);
+
   const minutes = (d: Date, fallback: number) => {
     if (d < dayStart) return 0;
     if (d > dayEnd) return 24 * 60;
@@ -133,6 +138,7 @@ export async function buildDaySchedule(dateKey: string): Promise<DaySchedule> {
             ).padStart(2, "0")}`,
             paidTotal,
             hasPaid: paidTotal > 0,
+            needsConsent: needsConsentByAppointment.get(a.id) ?? [],
           };
         }),
       offs: staffOffs.map((o) => ({
@@ -185,6 +191,7 @@ export async function buildDaySchedule(dateKey: string): Promise<DaySchedule> {
           ).padStart(2, "0")}`,
           paidTotal,
           hasPaid: paidTotal > 0,
+          needsConsent: needsConsentByAppointment.get(a.id) ?? [],
         };
       }),
     });
@@ -209,4 +216,40 @@ export async function buildDaySchedule(dateKey: string): Promise<DaySchedule> {
       ),
     },
   };
+}
+
+/**
+ * برای هر نوبت روز، عنوان رضایت‌نامه‌هایی که مخصوص همان خدمت‌اند و مراجعه‌کننده
+ * هنوز امضایشان نکرده. با سه کوئری ثابت انجام می‌شود، نه یکی به‌ازای هر نوبت.
+ */
+async function unsignedConsentsForDay(
+  appointments: Array<{ id: string; customerId: string; serviceId: string }>,
+): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>();
+  if (appointments.length === 0) return result;
+
+  const serviceIds = [...new Set(appointments.map((a) => a.serviceId))];
+  const customerIds = [...new Set(appointments.map((a) => a.customerId))];
+
+  const links = await prisma.consentTemplateService.findMany({
+    where: { serviceId: { in: serviceIds }, template: { isActive: true } },
+    select: { serviceId: true, templateId: true, template: { select: { title: true } } },
+  });
+  if (links.length === 0) return result;
+
+  const signatures = await prisma.consentSignature.findMany({
+    where: { customerId: { in: customerIds }, templateId: { in: links.map((l) => l.templateId) } },
+    select: { customerId: true, templateId: true },
+  });
+  const signed = new Set(signatures.map((s) => `${s.customerId}|${s.templateId}`));
+
+  for (const appt of appointments) {
+    const missing = links
+      .filter((l) => l.serviceId === appt.serviceId)
+      .filter((l) => !signed.has(`${appt.customerId}|${l.templateId}`))
+      .map((l) => l.template.title);
+    if (missing.length > 0) result.set(appt.id, [...new Set(missing)]);
+  }
+
+  return result;
 }

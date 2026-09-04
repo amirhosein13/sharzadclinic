@@ -58,9 +58,22 @@ export async function saveConsentTemplate(formData: FormData): Promise<FormResul
       isActive: v.isActive ?? false,
     };
 
+    // خدمات مرتبط: خالی یعنی رضایت‌نامه‌ی عمومی
+    const serviceIds = formData
+      .getAll("serviceIds")
+      .filter((v): v is string => typeof v === "string" && v !== "");
+
     const saved = id
       ? await prisma.consentTemplate.update({ where: { id }, data })
       : await prisma.consentTemplate.create({ data });
+
+    await prisma.$transaction([
+      prisma.consentTemplateService.deleteMany({ where: { templateId: saved.id } }),
+      prisma.consentTemplateService.createMany({
+        data: serviceIds.map((serviceId) => ({ templateId: saved.id, serviceId })),
+        skipDuplicates: true,
+      }),
+    ]);
 
     await logAction({ action: id ? "update" : "create", entity: "consentTemplate", entityId: saved.id });
     revalidatePath("/admin/consents");

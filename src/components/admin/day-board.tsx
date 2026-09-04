@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Phone, X } from "lucide-react";
+import { FileSignature, Phone, X } from "lucide-react";
 import { StatusSelect } from "@/components/admin/status-select";
 import { STATUS_META } from "@/lib/appointment-status";
 import { Badge } from "@/components/ui/badge";
@@ -164,6 +164,15 @@ export function DayBoard({
                         {formatToman(block.paidTotal, false)}
                       </span>
                     )}
+                    {block.needsConsent.length > 0 && (
+                      <span
+                        title={`رضایت‌نامه‌ی امضانشده: ${block.needsConsent.join("، ")}`}
+                        className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-300"
+                      >
+                        <FileSignature className="size-3 shrink-0" />
+                        رضایت‌نامه ندارد
+                      </span>
+                    )}
                   </button>
                 ))}
 
@@ -225,6 +234,19 @@ export function DayBoard({
                 </span>
               )}
             </div>
+
+            {selected.needsConsent.length > 0 && (
+              <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-sm leading-7 text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
+                <b>پیش از شروع، رضایت‌نامه بگیرید:</b> {selected.needsConsent.join("، ")}
+                <br />
+                <Link
+                  href={`/admin/customers/${selected.customerId}`}
+                  className="underline underline-offset-4"
+                >
+                  رفتن به پرونده‌ی مراجعه‌کننده
+                </Link>
+              </div>
+            )}
 
             {(selected.note || selected.adminNote) && (
               <div className="mt-4 space-y-2">
