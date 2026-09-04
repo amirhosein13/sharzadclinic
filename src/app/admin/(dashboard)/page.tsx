@@ -1,11 +1,15 @@
 import Link from "next/link";
 import {
-  ArrowLeft, CalendarDays, CircleCheck, Clock, MessageSquare, TrendingUp, Users, Wallet,
+  ArrowLeft, BellRing, CalendarDays, CircleCheck, Clock, MessageSquare, TrendingUp, Users, Wallet,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { AppointmentsChart } from "@/components/admin/revenue-chart";
+import { SetupChecklist } from "@/components/admin/setup-checklist";
+import { getAttentionItems } from "@/lib/attention";
+import { getSetupStatus } from "@/lib/setup-status";
+import { can } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_META } from "@/lib/appointment-status";
 import { formatJalaliWithWeekday, formatTime, timeAgoFa } from "@/lib/date";
@@ -26,7 +30,7 @@ export default async function AdminDashboard() {
 
   const [
     todayCount, pendingCount, customerCount, monthRevenue,
-    upcoming, recentMessages, monthlyAppointments,
+    upcoming, recentMessages, monthlyAppointments, attention, setup,
   ] = await Promise.all([
     prisma.appointment.count({ where: { startsAt: { gte: todayStart, lt: todayEnd } } }),
     prisma.appointment.count({ where: { status: "PENDING" } }),
@@ -46,6 +50,8 @@ export default async function AdminDashboard() {
       where: { createdAt: { gte: monthStart } },
       select: { createdAt: true },
     }),
+    getAttentionItems(user.role),
+    can(user.role, "settings") ? getSetupStatus() : null,
   ]);
 
   // نمودار ۱۴ روز اخیر
@@ -71,8 +77,70 @@ export default async function AdminDashboard() {
     <>
       <AdminPageHeader
         title={`سلام ${user?.name.split(" ")[0]} 👋`}
-        description="خلاصه‌ی وضعیت کلینیک در یک نگاه."
+        description="امروز چه چیزی از شما کار می‌خواهد."
       />
+
+      {setup && !setup.allDone && (
+        <SetupChecklist
+          steps={setup.steps}
+          done={setup.done}
+          total={setup.total}
+          allDone={setup.allDone}
+        />
+      )}
+
+      {attention.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-4 flex items-center gap-2 font-bold">
+            <BellRing className="size-[18px] text-rose-500" />
+            امروز این‌ها کار می‌خواهند
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {attention.map((item) => (
+              <Link
+                key={item.key}
+                href={item.href}
+                className={
+                  item.severity === "high"
+                    ? "group flex items-center gap-4 rounded-2xl border border-red-300 bg-red-50 p-4 transition-colors hover:bg-red-100 dark:border-red-400/30 dark:bg-red-500/10 dark:hover:bg-red-500/15"
+                    : "group flex items-center gap-4 rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-4 transition-colors hover:bg-[color:var(--bg-sunken)]"
+                }
+              >
+                <span
+                  className={
+                    item.severity === "high"
+                      ? "grid size-11 shrink-0 place-items-center rounded-xl bg-red-500 text-lg font-extrabold text-white"
+                      : "grid size-11 shrink-0 place-items-center rounded-xl bg-[color:var(--bg-sunken)] text-lg font-extrabold"
+                  }
+                >
+                  {toFa(item.count)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{item.label}</span>
+                  <span className="mt-0.5 block text-xs leading-6 text-[color:var(--fg-muted)]">
+                    {item.hint}
+                  </span>
+                </span>
+                <ArrowLeft className="size-4 shrink-0 text-[color:var(--fg-muted)] transition-transform group-hover:-translate-x-1" />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {attention.length === 0 && setup?.allDone !== false && (
+        <div className="mb-6 flex items-center gap-4 rounded-3xl border border-emerald-300 bg-emerald-50 p-6 dark:border-emerald-400/30 dark:bg-emerald-500/10">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-500 text-white">
+            <CircleCheck className="size-5" />
+          </span>
+          <div>
+            <p className="font-bold">همه‌چیز مرتب است</p>
+            <p className="mt-1 text-sm text-[color:var(--fg-muted)]">
+              کار معوقی نمانده. روز خوبی داشته باشید.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (

@@ -20,8 +20,21 @@ export type Breakdown = {
   revenue: number;
 };
 
+/** مقایسه با دوره‌ی قبلیِ هم‌اندازه */
+export type Comparison = {
+  revenue: number;
+  sessions: number;
+  newCustomers: number;
+  /** درصد تغییر نسبت به دوره‌ی قبل؛ null یعنی دوره‌ی قبل صفر بوده */
+  revenueChange: number | null;
+  sessionsChange: number | null;
+  newCustomersChange: number | null;
+  label: string;
+};
+
 export type ReportData = {
   range: ReportRange;
+  previous: Comparison | null;
   revenue: number;
   paymentCount: number;
   /** میانگین مبلغ هر پرداخت */
@@ -115,6 +128,13 @@ export async function buildReport(range: ReportRange): Promise<ReportData> {
   ]);
 
   const revenue = payments.reduce((sum, p) => sum + p.amount, 0);
+
+  // دوره‌ی قبلیِ هم‌اندازه، درست پیش از این بازه
+  const previous = await comparePrevious(range, {
+    revenue,
+    sessions: appointments.filter((a) => a.status === "DONE").length,
+    newCustomers,
+  });
 
   /* ── نوبت‌ها ─────────────────────────────────────────────── */
   const done = appointments.filter((a) => a.status === "DONE").length;
@@ -223,6 +243,7 @@ export async function buildReport(range: ReportRange): Promise<ReportData> {
 
   return {
     range,
+    previous,
     revenue,
     paymentCount: payments.length,
     averageTicket: payments.length ? Math.round(revenue / payments.length) : 0,
@@ -293,4 +314,46 @@ export function resolveRange(key: RangeKey): ReportRange {
     default:
       return { from: thisMonth.from, to: thisMonth.to, label: thisMonth.label };
   }
+}
+
+const changeOf = (now: number, before: number): number | null =>
+  before > 0 ? Math.round(((now - before) / before) * 100) : null;
+
+/**
+ * همان بازه، ولی درست قبلش. «۱۲٪ بیشتر از ماه قبل» خیلی گویاتر از یک
+ * عدد خالی است. اگر بازه از ابتدای تاریخ باشد، مقایسه معنی ندارد.
+ */
+async function comparePrevious(
+  range: ReportRange,
+  current: { revenue: number; sessions: number; newCustomers: number },
+): Promise<Comparison | null> {
+  const span = range.to.getTime() - range.from.getTime();
+  // بازه‌ی «از ابتدا» دوره‌ی قبلی ندارد
+  if (span <= 0 || span > 400 * 86_400_000) return null;
+
+  const prevTo = new Date(range.from.getTime() - 1);
+  const prevFrom = new Date(prevTo.getTime() - span);
+
+  const [payments, sessions, newCustomers] = await Promise.all([
+    prisma.payment.aggregate({
+      where: { status: "PAID", paidAt: { gte: prevFrom, lte: prevTo } },
+      _sum: { amount: true },
+    }),
+    prisma.appointment.count({
+      where: { status: "DONE", startsAt: { gte: prevFrom, lte: prevTo } },
+    }),
+    prisma.customer.count({ where: { createdAt: { gte: prevFrom, lte: prevTo } } }),
+  ]);
+
+  const revenue = payments._sum.amount ?? 0;
+
+  return {
+    revenue,
+    sessions,
+    newCustomers,
+    revenueChange: changeOf(current.revenue, revenue),
+    sessionsChange: changeOf(current.sessions, sessions),
+    newCustomersChange: changeOf(current.newCustomers, newCustomers),
+    label: `${formatJalali(prevFrom)} تا ${formatJalali(prevTo)}`,
+  };
 }

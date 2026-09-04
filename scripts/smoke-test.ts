@@ -21,7 +21,12 @@ import { buildProfit } from "../src/lib/expenses";
 import { openTicket, replyAsCustomer } from "../src/app/actions/tickets";
 import { customerUnreadCount, isUrgent } from "../src/lib/tickets";
 import { generateFollowUps } from "../src/lib/followups";
+import { checkLoginAllowed, recordFailedLogin, MAX_ATTEMPTS } from "../src/lib/login-guard";
+import { searchEverything } from "../src/lib/search";
+import { getSetupStatus } from "../src/lib/setup-status";
+import { getAttentionItems } from "../src/lib/attention";
 import { consumeForService, lowStockItems, recordMovement } from "../src/lib/inventory";
+import { toFa } from "../src/lib/utils";
 
 const prisma = new PrismaClient();
 
@@ -37,6 +42,12 @@ async function main() {
     console.log(`${pass ? "✅" : "❌"} ${name}`);
     if (!pass) failures++;
   };
+
+  // اگر اجرای قبلی وسط کار خطا خورده باشد، ته‌مانده‌اش نباید اجرای بعدی را خراب کند
+  await prisma.appointment.deleteMany({
+    where: { OR: [{ source: "smoke" }, { customer: { phone: "09129998877" } }] },
+  });
+  await prisma.customer.deleteMany({ where: { phone: "09129998877" } });
 
   const service = await prisma.service.findUniqueOrThrow({ where: { slug: "laser" } });
   const d = new Date(); d.setDate(d.getDate() + 5);
@@ -867,6 +878,83 @@ async function main() {
 
   await prisma.supportTicket.deleteMany({ where: { customerId: tkCustomer.id } });
   await prisma.customer.delete({ where: { id: tkCustomer.id } });
+
+  // ── قفل ورود پس از تلاش‌های ناموفق ──────────────────────────
+  const LG_EMAIL = "smoke-login@example.com";
+  await prisma.auditLog.deleteMany({
+    where: { action: { in: ["login", "login.failed"] }, detail: LG_EMAIL },
+  });
+
+  check("ابتدا ورود باز است", (await checkLoginAllowed(LG_EMAIL)).allowed);
+
+  for (let i = 0; i < MAX_ATTEMPTS - 1; i++) await recordFailedLogin(LG_EMAIL);
+  check(
+    `تا ${toFa(MAX_ATTEMPTS - 1)} تلاش ناموفق هنوز باز است`,
+    (await checkLoginAllowed(LG_EMAIL)).allowed
+  );
+
+  await recordFailedLogin(LG_EMAIL);
+  const locked = await checkLoginAllowed(LG_EMAIL);
+  check(
+    `پس از ${toFa(MAX_ATTEMPTS)} تلاش ناموفق قفل می‌شود`,
+    !locked.allowed && locked.message.includes("دقیقه")
+  );
+
+  check(
+    "قفل فقط برای همان ایمیل است",
+    (await checkLoginAllowed("smoke-other@example.com")).allowed
+  );
+
+  await prisma.auditLog.create({
+    data: { action: "login", entity: "User", detail: LG_EMAIL },
+  });
+  check("ورود موفق شمارنده را از نو شروع می‌کند", (await checkLoginAllowed(LG_EMAIL)).allowed);
+
+  await prisma.auditLog.deleteMany({
+    where: { action: { in: ["login", "login.failed"] }, detail: LG_EMAIL },
+  });
+
+  // ── جستجوی سراسری ───────────────────────────────────────────
+  const SR_PHONE = "09125558822";
+  await prisma.customer.deleteMany({ where: { phone: SR_PHONE } });
+  const srCustomer = await prisma.customer.create({
+    data: { firstName: "نازنین", lastName: "جستجویی", phone: SR_PHONE },
+  });
+
+  check("جستجو با نام", (await searchEverything("نازنین")).some((h) => h.id === srCustomer.id));
+  check(
+    "جستجو با شماره‌ی موبایل",
+    (await searchEverything("09125558822")).some((h) => h.id === srCustomer.id)
+  );
+  check(
+    "جستجو با ارقام فارسی",
+    (await searchEverything("۰۹۱۲۵۵۵۸۸۲۲")).some((h) => h.id === srCustomer.id)
+  );
+  check("جستجوی یک‌حرفی نتیجه نمی‌دهد", (await searchEverything("ن")).length === 0);
+
+  await prisma.customer.delete({ where: { id: srCustomer.id } });
+
+  // ── راهنمای راه‌اندازی و فهرست کارها ────────────────────────
+  const setup = await getSetupStatus();
+  check(
+    `راهنمای راه‌اندازی ${toFa(setup.total)} گام دارد`,
+    setup.total >= 8 && setup.done <= setup.total
+  );
+  check(
+    "گام‌های ضروری علامت‌گذاری شده‌اند",
+    setup.steps.some((step) => step.critical) && setup.steps.every((step) => !!step.href)
+  );
+
+  const adminItems = await getAttentionItems("ADMIN");
+  const operatorItems = await getAttentionItems("OPERATOR");
+  check(
+    "فهرست کارها بر اساس نقش فیلتر می‌شود",
+    operatorItems.length <= adminItems.length
+  );
+  check(
+    "هر مورد فهرست کارها عدد و لینک دارد",
+    adminItems.every((item) => item.count > 0 && item.href.startsWith("/admin"))
+  );
 
   await prisma.appointment.deleteMany({ where: { source: "smoke" } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });

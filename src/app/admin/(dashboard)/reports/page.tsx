@@ -26,16 +26,63 @@ function Share({ value, max }: { value: number; max: number }) {
   );
 }
 
+/** «۱۲٪ بیشتر از دوره‌ی قبل» — عدد خالی معنی ندارد، مقایسه دارد */
+function Delta({
+  change,
+  label,
+  before,
+  now,
+}: {
+  change: number | null;
+  label: string;
+  before: number;
+  now: number;
+}) {
+  // درصدِ رشد از صفر معنی ندارد، ولی «دوره‌ی قبل صفر بود» خودش خبر است
+  if (change === null) {
+    if (before !== 0 || now <= 0) return null;
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300"
+        title={`نسبت به ${label}`}
+      >
+        <TrendingUp className="size-3" />
+        دوره‌ی قبل چیزی ثبت نشده بود
+      </span>
+    );
+  }
+  const up = change > 0;
+  const flat = change === 0;
+
+  return (
+    <span
+      className={
+        flat
+          ? "inline-flex items-center gap-1 text-[11px] font-medium text-[color:var(--fg-muted)]"
+          : up
+            ? "inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300"
+            : "inline-flex items-center gap-1 text-[11px] font-medium text-red-600 dark:text-red-300"
+      }
+      title={`نسبت به ${label}`}
+    >
+      {flat ? null : up ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+      {flat ? "بدون تغییر" : `${toFa(Math.abs(change))}٪ ${up ? "بیشتر" : "کمتر"} از دوره‌ی قبل`}
+    </span>
+  );
+}
+
 function Stat({
   icon: Icon,
   label,
   value,
   hint,
+  delta,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
   hint?: string;
+  delta?: React.ReactNode;
 }) {
   return (
     <Card>
@@ -43,6 +90,7 @@ function Stat({
         <div className="min-w-0">
           <p className="text-xs text-[color:var(--fg-muted)]">{label}</p>
           <p className="mt-2 text-xl font-extrabold">{value}</p>
+          {delta && <p className="mt-1.5">{delta}</p>}
           {hint && <p className="mt-1.5 text-[11px] text-[color:var(--fg-muted)]">{hint}</p>}
         </div>
         <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 text-white">
@@ -122,12 +170,32 @@ export default async function ReportsPage({
               icon={Wallet}
               label="درآمد ثبت‌شده"
               value={formatToman(report.revenue)}
+              delta={
+                report.previous && (
+                  <Delta
+                    change={report.previous.revenueChange}
+                    label={report.previous.label}
+                    before={report.previous.revenue}
+                    now={report.revenue}
+                  />
+                )
+              }
               hint={`${toFa(report.paymentCount)} پرداخت • میانگین ${formatToman(report.averageTicket)}`}
             />
             <Stat
               icon={TrendingUp}
               label="جلسات انجام‌شده"
               value={toFa(report.appointments.done)}
+              delta={
+                report.previous && (
+                  <Delta
+                    change={report.previous.sessionsChange}
+                    label={report.previous.label}
+                    before={report.previous.sessions}
+                    now={report.appointments.done}
+                  />
+                )
+              }
               hint={`از ${toFa(report.appointments.total)} نوبت این بازه`}
             />
             <Stat
@@ -140,6 +208,16 @@ export default async function ReportsPage({
               icon={UserPlus}
               label="مشتری جدید"
               value={toFa(report.customers.newCount)}
+              delta={
+                report.previous && (
+                  <Delta
+                    change={report.previous.newCustomersChange}
+                    label={report.previous.label}
+                    before={report.previous.newCustomers}
+                    now={report.customers.newCount}
+                  />
+                )
+              }
               hint={`${toFa(report.customers.returningRate)}٪ از مراجعین این بازه، قبلاً هم آمده‌اند`}
             />
           </div>

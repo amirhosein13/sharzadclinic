@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/admin/sidebar";
+import { GlobalSearch } from "@/components/admin/global-search";
 import { can } from "@/lib/permissions";
 import { lowStockCount } from "@/lib/inventory";
 import { openTicketCount } from "@/lib/tickets";
@@ -53,7 +54,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
         }}
       />
       <div className="min-w-0 flex-1">
-        <div className="mx-auto max-w-7xl p-5 sm:p-8">{children}</div>
+        <div className="mx-auto max-w-7xl p-5 sm:p-8">
+          {can(user.role, "customers") && (
+            <div className="mb-6 max-w-xl">
+              <GlobalSearch />
+            </div>
+          )}
+          {children}
+        </div>
       </div>
     </div>
   );
