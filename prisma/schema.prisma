@@ -44,6 +44,7 @@ model User {
   ticketMessages TicketMessage[]
 
   cashCloses CashClose[]
+  campaigns  Campaign[]
 
   @@map("users")
 }
@@ -90,6 +91,9 @@ model Customer {
   referralSource String?
   /// کد اختصاصی این مشتری برای معرفی دوستان. با اولین نیاز ساخته می‌شود.
   referralCode   String? @unique
+  /// «پیامک تبلیغاتی برایم نفرست». پیامک‌های ضروری (کد ورود، یادآوری نوبت)
+  /// را تحت تأثیر قرار نمی‌دهد.
+  smsOptOut      Boolean @default(false)
   /// توضیح آزاد، مثلاً نام معرف
   referralNote   String?
   isBlocked    Boolean   @default(false)
@@ -110,6 +114,7 @@ model Customer {
 
   referralsMade     Referral[] @relation("Referrer")
   referralReceived  Referral?  @relation("Referred")
+  campaignMessages  CampaignRecipient[]
 
   @@index([lastName, firstName])
   @@index([createdAt])
@@ -1088,4 +1093,63 @@ model Referral {
   @@index([referrerId])
   @@index([status])
   @@map("referrals")
+}
+
+// ─── پیامک گروهی ───────────────────────────────────────────────
+
+enum CampaignStatus {
+  DRAFT
+  SENDING
+  DONE
+  CANCELLED
+}
+
+/// یک ارسال گروهی. گیرنده‌ها هنگام شروع «قفل» می‌شوند تا اگر ارسال نیمه‌کاره
+/// ماند، ادامه‌اش کسی را دوباره پیامک نکند.
+model Campaign {
+  id      String @id @default(cuid())
+  title   String
+  message String
+
+  /// فیلترِ انتخاب گروه، همان‌طور که کاربر انتخاب کرده
+  serviceId       String?
+  inactiveMonths  Int?
+  onlyWithVisits  Boolean @default(false)
+
+  status CampaignStatus @default(DRAFT)
+
+  total   Int @default(0)
+  sent    Int @default(0)
+  failed  Int @default(0)
+  skipped Int @default(0)
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  recipients CampaignRecipient[]
+
+  @@index([status])
+  @@map("campaigns")
+}
+
+model CampaignRecipient {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  /// queued | sent | failed
+  status String  @default("queued")
+  error  String?
+  sentAt DateTime?
+
+  /// یک نفر در یک کمپین فقط یک بار
+  @@unique([campaignId, customerId])
+  @@index([campaignId, status])
+  @@map("campaign_recipients")
 }

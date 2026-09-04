@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Boxes, CalendarDays, Coins, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Gift, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
+import { BarChart3, Boxes, CalendarDays, Coins, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Gift, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, Megaphone, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, TicketPercent, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -46,6 +46,7 @@ const NAV: {
   { href: "/admin/tickets", label: "گفت‌وگو با مشتری", icon: MessagesSquare, permission: "messages", badgeKey: "openTickets" },
   { href: "/admin/messages", label: "پیام‌ها", icon: MessageSquare, permission: "messages", badgeKey: "unreadMessages" },
   { href: "/admin/users", label: "کاربران", icon: Users, permission: "users" },
+  { href: "/admin/campaigns", label: "پیامک گروهی", icon: Megaphone, permission: "notifications" },
   { href: "/admin/notifications", label: "پیامک و ایمیل", icon: Send, permission: "notifications" },
   { href: "/admin/settings", label: "تنظیمات", icon: Settings, permission: "settings" },
   { href: "/admin/backup", label: "پشتیبان‌گیری", icon: DatabaseBackup, permission: "settings", adminOnly: true },

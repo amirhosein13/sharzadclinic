@@ -66,8 +66,8 @@ export const AUDIT_GROUPS: AuditGroup[] = [
   {
     key: "content",
     label: "محتوا و خدمات",
-    actions: ["service.create", "service.update"],
-    entities: ["Service", "Post", "GalleryItem", "Testimonial", "Staff"],
+    actions: ["service.create", "service.update", "campaign.create", "campaign.send", "campaign.cancel"],
+    entities: ["Service", "Post", "GalleryItem", "Testimonial", "Staff", "Campaign"],
   },
   { key: "settings", label: "تنظیمات", actions: ["settings.save"], entities: ["Setting"] },
 ];
@@ -99,6 +99,9 @@ const ACTION_LABELS: Record<string, string> = {
   "stock.adjust": "اصلاح موجودی انبار",
   "cash.close": "بستن صندوق",
   "cash.reopen": "بازکردن دوباره‌ی صندوق",
+  "campaign.create": "ساخت پیش‌نویس پیامک گروهی",
+  "campaign.send": "شروع ارسال پیامک گروهی",
+  "campaign.cancel": "توقف پیامک گروهی",
   "backup.create": "گرفتن نسخه‌ی پشتیبان",
   "backup.download": "دانلود نسخه‌ی پشتیبان",
   "backup.restore": "بازگردانی از پشتیبان",
@@ -129,6 +132,7 @@ const ENTITY_LABELS: Record<string, string> = {
   Setting: "تنظیمات",
   Backup: "پشتیبان",
   CashClose: "صندوق",
+  Campaign: "پیامک گروهی",
   FollowUp: "پیگیری",
 };
 
@@ -157,6 +161,7 @@ export function toneOf(action: string): "red" | "amber" | "plain" {
   if (action === "delete" || action.endsWith(".delete")) return "red";
   if (action === "customer.block") return "amber";
   if (action === "cash.reopen") return "amber";
+  if (action === "campaign.send") return "amber";
   return "plain";
 }
 

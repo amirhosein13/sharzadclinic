@@ -8,6 +8,7 @@ import { activePackages } from "@/lib/packages";
 import { getSettings } from "@/lib/settings";
 import { referralSummary } from "@/lib/referrals";
 import { ReferralCard } from "@/components/site/referral-card";
+import { SmsPreference } from "@/components/site/sms-preference";
 import { isZarinpalConfigured } from "@/lib/zarinpal";
 import { customerLogout } from "@/app/actions/customer";
 import { PageHero } from "@/components/site/page-hero";
@@ -388,6 +389,8 @@ export default async function AccountPage() {
                 phone={customer.phone}
               />
             </div>
+
+            <SmsPreference optedOut={customer.smsOptOut} />
 
             {customer.feedbacks.length > 0 && (
               <div className="rounded-4xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-7 shadow-soft">

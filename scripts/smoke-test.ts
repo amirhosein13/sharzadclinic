@@ -35,6 +35,9 @@ import { consumeForService, lowStockItems, recordMovement } from "../src/lib/inv
 import { toFa } from "../src/lib/utils";
 import { missingConsents } from "../src/lib/consents";
 import { listAudit } from "../src/lib/audit";
+import {
+  audienceWhere, decorateMessage, sendBatch, startCampaign,
+} from "../src/lib/campaigns";
 import { buildCashDay, closeCashDay, recentCloses, unclosedDays } from "../src/lib/cash";
 
 const prisma = new PrismaClient();
@@ -1328,6 +1331,141 @@ async function main() {
   await prisma.customer.deleteMany({
     where: { id: { in: [referrer.id, referred.id, oldCustomer.id] } },
   });
+
+
+  // ── پیامک گروهی ─────────────────────────────────────────────
+  const CAMP_PHONES = ["09129990081", "09129990082", "09129990083", "09129990084"];
+  await prisma.campaignRecipient.deleteMany({
+    where: { customer: { phone: { in: CAMP_PHONES } } },
+  });
+  await prisma.campaign.deleteMany({ where: { title: { startsWith: "SMOKE-CAMP" } } });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: { in: CAMP_PHONES } } } });
+  await prisma.customer.deleteMany({ where: { phone: { in: CAMP_PHONES } } });
+
+  const campOtherService = await prisma.service.findFirstOrThrow({ where: { slug: "botox" } });
+  const longAgo = new Date();
+  longAgo.setMonth(longAgo.getMonth() - 8);
+  const recently = new Date(Date.now() - 5 * 86_400_000);
+
+  // ۱: لیزر، خیلی وقت است نیامده  ← باید بیاید
+  // ۲: لیزر، تازه آمده             ← با فیلتر «۶ ماه» نباید بیاید
+  // ۳: بوتاکس، خیلی وقت است نیامده ← با فیلتر لیزر نباید بیاید
+  // ۴: لیزر، خیلی وقت است نیامده، ولی انصراف داده ← هیچ‌وقت نباید بیاید
+  const campCustomers = await Promise.all(
+    [
+      { phone: CAMP_PHONES[0], serviceId: service.id, when: longAgo, optOut: false },
+      { phone: CAMP_PHONES[1], serviceId: service.id, when: recently, optOut: false },
+      { phone: CAMP_PHONES[2], serviceId: campOtherService.id, when: longAgo, optOut: false },
+      { phone: CAMP_PHONES[3], serviceId: service.id, when: longAgo, optOut: true },
+    ].map(async (row, index) => {
+      const c = await prisma.customer.create({
+        data: {
+          firstName: "گروهی",
+          lastName: `آزمایشی${index}`,
+          phone: row.phone,
+          smsOptOut: row.optOut,
+        },
+      });
+      await prisma.appointment.create({
+        data: {
+          code: `SMOKE-CAMP${index}`,
+          customerId: c.id,
+          serviceId: row.serviceId,
+          startsAt: row.when,
+          endsAt: new Date(row.when.getTime() + 3_600_000),
+          status: "DONE",
+          source: "smoke",
+        },
+      });
+      return c;
+    }),
+  );
+  const campIds = campCustomers.map((c) => c.id);
+  const inGroup = async (filter: Parameters<typeof audienceWhere>[0]) => {
+    const rows = await prisma.customer.findMany({
+      where: { AND: [audienceWhere(filter), { id: { in: campIds } }] },
+      select: { id: true },
+    });
+    return new Set(rows.map((r) => r.id));
+  };
+
+  const laserInactive = await inGroup({ serviceId: service.id, inactiveMonths: 6 });
+  check("مشتریِ همان خدمت که مدت‌هاست نیامده انتخاب می‌شود", laserInactive.has(campIds[0]));
+  check("مشتریِ تازه‌آمده در فیلتر «۶ ماه» نمی‌آید", !laserInactive.has(campIds[1]));
+  check("مشتریِ خدمت دیگر انتخاب نمی‌شود", !laserInactive.has(campIds[2]));
+  check("کسی که انصراف داده هرگز انتخاب نمی‌شود", !laserInactive.has(campIds[3]));
+
+  const everyone = await inGroup({ onlyWithVisits: true });
+  check("بدون فیلتر خدمت، بقیه هم می‌آیند", everyone.has(campIds[1]) && everyone.has(campIds[2]));
+  check("انصراف حتی بدون فیلتر هم رعایت می‌شود", !everyone.has(campIds[3]));
+
+  // مشتریِ محدودشده هم نباید بیاید
+  await prisma.customer.update({ where: { id: campIds[0] }, data: { isBlocked: true } });
+  check("مشتری محدودشده انتخاب نمی‌شود", !(await inGroup({ onlyWithVisits: true })).has(campIds[0]));
+  await prisma.customer.update({ where: { id: campIds[0] }, data: { isBlocked: false } });
+
+  // متن باید راهنمای انصراف بگیرد
+  const decorated = await decorateMessage("سلام، این ماه تخفیف داریم");
+  check("راهنمای انصراف به متن اضافه می‌شود", decorated.includes("انصراف از پیامک"));
+
+  // ساخت و اجرای یک کمپین واقعی روی همین گروه
+  const campaign = await prisma.campaign.create({
+    data: {
+      title: "SMOKE-CAMP آزمایشی",
+      message: decorated,
+      serviceId: service.id,
+      inactiveMonths: 6,
+    },
+  });
+
+  const started = await startCampaign(campaign.id);
+  check("شروع کمپین گیرنده‌ها را قفل می‌کند", started.ok);
+
+  const queued = await prisma.campaignRecipient.findMany({
+    where: { campaignId: campaign.id },
+    select: { customerId: true },
+  });
+  const queuedIds = new Set(queued.map((r) => r.customerId));
+  check("فقط افراد واجد شرایط در صف‌اند", queuedIds.has(campIds[0]) && !queuedIds.has(campIds[3]));
+
+  // شروع دوباره نباید ممکن باشد
+  const restart = await startCampaign(campaign.id);
+  check("کمپینِ شروع‌شده دوباره شروع نمی‌شود", !restart.ok);
+
+  const batch = await sendBatch(campaign.id, 50);
+  check(`دسته‌ی اول فرستاده شد (${batch.sent})`, batch.sent >= 1);
+  check("چیزی در صف نماند", batch.remaining === 0);
+
+  const finished = await prisma.campaign.findUniqueOrThrow({ where: { id: campaign.id } });
+  check("کمپین تمام‌شده علامت می‌خورد", finished.status === "DONE");
+  check("شمارش ارسال ثبت شد", finished.sent === batch.sent);
+
+  // اجرای دوباره نباید کسی را دوباره پیامک کند
+  const rerun = await sendBatch(campaign.id, 50);
+  check("اجرای دوباره پیامک تکراری نمی‌فرستد", rerun.sent === 0);
+
+  // انصراف بعد از قفل‌شدن فهرست هم باید رعایت شود
+  const campaign2 = await prisma.campaign.create({
+    data: { title: "SMOKE-CAMP دوم", message: decorated, onlyWithVisits: true },
+  });
+  await startCampaign(campaign2.id);
+  await prisma.customer.update({ where: { id: campIds[1] }, data: { smsOptOut: true } });
+  await sendBatch(campaign2.id, 100);
+  const lateOptOut = await prisma.campaignRecipient.findFirst({
+    where: { campaignId: campaign2.id, customerId: campIds[1] },
+  });
+  check(
+    "انصرافِ بعد از قفل‌شدن فهرست هم رعایت می‌شود",
+    lateOptOut?.status === "failed" && lateOptOut.error === "انصراف از پیامک تبلیغاتی"
+  );
+
+  await prisma.campaignRecipient.deleteMany({
+    where: { campaignId: { in: [campaign.id, campaign2.id] } },
+  });
+  await prisma.campaign.deleteMany({ where: { title: { startsWith: "SMOKE-CAMP" } } });
+  await prisma.notificationLog.deleteMany({ where: { recipient: { in: CAMP_PHONES } } });
+  await prisma.appointment.deleteMany({ where: { customerId: { in: campIds } } });
+  await prisma.customer.deleteMany({ where: { id: { in: campIds } } });
 
   // ── بستن صندوق ──────────────────────────────────────────────
   const CASH_PHONE = "09129990055";
