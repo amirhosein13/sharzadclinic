@@ -271,6 +271,8 @@ export const consentTemplateSchema = z.object({
 });
 
 export const consentSignatureSchema = z.object({
+  /// اجازه‌ی انتشار عکس — جدا از خود رضایت‌نامه و کاملاً اختیاری
+  allowPhotoPublish: z.coerce.boolean().optional(),
   customerId: z.string().min(1),
   templateId: z.string().min(1, "رضایت‌نامه را انتخاب کنید"),
   fullName: z.string().trim().min(3, "نام و نام خانوادگی را کامل بنویسید").max(120),

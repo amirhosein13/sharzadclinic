@@ -94,6 +94,10 @@ model Customer {
   /// «پیامک تبلیغاتی برایم نفرست». پیامک‌های ضروری (کد ورود، یادآوری نوبت)
   /// را تحت تأثیر قرار نمی‌دهد.
   smsOptOut      Boolean @default(false)
+  /// اجازه‌ی انتشار عکس‌های قبل/بعد در سایت.
+  /// null = نپرسیده‌ایم، true = اجازه داده، false = نداده یا پس گرفته.
+  /// وضعیت فعلی این است؛ سند حقوقی‌اش در رضایت‌نامه‌ی امضاشده می‌ماند.
+  photoPublishAllowed Boolean?
   /// توضیح آزاد، مثلاً نام معرف
   referralNote   String?
   isBlocked    Boolean   @default(false)
@@ -406,6 +410,8 @@ model Payment {
 
 model GalleryItem {
   id          String   @id @default(cuid())
+  /// اگر از یک پرونده‌ی درمانی ساخته شده، تا دو بار اضافه نشود
+  treatmentId String?  @unique
   title       String
   description String?
   beforeImage String
@@ -933,6 +939,8 @@ model ConsentSignature {
   signatureData String?
   /// متن رضایت‌نامه در لحظه‌ی امضا، تا تغییر بعدی قالب سند را عوض نکند
   bodySnapshot  String
+  /// در همین امضا، اجازه‌ی انتشار عکس هم داده شد؟ سند این موافقت است.
+  allowPhotoPublish Boolean @default(false)
 
   signedAt  DateTime @default(now())
   createdAt DateTime @default(now())

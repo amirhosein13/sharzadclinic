@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, CalendarDays, FileSignature, FileText, Package as PackageIcon, Phone, Star, Trash2, TriangleAlert, Wallet } from "lucide-react";
+import { ArrowRight, CalendarDays, Camera, FileSignature, FileText, Package as PackageIcon, Phone, Star, Trash2, TriangleAlert, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
@@ -12,6 +12,7 @@ import { WaitlistForm } from "@/components/admin/forms/waitlist-form";
 import { ActionButton } from "@/components/admin/action-button";
 import { deleteTreatment } from "@/app/actions/reception";
 import { deleteConsentSignature } from "@/app/actions/consents";
+import { revokePhotoConsent } from "@/app/actions/photos";
 import { ConsentSignForm } from "@/components/admin/forms/consent-sign-form";
 import { PackageForm } from "@/components/admin/forms/package-form";
 import { PackageCard } from "@/components/admin/package-card";
@@ -406,6 +407,27 @@ export default async function CustomerDetailPage({
                 />
               )}
             </div>
+
+            {/* وضعیت اجازه‌ی انتشار عکس، کنار خود رضایت‌نامه‌ها */}
+            {customer.photoPublishAllowed !== null && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] px-6 py-4">
+                <p className="flex items-center gap-2 text-sm">
+                  <Camera className="size-4 shrink-0 text-[color:var(--fg-muted)]" />
+                  {customer.photoPublishAllowed
+                    ? "اجازه‌ی انتشار عکس قبل/بعد را داده است"
+                    : "اجازه‌ی انتشار عکس نداده یا پس گرفته است"}
+                </p>
+                {customer.photoPublishAllowed && canEditPackages && (
+                  <ActionButton
+                    action={revokePhotoConsent.bind(null, customer.id)}
+                    confirm="اجازه‌ی انتشار پس گرفته شود؟ عکس‌های این مشتری از سایت برداشته می‌شوند."
+                    className="text-xs"
+                  >
+                    پس‌گرفتن اجازه
+                  </ActionButton>
+                )}
+              </div>
+            )}
 
             {unsignedConsents.length > 0 && (
               <div className="border-b border-[color:var(--line)] bg-amber-50 p-5 dark:bg-amber-500/10">

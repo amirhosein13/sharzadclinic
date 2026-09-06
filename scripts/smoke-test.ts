@@ -37,6 +37,9 @@ import { missingConsents } from "../src/lib/consents";
 import { listAudit } from "../src/lib/audit";
 import { buildHealth } from "../src/lib/health";
 import {
+  promoteToGallery, publishCandidates, withdrawPhotoConsent,
+} from "../src/lib/photo-publish";
+import {
   audienceWhere, decorateMessage, sendBatch, startCampaign,
 } from "../src/lib/campaigns";
 import { buildCashDay, closeCashDay, recentCloses, unclosedDays } from "../src/lib/cash";
@@ -63,11 +66,25 @@ async function main() {
   await prisma.customer.deleteMany({ where: { phone: "09129998877" } });
 
   const service = await prisma.service.findUniqueOrThrow({ where: { slug: "laser" } });
-  const d = new Date(); d.setDate(d.getDate() + 5);
-  const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-  const slots = await getAvailableSlots({ serviceId: service.id, dateKey });
-  check(`محاسبه‌ی نوبت‌های خالی برای ${dateKey} (${slots.length} اسلات)`, slots.length > 0);
+  // روز ثابت («۵ روز بعد») بسته به اینکه تست چه روزی اجرا شود ممکن است روی
+  // جمعه بیفتد و کلینیک تعطیل باشد. اولین روزی را برمی‌داریم که واقعاً وقت
+  // خالی دارد، تا تست به روزِ هفته وابسته نباشد.
+  let dateKey = "";
+  let slots: Awaited<ReturnType<typeof getAvailableSlots>> = [];
+  for (let offset = 3; offset <= 17; offset++) {
+    const day = new Date();
+    day.setDate(day.getDate() + offset);
+    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+    const found = await getAvailableSlots({ serviceId: service.id, dateKey: key });
+    if (found.length > 0) {
+      dateKey = key;
+      slots = found;
+      break;
+    }
+  }
+
+  check(`محاسبه‌ی نوبت‌های خالی برای ${dateKey || "هیچ روزی"} (${slots.length} اسلات)`, slots.length > 0);
   if (slots.length === 0) process.exit(1);
 
   const res = await createBooking(fd({
@@ -399,7 +416,7 @@ async function main() {
   await prisma.customer.deleteMany({ where: { phone: WL_PHONE } });
 
   const wlFromKey = dateKey;
-  const wlTo = new Date(d);
+  const wlTo = parseYmdKey(dateKey);
   wlTo.setDate(wlTo.getDate() + 10);
   const wlToKey = `${wlTo.getFullYear()}-${String(wlTo.getMonth() + 1).padStart(2, "0")}-${String(wlTo.getDate()).padStart(2, "0")}`;
 
@@ -1492,6 +1509,83 @@ async function main() {
     "منطقه‌ی زمانی درست تشخیص داده می‌شود",
     healthChecks.find((c) => c.key === "timezone")?.level === "ok"
   );
+
+
+  // ── اجازه‌ی انتشار عکس قبل/بعد ──────────────────────────────
+  const PH_PHONE = "09129990091";
+  await prisma.galleryItem.deleteMany({ where: { treatmentId: { not: null } } });
+  await prisma.treatmentRecord.deleteMany({ where: { customer: { phone: PH_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: PH_PHONE } });
+
+  const phCustomer = await prisma.customer.create({
+    data: { firstName: "عکس", lastName: "آزمایشی", phone: PH_PHONE },
+  });
+  const phTreatment = await prisma.treatmentRecord.create({
+    data: {
+      customerId: phCustomer.id,
+      serviceId: service.id,
+      performedAt: new Date(Date.now() - 86_400_000),
+      beforePhoto: "/api/files/smoke-before.jpg",
+      afterPhoto: "/api/files/smoke-after.jpg",
+    },
+  });
+
+  // بدون اجازه، اصلاً نامزد انتشار نیست
+  const noConsent = await publishCandidates(50);
+  check(
+    "بدون اجازه، عکس نامزد انتشار نمی‌شود",
+    !noConsent.some((c) => c.treatmentId === phTreatment.id)
+  );
+  const blocked = await promoteToGallery(phTreatment.id);
+  check("بدون اجازه، افزودن به گالری رد می‌شود", !blocked.ok);
+
+  // با اجازه
+  await prisma.customer.update({
+    where: { id: phCustomer.id },
+    data: { photoPublishAllowed: true },
+  });
+  const withConsent = await publishCandidates(50);
+  check(
+    "با اجازه، عکس در فهرست نامزدها می‌آید",
+    withConsent.some((c) => c.treatmentId === phTreatment.id)
+  );
+
+  const promoted = await promoteToGallery(phTreatment.id);
+  check("افزودن به گالری انجام می‌شود", promoted.ok);
+
+  const galleryItem = await prisma.galleryItem.findUniqueOrThrow({
+    where: { treatmentId: phTreatment.id },
+  });
+  check("نمونه‌کار به‌صورت منتشرنشده ساخته می‌شود", galleryItem.isPublished === false);
+  check("عنوان نام مشتری را لو نمی‌دهد", !galleryItem.title.includes("عکس آزمایشی"));
+  check("هر دو عکس ثبت شده‌اند", !!galleryItem.beforeImage && !!galleryItem.afterImage);
+
+  // دوباره اضافه نمی‌شود
+  const phDuplicate = await promoteToGallery(phTreatment.id);
+  check("پرونده دو بار به گالری اضافه نمی‌شود", !phDuplicate.ok);
+  const afterPromote = await publishCandidates(50);
+  check(
+    "پرونده‌ی اضافه‌شده دیگر در فهرست نامزدها نیست",
+    !afterPromote.some((c) => c.treatmentId === phTreatment.id)
+  );
+
+  // پس‌گرفتن اجازه باید عکس منتشرشده را از سایت بردارد
+  await prisma.galleryItem.update({
+    where: { id: galleryItem.id },
+    data: { isPublished: true },
+  });
+  const hidden = await withdrawPhotoConsent(phCustomer.id);
+  check(`پس‌گرفتن اجازه، عکس را از سایت برمی‌دارد (${hidden})`, hidden === 1);
+  const afterWithdraw = await prisma.galleryItem.findUniqueOrThrow({
+    where: { id: galleryItem.id },
+  });
+  check("عکس دیگر منتشر نیست", afterWithdraw.isPublished === false);
+  const revoked = await prisma.customer.findUniqueOrThrow({ where: { id: phCustomer.id } });
+  check("وضعیت مشتری به «اجازه نداده» برمی‌گردد", revoked.photoPublishAllowed === false);
+
+  await prisma.galleryItem.deleteMany({ where: { treatmentId: phTreatment.id } });
+  await prisma.treatmentRecord.deleteMany({ where: { customerId: phCustomer.id } });
+  await prisma.customer.delete({ where: { id: phCustomer.id } });
 
   // ── بستن صندوق ──────────────────────────────────────────────
   const CASH_PHONE = "09129990055";

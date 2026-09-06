@@ -114,6 +114,7 @@ export async function signConsent(formData: FormData): Promise<FormResult> {
       nationalCode: text(formData.get("nationalCode")),
       signatureData: text(formData.get("signatureData")),
       agreed: formData.get("agreed") === "on",
+      allowPhotoPublish: formData.get("allowPhotoPublish") === "on",
     });
     if (!parsed.success) return FAIL("ورودی‌ها را بررسی کنید.", fieldErrors(parsed.error));
 
@@ -138,8 +139,18 @@ export async function signConsent(formData: FormData): Promise<FormResult> {
         signatureData: nullable(v.signatureData),
         bodySnapshot,
         signedAt,
+        allowPhotoPublish: !!v.allowPhotoPublish,
       },
     });
+
+    // اجازه‌ی انتشار فقط اضافه می‌شود، هیچ‌وقت با یک امضای جدید پس گرفته
+    // نمی‌شود؛ پس‌گرفتنش کار خود مشتری یا مدیر است.
+    if (v.allowPhotoPublish) {
+      await prisma.customer.update({
+        where: { id: v.customerId },
+        data: { photoPublishAllowed: true },
+      });
+    }
 
     await logAction({
       action: "sign",

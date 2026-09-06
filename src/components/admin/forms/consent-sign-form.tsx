@@ -124,6 +124,18 @@ export function ConsentSignForm({
 
           <SignaturePad name="signatureData" />
 
+          {/* جدا و اختیاری — اجازه‌ی انتشار نباید با رضایت درمان یکی شود */}
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-dashed border-[color:var(--line)] bg-[color:var(--bg-sunken)] p-4 text-sm leading-7">
+            <input type="checkbox" name="allowPhotoPublish" className="mt-1.5 size-4 accent-rose-500" />
+            <span>
+              <b>اختیاری:</b> اجازه می‌دهم عکس‌های قبل و بعدِ ناحیه‌ی تحت درمان (بدون نام و
+              چهره) در سایت و شبکه‌های اجتماعی کلینیک منتشر شود.
+              <span className="mt-1 block text-xs text-[color:var(--fg-muted)]">
+                نزدنِ این تیک هیچ تأثیری بر درمان ندارد و هر وقت خواستید می‌توانید پسش بگیرید.
+              </span>
+            </span>
+          </label>
+
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[color:var(--line)] p-4 text-sm leading-7">
             <input type="checkbox" name="agreed" className="mt-1.5 size-4 accent-rose-500" />
             <span>

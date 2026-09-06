@@ -9,6 +9,7 @@ import { getSettings } from "@/lib/settings";
 import { referralSummary } from "@/lib/referrals";
 import { ReferralCard } from "@/components/site/referral-card";
 import { SmsPreference } from "@/components/site/sms-preference";
+import { PhotoConsent } from "@/components/site/photo-consent";
 import { isZarinpalConfigured } from "@/lib/zarinpal";
 import { customerLogout } from "@/app/actions/customer";
 import { PageHero } from "@/components/site/page-hero";
@@ -90,6 +91,9 @@ export default async function AccountPage() {
     (a) => a.startsAt >= now && (a.status === "PENDING" || a.status === "CONFIRMED")
   );
   const past = customer.appointments.filter((a) => !upcoming.includes(a));
+  // اگر پرونده‌اش اصلاً عکسی ندارد، پرسیدن درباره‌ی انتشار عکس بی‌معنی است
+  const hasCasePhotos = customer.treatments.some((t) => t.beforePhoto || t.afterPhoto);
+
   const totalPaid = customer.payments.reduce((sum, p) => sum + p.amount, 0);
 
   // خط زمانی مراجعات: پرونده‌ی درمانی به‌علاوه‌ی نوبت‌های انجام‌شده‌ای که
@@ -391,6 +395,9 @@ export default async function AccountPage() {
             </div>
 
             <SmsPreference optedOut={customer.smsOptOut} />
+
+            {/* فقط وقتی معنی دارد که پرونده‌اش عکسی داشته باشد */}
+            {hasCasePhotos && <PhotoConsent allowed={customer.photoPublishAllowed} />}
 
             {customer.feedbacks.length > 0 && (
               <div className="rounded-4xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-7 shadow-soft">
