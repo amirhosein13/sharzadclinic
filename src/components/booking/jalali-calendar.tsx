@@ -9,10 +9,13 @@ export function JalaliCalendar({
   value,
   onChange,
   maxDaysAhead = 45,
+  closedNote,
 }: {
   value: string | null;
   onChange: (dateKey: string) => void;
   maxDaysAhead?: number;
+  /** از روی ساعات کاری واقعی می‌آید، نه متن ثابت */
+  closedNote?: string | null;
 }) {
   const [offset, setOffset] = useState(0);
   const { cells, monthLabel } = useMemo(() => jalaliMonthGrid(offset), [offset]);
@@ -96,9 +99,11 @@ export function JalaliCalendar({
         })}
       </div>
 
-      <p className="mt-4 border-t border-[color:var(--line)] pt-4 text-center text-xs text-[color:var(--fg-muted)]">
-        جمعه‌ها کلینیک تعطیل است.
-      </p>
+      {closedNote && (
+        <p className="mt-4 border-t border-[color:var(--line)] pt-4 text-center text-xs text-[color:var(--fg-muted)]">
+          {closedNote}
+        </p>
+      )}
     </div>
   );
 }

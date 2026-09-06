@@ -36,6 +36,12 @@ import { toFa } from "../src/lib/utils";
 import { missingConsents } from "../src/lib/consents";
 import { listAudit } from "../src/lib/audit";
 import { buildHealth } from "../src/lib/health";
+import { noShowCost, noShowProfile, noShowReport } from "../src/lib/no-shows";
+import { activeClosure, closedWeekdaysText, upcomingClosures } from "../src/lib/closures";
+import { buildUtilization } from "../src/lib/utilization";
+import { buildSiteStats, pruneEvents, trackEvent } from "../src/lib/site-stats";
+import { EVENTS } from "../src/lib/events";
+import { WEEKDAYS_FA } from "../src/lib/date";
 import { GUIDE, guideFor } from "../src/lib/guide";
 import { can } from "../src/lib/permissions";
 import { readdirSync } from "node:fs";
@@ -1644,6 +1650,179 @@ async function main() {
     `همه‌ی لینک‌های راهنما به صفحه‌ی واقعی می‌روند${brokenLinks.length ? ` (${brokenLinks.join(", ")})` : ""}`,
     brokenLinks.length === 0
   );
+
+
+  // ── مشتری‌های بدقول ─────────────────────────────────────────
+  const NS_PHONE = "09129990101";
+  await prisma.appointment.deleteMany({ where: { customer: { phone: NS_PHONE } } });
+  await prisma.customer.deleteMany({ where: { phone: NS_PHONE } });
+
+  const nsCustomer = await prisma.customer.create({
+    data: { firstName: "بدقول", lastName: "آزمایشی", phone: NS_PHONE },
+  });
+
+  const nsAppt = async (daysAgo: number, status: "DONE" | "NO_SHOW") => {
+    const at = new Date(Date.now() - daysAgo * 86_400_000);
+    return prisma.appointment.create({
+      data: {
+        code: `SMOKE-NS${daysAgo}`,
+        customerId: nsCustomer.id,
+        serviceId: service.id,
+        startsAt: at,
+        endsAt: new Date(at.getTime() + 3_600_000),
+        status,
+        source: "smoke",
+      },
+    });
+  };
+
+  check("مشتری بدون سابقه علامتی نمی‌گیرد", (await noShowProfile(nsCustomer.id)).risk === "none");
+
+  await nsAppt(30, "NO_SHOW");
+  const one = await noShowProfile(nsCustomer.id);
+  check("یک بار نیامدن هشدار نمی‌سازد", one.risk === "none" && one.streak === 1);
+
+  await nsAppt(20, "NO_SHOW");
+  const two = await noShowProfile(nsCustomer.id);
+  check("دو بار پیاپی هشدار می‌گیرد", two.risk === "watch" && two.streak === 2);
+  check("هنوز بیعانه اجباری نیست", !two.requiresDeposit);
+
+  await nsAppt(10, "NO_SHOW");
+  const three = await noShowProfile(nsCustomer.id);
+  check("سه بار پیاپی بیعانه را اجباری می‌کند", three.requiresDeposit && three.risk === "high");
+  check("پیام برای منشی نوشته می‌شود", !!three.message && three.message.includes("بیعانه"));
+
+  // یک مراجعه‌ی واقعی، شمارشِ «پیاپی» را صفر می‌کند
+  await nsAppt(5, "DONE");
+  const afterVisit = await noShowProfile(nsCustomer.id);
+  check("مراجعه‌ی واقعی، شمارش پیاپی را صفر می‌کند", afterVisit.streak === 0);
+  check("ولی مجموع نیامدن‌ها یادش می‌ماند", afterVisit.total === 3);
+  check("بعد از مراجعه، بیعانه دیگر اجباری نیست", !afterVisit.requiresDeposit);
+
+  // گزارش مدیر
+  const nsReport = await noShowReport(12);
+  const nsRow = nsReport.find((r) => r.customerId === nsCustomer.id);
+  check("در گزارش بدقول‌ها می‌آید", !!nsRow && nsRow.total === 3);
+  check(
+    "ارزش وقت‌های هدررفته تخمین زده می‌شود",
+    !!nsRow && nsRow.wastedValue === 3 * (service.priceFrom ?? 0)
+  );
+
+  const nsCostFrom = new Date(Date.now() - 60 * 86_400_000);
+  const nsCostRow = await noShowCost(nsCostFrom, new Date());
+  check("هزینه‌ی نیامدن‌ها در بازه جمع می‌شود", nsCostRow.count >= 3);
+
+  await prisma.appointment.deleteMany({ where: { customerId: nsCustomer.id } });
+  await prisma.customer.delete({ where: { id: nsCustomer.id } });
+
+
+  // ── اعلان تعطیلی ────────────────────────────────────────────
+  await prisma.timeOff.deleteMany({ where: { reason: { startsWith: "SMOKE-OFF" } } });
+
+  const closedFrom = new Date(Date.now() + 2 * 86_400_000);
+  const closedTo = new Date(Date.now() + 5 * 86_400_000);
+  await prisma.timeOff.create({
+    data: { staffId: null, from: closedFrom, to: closedTo, reason: "SMOKE-OFF تعطیلات نوروز" },
+  });
+
+  const closures = await upcomingClosures();
+  const smokeClosure = closures.find((c) => c.reason === "SMOKE-OFF تعطیلات نوروز");
+  check("تعطیلی پیش‌رو به مشتری اعلام می‌شود", !!smokeClosure);
+  check("متن تعطیلی تاریخ و علت دارد", !!smokeClosure?.message.includes("SMOKE-OFF"));
+  check("الان تعطیل نیستیم", activeClosure(closures) === null);
+  check(
+    "وسط بازه، تعطیل حساب می‌شویم",
+    activeClosure(closures, new Date(Date.now() + 3 * 86_400_000))?.reason === "SMOKE-OFF تعطیلات نوروز"
+  );
+
+  // مرخصی یک پرسنل نباید به‌عنوان تعطیلی کلینیک اعلام شود
+  const offStaff = await prisma.staff.findFirstOrThrow();
+  await prisma.timeOff.create({
+    data: { staffId: offStaff.id, from: closedFrom, to: closedTo, reason: "SMOKE-OFF مرخصی شخصی" },
+  });
+  const afterStaffOff = await upcomingClosures();
+  check(
+    "مرخصی شخصی پرسنل به‌عنوان تعطیلی کلینیک اعلام نمی‌شود",
+    !afterStaffOff.some((c) => c.reason === "SMOKE-OFF مرخصی شخصی")
+  );
+
+  // متن روزهای تعطیل باید از ساعات کاری واقعی بیاید، نه ثابت
+  const closedText = await closedWeekdaysText();
+  check("متن روزهای تعطیل ساخته می‌شود", closedText === null || closedText.length > 0);
+  const openDays = await prisma.workingHour.findMany({ where: { isOpen: false } });
+  if (openDays.length === 1) {
+    check(
+      "متن روز تعطیل با ساعات کاری واقعی می‌خواند",
+      !!closedText && closedText.includes(WEEKDAYS_FA[openDays[0].weekday])
+    );
+  }
+
+  await prisma.timeOff.deleteMany({ where: { reason: { startsWith: "SMOKE-OFF" } } });
+
+
+  // ── نرخ اشغال و آمار سایت ───────────────────────────────────
+  const utilRange = resolveRange("this-month");
+  const util = await buildUtilization(utilRange);
+  check("گزارش نرخ اشغال ساخته می‌شود", util.hasSchedules);
+  check("ظرفیت از برنامه‌ی هفتگی حساب می‌شود", util.capacity > 0);
+  check("نرخ اشغال بین صفر تا صد است", util.percent >= 0 && util.percent <= 100);
+  check(
+    "درصد هر روز با ظرفیت و پرشده‌اش می‌خواند",
+    util.byWeekday.every(
+      (d) => d.capacity === 0 || d.percent === Math.min(100, Math.round((d.booked / d.capacity) * 100))
+    )
+  );
+  check("پرشده هیچ‌وقت از ظرفیت بیشتر گزارش نمی‌شود", util.byWeekday.every((d) => d.percent <= 100));
+  check("ساعت‌های بدون ظرفیت در فهرست نمی‌آیند", util.byHour.every((h) => h.capacity > 0));
+  check(
+    "پرسنل از کم‌کارترین مرتب می‌شوند",
+    util.byStaff.every((row, i) => i === 0 || util.byStaff[i - 1].percent <= row.percent)
+  );
+
+  // مرخصیِ کل کلینیک باید ظرفیت را کم کند
+  const utilBefore = util.capacity;
+  const offFrom = new Date(Math.max(utilRange.from.getTime(), Date.now() - 3 * 86_400_000));
+  const offTo = new Date(offFrom.getTime() + 2 * 86_400_000);
+  const bigOff = await prisma.timeOff.create({
+    data: { staffId: null, from: offFrom, to: offTo, reason: "SMOKE-UTIL" },
+  });
+  const utilAfter = await buildUtilization(utilRange);
+  check(
+    `تعطیلی کلینیک ظرفیت را کم می‌کند (${utilBefore} ← ${utilAfter.capacity})`,
+    utilAfter.capacity < utilBefore
+  );
+  await prisma.timeOff.delete({ where: { id: bigOff.id } });
+
+  // آمار سایت
+  await prisma.siteEvent.deleteMany({});
+  const emptyStats = await buildSiteStats(utilRange);
+  check("بدون داده، آمار سایت خالی گزارش می‌شود", !emptyStats.hasData);
+
+  await trackEvent(EVENTS.serviceView, service.slug);
+  await trackEvent(EVENTS.serviceView, service.slug);
+  await trackEvent(EVENTS.serviceView, "botox");
+  await trackEvent("چیز-نامعتبر", service.slug);
+  for (let i = 0; i < 10; i++) await trackEvent(EVENTS.bookingStart);
+  for (let i = 0; i < 8; i++) await trackEvent(EVENTS.bookingService, service.slug);
+  for (let i = 0; i < 3; i++) await trackEvent(EVENTS.bookingTime, service.slug);
+  for (let i = 0; i < 2; i++) await trackEvent(EVENTS.bookingDone, service.slug);
+
+  const stats = await buildSiteStats(utilRange);
+  check("رویداد نامعتبر ثبت نمی‌شود", stats.totalViews === 3);
+  const laserRow = stats.byService.find((r) => r.slug === service.slug);
+  check("بازدید هر خدمت جدا شمرده می‌شود", laserRow?.views === 2);
+  check("عنوان فارسی خدمت در آمار می‌آید", laserRow?.title === service.title);
+  check("پربازدیدترین اول می‌آید", stats.byService[0]?.slug === service.slug);
+  check("قیف رزرو مراحل را می‌شمارد", stats.funnel.started === 10 && stats.funnel.finished === 2);
+  check(
+    "بیشترین ریزش درست تشخیص داده می‌شود",
+    stats.funnel.biggestDropLabel === "از انتخاب خدمت تا انتخاب ساعت"
+  );
+  check("درصد ریزش درست است", stats.funnel.biggestDropPercent === 63);
+
+  const pruned = await pruneEvents(0);
+  check("پاک‌سازی رویدادهای قدیمی کار می‌کند", pruned > 0);
+  await prisma.siteEvent.deleteMany({});
 
   // ── بستن صندوق ──────────────────────────────────────────────
   const CASH_PHONE = "09129990055";

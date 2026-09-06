@@ -47,6 +47,10 @@ const FIELDS: {
   { key: "referrerReward", label: "هدیه‌ی معرف (تومان)", hint: "وقتی معرفی‌شده اولین جلسه‌اش را انجام داد، این مبلغ به شکل کد تخفیف برای معرف پیامک می‌شود", ltr: true },
   { key: "referredReward", label: "هدیه‌ی معرفی‌شده (تومان)", hint: "هدیه‌ی خوش‌آمد کسی که با کد معرف آمده", ltr: true },
   { key: "referralRewardDays", label: "اعتبار هدیه‌ی معرفی (روز)", hint: "کدهای هدیه بعد از این مدت منقضی می‌شوند", ltr: true },
+  { key: "noShowWatchAfter", label: "هشدار بدقولی بعد از چند بار", hint: "بعد از این تعداد نیامدنِ پشت‌سرهم، روی پرونده‌ی مشتری هشدار می‌آید", ltr: true },
+  { key: "noShowDepositAfter", label: "بیعانه‌ی اجباری بعد از چند بار", hint: "بعد از این تعداد نیامدنِ پشت‌سرهم، رزرو آنلاینش فقط با پرداخت بیعانه قطعی می‌شود", ltr: true },
+  { key: "googleAnalyticsId", label: "شناسه‌ی گوگل آنالیتیکس", hint: "مثل G-XXXXXXXXXX — از analytics.google.com بعد از ساخت Property می‌گیرید. خالی یعنی خاموش", ltr: true },
+  { key: "googleSiteVerification", label: "کد تأیید گوگل سرچ کنسول", hint: "فقط مقدار content تگ meta که گوگل می‌دهد، نه کل تگ", ltr: true },
 ];
 
 export function SettingsForm({ settings }: { settings: SettingsMap }) {

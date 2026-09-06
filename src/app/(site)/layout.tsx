@@ -4,10 +4,12 @@ import { FloatingActions } from "@/components/site/floating-actions";
 import { getSettings } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 import { getCustomerSession } from "@/lib/customer-auth";
+import { activeClosure, upcomingClosures } from "@/lib/closures";
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const settings = await getSettings();
   const customer = await getCustomerSession();
+  const closedNow = activeClosure(await upcomingClosures().catch(() => []));
 
   const categories = await prisma.serviceCategory
     .findMany({
@@ -55,6 +57,13 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         phone={settings.phone}
         customerName={customer?.name.split(" ")[0] ?? null}
       />
+      {/* اگر همین حالا تعطیلیم، مشتری باید بداند — نه اینکه فکر کند سایت خراب است */}
+      {closedNow && (
+        <div className="bg-amber-100 px-5 py-3 text-center text-sm leading-6 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200">
+          <b>کلینیک تعطیل است:</b> {closedNow.message}
+        </div>
+      )}
+
       <main id="main" className="flex-1">
         {children}
       </main>

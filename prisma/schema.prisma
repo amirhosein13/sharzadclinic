@@ -1161,3 +1161,22 @@ model CampaignRecipient {
   @@index([campaignId, status])
   @@map("campaign_recipients")
 }
+
+// ─── آمار سایت ─────────────────────────────────────────────────
+
+/// یک رویداد ساده‌ی سایت. هیچ چیزِ شناسایی‌کننده‌ای ذخیره نمی‌شود —
+/// نه IP، نه کوکی، نه شناسه‌ی کاربر. فقط «چه اتفاقی افتاد و کجا».
+model SiteEvent {
+  id String @id @default(cuid())
+
+  /// service_view | booking_start | booking_service | booking_time | booking_submit | booking_done
+  kind String
+  /// اگر به یک خدمت مربوط است
+  serviceSlug String?
+
+  createdAt DateTime @default(now())
+
+  @@index([kind, createdAt])
+  @@index([serviceSlug, createdAt])
+  @@map("site_events")
+}

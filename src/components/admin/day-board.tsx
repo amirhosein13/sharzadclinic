@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { FileSignature, Phone, X } from "lucide-react";
+import { FileSignature, Phone, UserX, X } from "lucide-react";
 import { StatusSelect } from "@/components/admin/status-select";
 import { STATUS_META } from "@/lib/appointment-status";
 import { Badge } from "@/components/ui/badge";
@@ -164,6 +164,15 @@ export function DayBoard({
                         {formatToman(block.paidTotal, false)}
                       </span>
                     )}
+                    {block.noShowStreak > 0 && (
+                      <span
+                        title={`${toFa(block.noShowStreak)} بار پشت‌سرهم نیامده است`}
+                        className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-red-700 dark:text-red-300"
+                      >
+                        <UserX className="size-3 shrink-0" />
+                        سابقه‌ی نیامدن
+                      </span>
+                    )}
                     {block.needsConsent.length > 0 && (
                       <span
                         title={`رضایت‌نامه‌ی امضانشده: ${block.needsConsent.join("، ")}`}
@@ -234,6 +243,13 @@ export function DayBoard({
                 </span>
               )}
             </div>
+
+            {selected.noShowStreak > 0 && (
+              <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3.5 text-sm leading-7 text-red-800 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
+                <b>{toFa(selected.noShowStreak)} بار پشت‌سرهم نیامده است.</b> بهتر است امروز یک
+                زنگ یادآوری بزنید تا این وقت هم هدر نرود.
+              </div>
+            )}
 
             {selected.needsConsent.length > 0 && (
               <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-sm leading-7 text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">

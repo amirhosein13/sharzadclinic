@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpen, Boxes, CalendarDays, Coins, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Gift, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, Megaphone, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, Stethoscope, TicketPercent, Users, Wallet, X } from "lucide-react";
+import { BarChart3, BookOpen, Boxes, CalendarDays, Coins, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Gift, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, Megaphone, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, Stethoscope, TicketPercent, TrendingUp, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -36,6 +36,7 @@ const NAV: {
   { href: "/admin/cash", label: "بستن صندوق", icon: Coins, permission: "payroll", badgeKey: "unclosedDays" },
   { href: "/admin/inventory", label: "انبار مواد", icon: Boxes, permission: "payroll", badgeKey: "lowStock" },
   { href: "/admin/reports", label: "گزارش‌ها", icon: BarChart3, permission: "payroll" },
+  { href: "/admin/analytics", label: "تحلیل و رشد", icon: TrendingUp, permission: "payroll" },
   { href: "/admin/my/earnings", label: "درآمد من", icon: Wallet, permission: "payroll.own" },
   { href: "/admin/consents", label: "رضایت‌نامه‌ها", icon: FileSignature, permission: "content" },
   { href: "/admin/discounts", label: "کد تخفیف", icon: TicketPercent, permission: "content" },

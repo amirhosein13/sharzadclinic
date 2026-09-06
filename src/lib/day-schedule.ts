@@ -3,6 +3,7 @@ import type { AppointmentStatus } from "@prisma/client";
 import { prisma } from "./prisma";
 import { getSettings } from "./settings";
 import { atTime, jalaliWeekday, minutesFromHHMM, parseYmdKey } from "./date";
+import { noShowSettings } from "./no-shows";
 
 export type DayBlock = {
   id: string;
@@ -22,6 +23,8 @@ export type DayBlock = {
   hasPaid: boolean;
   /** رضایت‌نامه‌ی مخصوص این خدمت را امضا نکرده است */
   needsConsent: string[];
+  /** چند بار پشت‌سرهم نیامده — صفر یعنی مشکلی نیست */
+  noShowStreak: number;
 };
 
 export type DayOff = {
@@ -96,6 +99,8 @@ export async function buildDaySchedule(dateKey: string): Promise<DaySchedule> {
 
   // رضایت‌نامه‌های امضانشده‌ی مراجعین امروز — منشی باید پیش از شروع کار ببیند
   const needsConsentByAppointment = await unsignedConsentsForDay(appointments);
+  // بدقولی: بهتر است پیش از اینکه وقت هدر برود، یک زنگ یادآوری زده شود
+  const streakByCustomer = await noShowStreaksForDay(appointments);
 
   const minutes = (d: Date, fallback: number) => {
     if (d < dayStart) return 0;
@@ -139,6 +144,7 @@ export async function buildDaySchedule(dateKey: string): Promise<DaySchedule> {
             paidTotal,
             hasPaid: paidTotal > 0,
             needsConsent: needsConsentByAppointment.get(a.id) ?? [],
+            noShowStreak: streakByCustomer.get(a.customer.id) ?? 0,
           };
         }),
       offs: staffOffs.map((o) => ({
@@ -192,6 +198,7 @@ export async function buildDaySchedule(dateKey: string): Promise<DaySchedule> {
           paidTotal,
           hasPaid: paidTotal > 0,
           needsConsent: needsConsentByAppointment.get(a.id) ?? [],
+          noShowStreak: streakByCustomer.get(a.customer.id) ?? 0,
         };
       }),
     });
@@ -251,5 +258,44 @@ async function unsignedConsentsForDay(
     if (missing.length > 0) result.set(appt.id, [...new Set(missing)]);
   }
 
+  return result;
+}
+
+/**
+ * برای مراجعین امروز، چند بار پشت‌سرهم نیامده‌اند.
+ * با یک کوئری برای همه‌شان، نه یکی به‌ازای هر نفر.
+ */
+async function noShowStreaksForDay(
+  appointments: Array<{ customerId: string }>,
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  const customerIds = [...new Set(appointments.map((a) => a.customerId))];
+  if (customerIds.length === 0) return result;
+
+  const { watchAt } = await noShowSettings();
+
+  const past = await prisma.appointment.findMany({
+    where: {
+      customerId: { in: customerIds },
+      startsAt: { lt: new Date() },
+      status: { in: ["DONE", "NO_SHOW"] },
+    },
+    orderBy: { startsAt: "desc" },
+    select: { customerId: true, status: true },
+  });
+
+  const seen = new Map<string, { streak: number; stopped: boolean }>();
+  for (const row of past) {
+    const state = seen.get(row.customerId) ?? { streak: 0, stopped: false };
+    if (!state.stopped) {
+      if (row.status === "NO_SHOW") state.streak++;
+      else state.stopped = true;
+    }
+    seen.set(row.customerId, state);
+  }
+
+  for (const [customerId, state] of seen) {
+    if (state.streak >= watchAt) result.set(customerId, state.streak);
+  }
   return result;
 }

@@ -19,6 +19,7 @@ import { PackageCard } from "@/components/admin/package-card";
 import { CasePhotos } from "@/components/case-photos";
 import { summarizePackages } from "@/lib/packages";
 import { missingConsents, renderConsentBody } from "@/lib/consents";
+import { noShowProfile } from "@/lib/no-shows";
 import { aspectLabel } from "@/lib/feedback";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_META } from "@/lib/appointment-status";
@@ -88,6 +89,7 @@ export default async function CustomerDetailPage({
   ]);
 
   const unsignedConsents = await missingConsents(customer.id);
+  const noShow = await noShowProfile(customer.id);
 
   const packageOptions = packages
     .filter((p) => !p.isFinished && !p.isExpired)
@@ -148,6 +150,32 @@ export default async function CustomerDetailPage({
         <ArrowRight className="size-4" />
         بازگشت به لیست مشتریان
       </Link>
+
+      {/* بدقولی: منشی باید پیش از دادن نوبت بعدی ببیندش */}
+      {noShow.message && (
+        <div
+          className={
+            noShow.risk === "high"
+              ? "mb-6 rounded-2xl border border-red-300 bg-red-50 p-5 dark:border-red-400/30 dark:bg-red-500/10"
+              : "mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-5 dark:border-amber-400/30 dark:bg-amber-500/10"
+          }
+        >
+          <p
+            className={
+              noShow.risk === "high"
+                ? "flex items-center gap-2 text-sm font-bold text-red-800 dark:text-red-200"
+                : "flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-200"
+            }
+          >
+            <TriangleAlert className="size-4 shrink-0" />
+            {noShow.message}
+          </p>
+          <p className="mt-1.5 text-xs leading-6 text-[color:var(--fg-muted)]">
+            در مجموع {toFa(noShow.total)} بار نوبت گرفته و نیامده است.
+            {noShow.requiresDeposit && " رزرو آنلاینش هم فقط با پرداخت بیعانه قطعی می‌شود."}
+          </p>
+        </div>
+      )}
 
       <AdminPageHeader
         title={fullName}

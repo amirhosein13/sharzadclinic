@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { bookingSchema, fieldErrors, trackSchema } from "@/lib/validators";
 import { normalizeSource } from "@/lib/referral-sources";
 import { attachReferral } from "@/lib/referrals";
+import { noShowProfile } from "@/lib/no-shows";
 import { getAvailableSlots, releaseExpiredHolds } from "@/lib/availability";
 import { atTime, formatJalaliDateTime, parseYmdKey } from "@/lib/date";
 import { generateBookingCode } from "@/lib/utils";
@@ -115,7 +116,23 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
 
     // آیا این خدمت برای قطعی‌شدن نیاز به پرداخت بیعانه دارد؟
     const deposit = await depositFor(service.id);
-    const needsPayment = deposit > 0 && isZarinpalConfigured();
+
+    // کسی که چند بار پشت‌سرهم نیامده، رزرو رایگانش برای کلینیک هزینه دارد.
+    // اگر خدمت بیعانه ندارد، درصد عمومی را مبنا می‌گیریم.
+    const noShow = await noShowProfile(customer.id);
+    const enforced = noShow.requiresDeposit ? Math.max(deposit, await fallbackDeposit(service)) : 0;
+    const dueNow = Math.max(deposit, enforced);
+    const needsPayment = dueNow > 0 && isZarinpalConfigured();
+
+    // اگر باید بیعانه بگیریم ولی درگاه وصل نیست، نوبت آنلاین را قطعی
+    // نمی‌کنیم؛ به‌جایش می‌گوییم تلفنی هماهنگ کند.
+    if (noShow.requiresDeposit && !isZarinpalConfigured()) {
+      return {
+        ok: false,
+        message:
+          "برای رزرو آنلاین این نوبت لازم است ابتدا با کلینیک تماس بگیرید. لطفاً با ما تماس بگیرید تا هماهنگ کنیم.",
+      };
+    }
 
     let appointment = null;
     for (let attempt = 0; attempt < 5 && !appointment; attempt++) {
@@ -159,7 +176,7 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
       const settings = await getSettings();
       const base = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
       const payment = await requestPayment({
-        amountToman: deposit,
+        amountToman: dueNow,
         description: `رزرو ${service.title} — ${settings.clinicName}`,
         callbackUrl: `${base}/payment/callback`,
         mobile: customer.phone,
@@ -176,7 +193,7 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
         data: {
           customerId: customer.id,
           appointmentId: appointment.id,
-          amount: deposit,
+          amount: dueNow,
           method: "ONLINE",
           status: "PENDING",
           gateway: "zarinpal",
@@ -217,6 +234,19 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
   } catch {
     return { ok: false, message: "ثبت نوبت با خطا مواجه شد. لطفاً دوباره تلاش کنید." };
   }
+}
+
+/**
+ * وقتی خدمتی بیعانه ندارد ولی به‌خاطر بدقولیِ مکرر باید بگیریم.
+ * از درصد عمومی استفاده می‌کنیم؛ اگر قیمتی هم نبود، یک مبلغ حداقلی.
+ */
+async function fallbackDeposit(service: { priceFrom: number | null }): Promise<number> {
+  const settings = await getSettings();
+  const percent = Number(settings.depositPercent) || 0;
+  if (percent > 0 && service.priceFrom) {
+    return Math.round((service.priceFrom * percent) / 100);
+  }
+  return 100_000;
 }
 
 /** مبلغ بیعانه‌ی یک خدمت: مقدار اختصاصی، وگرنه درصد عمومی از قیمت پایه */

@@ -50,6 +50,14 @@ export const DEFAULT_SETTINGS = {
   referredReward: "200000",
   /** هدیه‌ها چند روز اعتبار دارند */
   referralRewardDays: "90",
+  /** بعد از چند بار نیامدنِ پیاپی، مشتری علامت هشدار بگیرد */
+  noShowWatchAfter: "2",
+  /** بعد از چند بار نیامدنِ پیاپی، برای رزرو آنلاین بیعانه اجباری شود */
+  noShowDepositAfter: "3",
+  /** شناسه‌ی گوگل آنالیتیکس ۴، مثل G-XXXXXXXXXX. خالی یعنی خاموش */
+  googleAnalyticsId: "",
+  /** کد تأیید مالکیت سایت در گوگل سرچ کنسول (روش HTML tag) */
+  googleSiteVerification: "",
 } as const;
 
 export type SettingsMap = Record<string, string>;

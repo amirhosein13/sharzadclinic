@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/vazirmatn";
 import "./globals.css";
+import Script from "next/script";
 import { Toaster } from "sonner";
 import { getSettings } from "@/lib/settings";
 import { ThemeScript } from "@/components/theme-toggle";
@@ -32,6 +33,10 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: { card: "summary_large_image" },
     robots: { index: true, follow: true },
     alternates: { canonical: "/" },
+    // تأیید مالکیت سایت در گوگل سرچ کنسول
+    ...(s.googleSiteVerification
+      ? { verification: { google: s.googleSiteVerification } }
+      : {}),
   };
 }
 
@@ -44,7 +49,10 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const settings = await getSettings();
+  const gaId = settings.googleAnalyticsId?.trim();
+
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body className="min-h-dvh antialiased">
@@ -56,6 +64,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           پرش به محتوای اصلی
         </a>
         {children}
+
+        {/* گوگل آنالیتیکس — فقط اگر شناسه در تنظیمات گذاشته شده باشد */}
+        {gaId && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga-init" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${gaId}');`}
+            </Script>
+          </>
+        )}
+
         <Toaster
           position="top-center"
           dir="rtl"

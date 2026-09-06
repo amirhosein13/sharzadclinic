@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -14,6 +14,7 @@ import { WaitlistPrompt } from "./waitlist-prompt";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { REFERRAL_SOURCES } from "@/lib/referral-sources";
+import { EVENTS } from "@/lib/events";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDuration, formatPriceRange, formatToman, toFa } from "@/lib/utils";
 
@@ -48,12 +49,33 @@ type Slot = { time: string; label: string; staffId: string; staffName: string };
 
 const STEPS = ["خدمت", "متخصص", "زمان", "اطلاعات"] as const;
 
+/** ثبت بی‌صدای یک مرحله‌ی رزرو — هیچ‌وقت جلوی کار کاربر را نمی‌گیرد */
+function track(kind: string, slug?: string) {
+  const payload = JSON.stringify({ kind, slug });
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon("/api/track", new Blob([payload], { type: "application/json" }));
+      return;
+    }
+  } catch {
+    // می‌افتیم روی fetch
+  }
+  fetch("/api/track", {
+    method: "POST",
+    body: payload,
+    headers: { "Content-Type": "application/json" },
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
 export function BookingWizard({
   services,
   staff,
   initialServiceSlug,
   customer,
   referralEnabled = false,
+  closedNote,
+  closures = [],
 }: {
   services: WizardService[];
   staff: WizardStaff[];
@@ -62,6 +84,10 @@ export function BookingWizard({
   customer?: WizardCustomer | null;
   /** «کد معرف» فقط وقتی نشان داده می‌شود که در تنظیمات روشن باشد */
   referralEnabled?: boolean;
+  /** «جمعه‌ها تعطیل است» — از روی ساعات کاری واقعی */
+  closedNote?: string | null;
+  /** تعطیلی‌های پیش‌رو، تا مشتری بداند چرا وقت خالی نیست */
+  closures?: { message: string }[];
 }) {
   const initial = services.find((s) => s.slug === initialServiceSlug) ?? null;
 
@@ -77,6 +103,16 @@ export function BookingWizard({
   const [pending, startTransition] = useTransition();
 
   const eligibleStaff = service ? staff.filter((s) => s.serviceIds.includes(service.id)) : [];
+
+  // «چند نفر اصلاً وارد صفحه‌ی رزرو شدند» — مبنای قیف رزرو
+  const started = useRef(false);
+  // فقط اولین انتخاب ساعت شمرده می‌شود، نه هر بار عوض‌کردنش
+  const pickedTime = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    track(EVENTS.bookingStart);
+  }, []);
 
   // با تغییر خدمت/متخصص/تاریخ، نوبت‌های خالی را دوباره می‌گیریم
   useEffect(() => {
@@ -127,6 +163,7 @@ export function BookingWizard({
         }
         setDone({ code: result.code, summary: result.summary, loggedIn: result.loggedIn });
         setErrors({});
+        track(EVENTS.bookingDone, service?.slug);
       } else {
         setErrors(result.errors ?? {});
         if (result.message) toast.error(result.message);
@@ -156,6 +193,7 @@ export function BookingWizard({
                     setStaffId(null);
                     setDateKey(null);
                     setStep(1);
+                    track(EVENTS.bookingService, s.slug);
                   }}
                   className={cn(
                     "flex items-center gap-4 rounded-3xl border p-4 text-right transition-all",
@@ -259,7 +297,25 @@ export function BookingWizard({
         {step === 2 && service && (
           <StepShell title="چه روز و ساعتی؟" hint="ابتدا روز را انتخاب کنید تا ساعت‌های خالی نمایش داده شود.">
             <div className="grid gap-6 lg:grid-cols-2">
-              <JalaliCalendar value={dateKey} onChange={setDateKey} />
+              {closures.length > 0 && (
+                <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-400/30 dark:bg-amber-500/10">
+                  <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                    تعطیلی کلینیک
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {closures.map((c) => (
+                      <li key={c.message} className="text-xs leading-6 text-amber-900 dark:text-amber-200">
+                        {c.message}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-xs leading-6 text-[color:var(--fg-muted)]">
+                    در این روزها وقت خالی نشان داده نمی‌شود؛ لطفاً روز دیگری انتخاب کنید.
+                  </p>
+                </div>
+              )}
+
+              <JalaliCalendar value={dateKey} onChange={setDateKey} closedNote={closedNote} />
 
               <div className="rounded-4xl border border-[color:var(--line)] p-5 sm:p-6">
                 <h3 className="mb-4 flex items-center gap-2 text-sm font-bold">
@@ -305,7 +361,13 @@ export function BookingWizard({
                         <button
                           key={slot.time}
                           type="button"
-                          onClick={() => setTime(slot.time)}
+                          onClick={() => {
+                            setTime(slot.time);
+                            if (!pickedTime.current) {
+                              pickedTime.current = true;
+                              track(EVENTS.bookingTime, service?.slug);
+                            }
+                          }}
                           className={cn(
                             "h-11 rounded-2xl border text-sm font-medium tabular-nums transition-all",
                             time === slot.time

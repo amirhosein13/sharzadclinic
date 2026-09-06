@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { getCustomerSession } from "@/lib/customer-auth";
 import { getSettings } from "@/lib/settings";
+import { closedWeekdaysText, upcomingClosures } from "@/lib/closures";
 import { isZarinpalConfigured } from "@/lib/zarinpal";
 import { PageHero } from "@/components/site/page-hero";
 import { BookingWizard } from "@/components/booking/booking-wizard";
@@ -28,7 +29,12 @@ export default async function BookingPage({
 }) {
   const { service } = await searchParams;
 
-  const [session, settings] = await Promise.all([getCustomerSession(), getSettings()]);
+  const [session, settings, closures, closedNote] = await Promise.all([
+    getCustomerSession(),
+    getSettings(),
+    upcomingClosures(),
+    closedWeekdaysText(),
+  ]);
   const gatewayReady = isZarinpalConfigured();
   const globalPercent = Number(settings.depositPercent) || 0;
 
@@ -66,6 +72,8 @@ export default async function BookingPage({
           initialServiceSlug={service}
           customer={customer}
           referralEnabled={settings.referralEnabled === "1"}
+          closedNote={closedNote}
+          closures={closures.map((c) => ({ message: c.message }))}
           services={services.map((s) => ({
             id: s.id,
             slug: s.slug,
