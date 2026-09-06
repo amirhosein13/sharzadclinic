@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Boxes, CalendarDays, Coins, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Gift, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, Megaphone, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, Stethoscope, TicketPercent, Users, Wallet, X } from "lucide-react";
+import { BarChart3, BookOpen, Boxes, CalendarDays, Coins, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Gift, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, Megaphone, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, Stethoscope, TicketPercent, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -52,6 +52,7 @@ const NAV: {
   { href: "/admin/backup", label: "پشتیبان‌گیری", icon: DatabaseBackup, permission: "settings", adminOnly: true },
   { href: "/admin/health", label: "سلامت سیستم", icon: Stethoscope, permission: "settings" },
   { href: "/admin/audit", label: "گزارش فعالیت", icon: History, permission: "audit" },
+  { href: "/admin/help", label: "راهنما", icon: BookOpen, permission: "help" },
 ];
 
 export type SidebarBadges = {

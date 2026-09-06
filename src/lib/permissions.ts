@@ -12,17 +12,19 @@ export const PERMISSIONS = {
   ADMIN: [
     "dashboard", "appointments.all", "appointments.write", "customers", "customers.write",
     "content", "staff", "payroll", "payroll.write", "users", "settings", "notifications", "messages",
-    "audit",
+    "audit", "help",
   ],
   MANAGER: [
     "dashboard", "appointments.all", "appointments.write", "customers", "customers.write",
     "content", "staff", "payroll", "payroll.write", "settings", "notifications", "messages",
-    "audit",
+    "audit", "help",
   ],
   RECEPTION: [
     "dashboard", "appointments.all", "appointments.write", "customers", "customers.write", "messages",
+    "help",
   ],
-  OPERATOR: ["dashboard.own", "appointments.own", "payroll.own"],
+  // راهنما را همه می‌بینند — هر نقشی فقط بخش‌های خودش را
+  OPERATOR: ["dashboard.own", "appointments.own", "payroll.own", "help"],
 } as const satisfies Record<Role, readonly string[]>;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS][number];

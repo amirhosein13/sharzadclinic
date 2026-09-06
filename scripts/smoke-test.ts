@@ -36,6 +36,9 @@ import { toFa } from "../src/lib/utils";
 import { missingConsents } from "../src/lib/consents";
 import { listAudit } from "../src/lib/audit";
 import { buildHealth } from "../src/lib/health";
+import { GUIDE, guideFor } from "../src/lib/guide";
+import { can } from "../src/lib/permissions";
+import { readdirSync } from "node:fs";
 import {
   promoteToGallery, publishCandidates, withdrawPhotoConsent,
 } from "../src/lib/photo-publish";
@@ -1586,6 +1589,61 @@ async function main() {
   await prisma.galleryItem.deleteMany({ where: { treatmentId: phTreatment.id } });
   await prisma.treatmentRecord.deleteMany({ where: { customerId: phCustomer.id } });
   await prisma.customer.delete({ where: { id: phCustomer.id } });
+
+
+  // ── راهنمای کاربری ──────────────────────────────────────────
+  const adminGuide = guideFor((permission) => can("ADMIN", permission));
+  const receptionGuide = guideFor((permission) => can("RECEPTION", permission));
+  const operatorGuide = guideFor((permission) => can("OPERATOR", permission));
+
+  const cardsOf = (g: typeof adminGuide) => g.flatMap((s) => s.cards);
+  check("راهنما چند بخش دارد", adminGuide.length >= 8);
+  check("مدیر همه‌ی بخش‌ها را می‌بیند", cardsOf(adminGuide).length === GUIDE.flatMap((s) => s.cards).length);
+  check(
+    "منشی راهنمای حقوق و پشتیبان را نمی‌بیند",
+    !cardsOf(receptionGuide).some((c) => ["payroll", "backup", "users", "audit"].includes(c.id))
+  );
+  check(
+    "منشی راهنمای کارهای خودش را می‌بیند",
+    cardsOf(receptionGuide).some((c) => c.id === "day") &&
+      cardsOf(receptionGuide).some((c) => c.id === "new-customer")
+  );
+  check("اپراتور هم راهنمای پایه را دارد", cardsOf(operatorGuide).some((c) => c.id === "login"));
+  check(
+    "بخش عیب‌یابی برای همه هست",
+    operatorGuide.some((s) => s.id === "troubleshoot") &&
+      receptionGuide.some((s) => s.id === "troubleshoot")
+  );
+  check(
+    "هیچ بخش خالی‌ای نمی‌ماند",
+    [adminGuide, receptionGuide, operatorGuide].every((g) => g.every((s) => s.cards.length > 0))
+  );
+
+  const allCards = cardsOf(adminGuide);
+  check("هر مورد شناسه و عنوان و خلاصه دارد", allCards.every((c) => !!c.id && !!c.title && !!c.summary));
+  check(
+    "شناسه‌ها تکراری نیستند",
+    new Set(allCards.map((c) => c.id)).size === allCards.length
+  );
+  check(
+    "هر مورد یا مرحله دارد یا نکته",
+    allCards.every((c) => (c.steps?.length ?? 0) > 0 || (c.tips?.length ?? 0) > 0)
+  );
+  check("هیچ مرحله‌ای خالی نیست", allCards.every((c) => (c.steps ?? []).every((s) => s.lines.length > 0)));
+
+  // لینک‌های داخل راهنما باید به صفحه‌های واقعی اشاره کنند
+  const guideLinks = [...new Set(allCards.map((c) => c.href).filter((h): h is string => !!h))];
+  const knownPages = new Set(
+    readdirSync("src/app/admin/(dashboard)", { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => `/admin/${e.name}`)
+      .concat(["/admin"]),
+  );
+  const brokenLinks = guideLinks.filter((h) => !knownPages.has(h));
+  check(
+    `همه‌ی لینک‌های راهنما به صفحه‌ی واقعی می‌روند${brokenLinks.length ? ` (${brokenLinks.join(", ")})` : ""}`,
+    brokenLinks.length === 0
+  );
 
   // ── بستن صندوق ──────────────────────────────────────────────
   const CASH_PHONE = "09129990055";
