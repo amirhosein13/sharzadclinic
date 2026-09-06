@@ -35,6 +35,7 @@ import { consumeForService, lowStockItems, recordMovement } from "../src/lib/inv
 import { toFa } from "../src/lib/utils";
 import { missingConsents } from "../src/lib/consents";
 import { listAudit } from "../src/lib/audit";
+import { buildHealth } from "../src/lib/health";
 import {
   audienceWhere, decorateMessage, sendBatch, startCampaign,
 } from "../src/lib/campaigns";
@@ -1466,6 +1467,31 @@ async function main() {
   await prisma.notificationLog.deleteMany({ where: { recipient: { in: CAMP_PHONES } } });
   await prisma.appointment.deleteMany({ where: { customerId: { in: campIds } } });
   await prisma.customer.deleteMany({ where: { id: { in: campIds } } });
+
+
+  // ── سلامت سیستم ────────────────────────────────────────────
+  const health = await buildHealth();
+  const healthChecks = health.groups.flatMap((g) => g.checks);
+  check("گزارش سلامت چند دسته دارد", health.groups.length >= 5);
+  check("هر بررسی عنوان و وضعیت دارد", healthChecks.every((c) => !!c.title && !!c.detail));
+  check(
+    "سطح‌ها فقط سه حالت دارند",
+    healthChecks.every((c) => ["ok", "warn", "bad"].includes(c.level))
+  );
+  check(
+    "هر مورد غیرسالم می‌گوید چه اتفاقی می‌افتد",
+    healthChecks.filter((c) => c.level === "bad").every((c) => !!c.impact)
+  );
+  check(
+    "شمارش مشکل‌ها با خود بررسی‌ها می‌خواند",
+    health.bad === healthChecks.filter((c) => c.level === "bad").length &&
+      health.warn === healthChecks.filter((c) => c.level === "warn").length
+  );
+  check("دیتابیس سالم گزارش می‌شود", healthChecks.find((c) => c.key === "db")?.level === "ok");
+  check(
+    "منطقه‌ی زمانی درست تشخیص داده می‌شود",
+    healthChecks.find((c) => c.key === "timezone")?.level === "ok"
+  );
 
   // ── بستن صندوق ──────────────────────────────────────────────
   const CASH_PHONE = "09129990055";
