@@ -86,7 +86,7 @@ export default async function HealthPage() {
       <div className="space-y-6">
         {report.groups.map((group) => (
           <Card key={group.title} padded={false}>
-            <h2 className="border-b border-[color:var(--line)] p-6 font-bold">{group.title}</h2>
+            <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">{group.title}</h2>
             <ul className="divide-y divide-[color:var(--line)]">
               {group.checks.map((check) => {
                 const Icon = ICONS[check.level];

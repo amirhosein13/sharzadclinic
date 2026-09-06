@@ -59,7 +59,7 @@ export default async function InventoryPage() {
       />
 
       {low.length > 0 && (
-        <div className="mb-6 rounded-3xl border border-amber-300 bg-amber-50 p-6 dark:border-amber-400/30 dark:bg-amber-500/10">
+        <div className="mb-6 rounded-3xl border border-amber-300 bg-amber-50 p-4 sm:p-6 dark:border-amber-400/30 dark:bg-amber-500/10">
           <p className="flex items-center gap-2 font-bold">
             <TriangleAlert className="size-5 text-amber-600 dark:text-amber-300" />
             {toFa(low.length)} قلم رو به اتمام است
@@ -171,7 +171,7 @@ export default async function InventoryPage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card padded={false}>
-          <div className="border-b border-[color:var(--line)] p-6">
+          <div className="border-b border-[color:var(--line)] p-4 sm:p-6">
             <h2 className="font-bold">مصرف استاندارد خدمات</h2>
             <p className="mt-1.5 text-xs leading-6 text-[color:var(--fg-muted)]">
               با ثبت هر جلسه‌ی درمان، این مقدارها خودکار از انبار کم می‌شوند و بهای
@@ -179,7 +179,7 @@ export default async function InventoryPage() {
             </p>
           </div>
           {materials.length === 0 ? (
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <EmptyState
                 icon={FlaskConical}
                 title="هنوز تعریف نشده"
@@ -212,9 +212,9 @@ export default async function InventoryPage() {
         </Card>
 
         <Card padded={false}>
-          <h2 className="border-b border-[color:var(--line)] p-6 font-bold">آخرین حرکت‌های انبار</h2>
+          <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">آخرین حرکت‌های انبار</h2>
           {movements.length === 0 ? (
-            <p className="p-6 text-sm text-[color:var(--fg-muted)]">هنوز حرکتی ثبت نشده است.</p>
+            <p className="p-4 sm:p-6 text-sm text-[color:var(--fg-muted)]">هنوز حرکتی ثبت نشده است.</p>
           ) : (
             <ul className="divide-y divide-[color:var(--line)]">
               {movements.map((m) => {

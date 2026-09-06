@@ -94,7 +94,7 @@ export default async function AboutPage() {
               </p>
             </div>
 
-            <div className="mt-10 grid grid-cols-3 gap-4">
+            <div className="mt-10 grid grid-cols-3 gap-3 sm:gap-4">
               {[
                 { icon: Users, value: "۱۲٬۰۰۰+", label: "مراجع" },
                 { icon: Award, value: `${toFa(15)}+`, label: "سال تجربه" },
@@ -102,7 +102,7 @@ export default async function AboutPage() {
               ].map((s) => (
                 <div
                   key={s.label}
-                  className="rounded-3xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-5 text-center"
+                  className="rounded-3xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-3 text-center sm:p-5"
                 >
                   <s.icon className="mx-auto size-5 text-rose-500" />
                   <p className="mt-3 text-lg font-extrabold">{s.value}</p>

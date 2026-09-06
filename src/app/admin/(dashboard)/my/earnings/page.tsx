@@ -7,6 +7,7 @@ import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-heade
 import { Badge } from "@/components/ui/badge";
 import { jalaliMonthRange, formatJalaliLong } from "@/lib/date";
 import { cn, formatToman, toFa } from "@/lib/utils";
+import { TableScroll } from "@/components/admin/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -117,43 +118,43 @@ export default async function MyEarningsPage({
         <EmptyState icon={Wallet} title="در این دوره جلسه‌ی انجام‌شده‌ای ندارید" />
       ) : (
         <Card padded={false}>
-          <h2 className="border-b border-[color:var(--line)] p-6 font-bold">
+          <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
             ریز جلسات ({toFa(computed.lines.length)} مورد)
           </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[38rem] text-sm">
+          <TableScroll>
+            <table className="w-full min-w-[33rem] text-sm">
               <thead className="bg-[color:var(--bg-sunken)] text-xs text-[color:var(--fg-muted)]">
                 <tr>
-                  <th className="px-5 py-3 text-right font-medium">تاریخ</th>
-                  <th className="px-5 py-3 text-right font-medium">خدمت</th>
-                  <th className="px-5 py-3 text-right font-medium">مبلغ</th>
-                  <th className="px-5 py-3 text-right font-medium">درصد</th>
-                  <th className="px-5 py-3 text-right font-medium">سهم شما</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">تاریخ</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">خدمت</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">مبلغ</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">درصد</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">سهم شما</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--line)]">
                 {computed.lines.map((line) => (
                   <tr key={line.appointmentId} className="transition-colors hover:bg-[color:var(--bg-sunken)]">
-                    <td className="whitespace-nowrap px-5 py-4 text-xs">{formatJalaliLong(line.date)}</td>
-                    <td className="px-5 py-4">
+                    <td className="whitespace-nowrap px-3 sm:px-5 py-4 text-xs">{formatJalaliLong(line.date)}</td>
+                    <td className="px-3 sm:px-5 py-4">
                       {line.serviceTitle}
                       <span className="block text-xs text-[color:var(--fg-muted)]">{line.customerName}</span>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4">
+                    <td className="whitespace-nowrap px-3 sm:px-5 py-4">
                       {formatToman(line.amount, false)}
                       {line.estimated && (
                         <span className="mr-1.5 text-[10px] text-amber-600 dark:text-amber-300">تخمینی</span>
                       )}
                     </td>
-                    <td className="px-5 py-4">{toFa(line.commissionPercent)}٪</td>
-                    <td className="px-5 py-4 font-bold text-rose-600 dark:text-rose-300">
+                    <td className="px-3 sm:px-5 py-4">{toFa(line.commissionPercent)}٪</td>
+                    <td className="px-3 sm:px-5 py-4 font-bold text-rose-600 dark:text-rose-300">
                       {formatToman(line.commission, false)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </Card>
       )}
     </>

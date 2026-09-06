@@ -79,7 +79,7 @@ export default async function BackupPage() {
       </Card>
 
       <Card className="mt-6" padded={false}>
-        <div className="border-b border-[color:var(--line)] p-6">
+        <div className="border-b border-[color:var(--line)] p-4 sm:p-6">
           <h2 className="font-bold">
             نسخه‌های روی سرور
             <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
@@ -92,7 +92,7 @@ export default async function BackupPage() {
         </div>
 
         {backups.length === 0 ? (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <EmptyState
               icon={DatabaseBackup}
               title="نسخه‌ای روی سرور نیست"

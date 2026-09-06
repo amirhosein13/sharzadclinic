@@ -9,6 +9,7 @@ import { reopenCashDay } from "@/app/actions/cash";
 import { buildCashDay, recentCloses, unclosedDays } from "@/lib/cash";
 import { formatJalaliWithWeekday, formatJalaliDateTime, ymdKey } from "@/lib/date";
 import { cn, formatToman, toFa } from "@/lib/utils";
+import { TableScroll } from "@/components/admin/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -274,12 +275,12 @@ export default async function CashPage({
 
       {/* تاریخچه */}
       <Card padded={false} className="mt-6">
-        <div className="border-b border-[color:var(--line)] p-6">
+        <div className="border-b border-[color:var(--line)] p-4 sm:p-6">
           <h2 className="font-bold">روزهای بسته‌شده‌ی اخیر</h2>
         </div>
 
         {history.length === 0 ? (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <EmptyState
               icon={Wallet}
               title="هنوز صندوقی بسته نشده"
@@ -287,21 +288,21 @@ export default async function CashPage({
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[36rem] text-sm">
+          <TableScroll>
+            <table className="w-full min-w-[31rem] text-sm">
               <thead className="bg-[color:var(--bg-sunken)] text-xs text-[color:var(--fg-muted)]">
                 <tr>
-                  <th className="px-5 py-3 text-right font-medium">روز</th>
-                  <th className="px-5 py-3 text-right font-medium">انتظار</th>
-                  <th className="px-5 py-3 text-right font-medium">شمرده</th>
-                  <th className="px-5 py-3 text-right font-medium">اختلاف</th>
-                  <th className="px-5 py-3 text-right font-medium">بست</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">روز</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">انتظار</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">شمرده</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">اختلاف</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">بست</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--line)]">
                 {history.map((row) => (
                   <tr key={row.id}>
-                    <td className="px-5 py-3.5">
+                    <td className="px-3 sm:px-5 py-3.5">
                       <Link
                         href={`/admin/cash?date=${row.dateKey}`}
                         className="font-medium hover:text-rose-500"
@@ -314,10 +315,10 @@ export default async function CashPage({
                         </p>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 tabular-nums text-[color:var(--fg-muted)]">
+                    <td className="px-3 sm:px-5 py-3.5 tabular-nums text-[color:var(--fg-muted)]">
                       {formatToman(row.expectedInDrawer, false)}
                     </td>
-                    <td className="px-5 py-3.5 tabular-nums">{formatToman(row.countedCash, false)}</td>
+                    <td className="px-3 sm:px-5 py-3.5 tabular-nums">{formatToman(row.countedCash, false)}</td>
                     <td
                       className={cn(
                         "px-5 py-3.5 font-medium tabular-nums",
@@ -330,14 +331,14 @@ export default async function CashPage({
                     >
                       {row.difference === 0 ? "—" : formatToman(row.difference, false)}
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-[color:var(--fg-muted)]">
+                    <td className="px-3 sm:px-5 py-3.5 text-xs text-[color:var(--fg-muted)]">
                       {row.closedBy ?? "—"}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </Card>
     </>

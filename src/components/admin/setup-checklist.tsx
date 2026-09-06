@@ -41,7 +41,7 @@ export function SetupChecklist({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-4 p-6 text-right"
+        className="flex w-full items-center justify-between gap-4 p-4 sm:p-6 text-right"
       >
         <span className="flex min-w-0 items-center gap-4">
           <span

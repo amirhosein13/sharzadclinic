@@ -106,7 +106,7 @@ export default async function AdminServicesPage() {
               </div>
 
               {category.services.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-[color:var(--line)] p-6 text-center text-sm text-[color:var(--fg-muted)]">
+                <p className="rounded-2xl border border-dashed border-[color:var(--line)] p-4 sm:p-6 text-center text-sm text-[color:var(--fg-muted)]">
                   خدمتی در این دسته‌بندی ثبت نشده.
                 </p>
               ) : (

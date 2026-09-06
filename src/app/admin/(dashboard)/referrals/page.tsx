@@ -86,7 +86,7 @@ export default async function ReferralsPage() {
 
       {leaders.length > 0 && (
         <Card padded={false} className="mb-6">
-          <h2 className="border-b border-[color:var(--line)] p-6 font-bold">معرف‌های برتر</h2>
+          <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">معرف‌های برتر</h2>
           <ul className="divide-y divide-[color:var(--line)]">
             {leaders.map((row) => (
               <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 p-5">
@@ -115,10 +115,10 @@ export default async function ReferralsPage() {
       )}
 
       <Card padded={false}>
-        <h2 className="border-b border-[color:var(--line)] p-6 font-bold">آخرین معرفی‌ها</h2>
+        <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">آخرین معرفی‌ها</h2>
 
         {referrals.length === 0 ? (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <EmptyState
               icon={Users}
               title="هنوز معرفی‌ای ثبت نشده"

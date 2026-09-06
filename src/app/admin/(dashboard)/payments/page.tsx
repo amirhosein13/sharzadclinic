@@ -9,6 +9,7 @@ import { deletePayment } from "@/app/actions/payroll";
 import { Badge } from "@/components/ui/badge";
 import { formatJalaliLong, timeAgoFa } from "@/lib/date";
 import { formatToman, toFa } from "@/lib/utils";
+import { TableScroll } from "@/components/admin/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -98,23 +99,23 @@ export default async function PaymentsPage() {
         />
       ) : (
         <Card padded={false}>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[52rem] text-sm">
+          <TableScroll>
+            <table className="w-full min-w-[32rem] text-sm lg:min-w-[45rem]">
               <thead className="bg-[color:var(--bg-sunken)] text-xs text-[color:var(--fg-muted)]">
                 <tr>
-                  <th className="px-5 py-3 text-right font-medium">مشتری</th>
-                  <th className="px-5 py-3 text-right font-medium">بابت</th>
-                  <th className="px-5 py-3 text-right font-medium">مبلغ</th>
-                  <th className="px-5 py-3 text-right font-medium">روش</th>
-                  <th className="px-5 py-3 text-right font-medium">وضعیت</th>
-                  <th className="px-5 py-3 text-right font-medium">زمان</th>
-                  <th className="px-5 py-3 text-right font-medium"> </th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">مشتری</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">بابت</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">مبلغ</th>
+                  <th className="hidden px-3 py-3 text-right font-medium sm:px-5 lg:table-cell">روش</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">وضعیت</th>
+                  <th className="hidden px-3 py-3 text-right font-medium sm:px-5 lg:table-cell">زمان</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium"> </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--line)]">
                 {payments.map((p) => (
                   <tr key={p.id} className="transition-colors hover:bg-[color:var(--bg-sunken)]">
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <p className="font-medium">
                         {p.customer.firstName} {p.customer.lastName}
                       </p>
@@ -122,15 +123,22 @@ export default async function PaymentsPage() {
                         {toFa(p.customer.phone)}
                       </p>
                     </td>
-                    <td className="px-5 py-4 text-xs">
+                    <td className="px-3 sm:px-5 py-4 text-xs">
                       {p.appointment?.service.title ?? "—"}
                       {p.appointment && (
                         <span className="block text-[color:var(--fg-muted)]">{p.appointment.code}</span>
                       )}
                       {p.note && <span className="block text-[color:var(--fg-muted)]">{p.note}</span>}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4 font-medium">{formatToman(p.amount)}</td>
-                    <td className="px-5 py-4 text-xs">
+                    <td className="whitespace-nowrap px-3 py-4 font-medium sm:px-5">
+                      {formatToman(p.amount)}
+                      {/* روی گوشی ستون‌های روش و زمان پنهان‌اند */}
+                      <span className="block text-xs font-normal text-[color:var(--fg-muted)] lg:hidden">
+                        {METHOD_LABELS[p.method] ?? p.method} •{" "}
+                        {p.paidAt ? formatJalaliLong(p.paidAt) : timeAgoFa(p.createdAt)}
+                      </span>
+                    </td>
+                    <td className="hidden px-3 py-4 text-xs sm:px-5 lg:table-cell">
                       {METHOD_LABELS[p.method] ?? p.method}
                       {p.gateway === "zarinpal" && (
                         <span className="mt-1 flex items-center gap-1 text-[color:var(--fg-muted)]">
@@ -144,15 +152,15 @@ export default async function PaymentsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <Badge tone={STATUS_META[p.status]?.tone ?? "neutral"}>
                         {STATUS_META[p.status]?.label ?? p.status}
                       </Badge>
                     </td>
-                    <td className="px-5 py-4 text-xs text-[color:var(--fg-muted)]">
+                    <td className="hidden px-3 py-4 text-xs text-[color:var(--fg-muted)] sm:px-5 lg:table-cell">
                       {p.paidAt ? formatJalaliLong(p.paidAt) : timeAgoFa(p.createdAt)}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <div className="flex items-center gap-2">
                       {p.status === "PAID" && (
                         <Link
@@ -178,7 +186,7 @@ export default async function PaymentsPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </Card>
       )}
     </>

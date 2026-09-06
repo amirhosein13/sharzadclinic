@@ -233,7 +233,7 @@ export default async function ReportsPage({
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             <Card padded={false}>
-              <h2 className="border-b border-[color:var(--line)] p-6 font-bold">
+              <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
                 درآمد به تفکیک خدمت
               </h2>
               <ul className="divide-y divide-[color:var(--line)]">
@@ -253,7 +253,7 @@ export default async function ReportsPage({
             </Card>
 
             <Card padded={false}>
-              <h2 className="border-b border-[color:var(--line)] p-6 font-bold">
+              <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
                 عملکرد پرسنل
               </h2>
               <ul className="divide-y divide-[color:var(--line)]">
@@ -275,7 +275,7 @@ export default async function ReportsPage({
 
           {report.bySource.length > 0 && (
             <Card padded={false} className="mt-6">
-              <div className="border-b border-[color:var(--line)] p-6">
+              <div className="border-b border-[color:var(--line)] p-4 sm:p-6">
                 <h2 className="font-bold">مشتری از کجا آمد؟</h2>
                 <p className="mt-1.5 text-xs leading-6 text-[color:var(--fg-muted)]">
                   از مشتریانی که در این بازه پرونده‌شان ساخته شده. «درآمد» یعنی پولی که همان
@@ -363,11 +363,11 @@ export default async function ReportsPage({
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
             <Card padded={false}>
-              <h2 className="border-b border-[color:var(--line)] p-6 font-bold">
+              <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
                 مشتریان برتر این بازه
               </h2>
               {report.topCustomers.length === 0 ? (
-                <p className="p-6 text-sm text-[color:var(--fg-muted)]">
+                <p className="p-4 sm:p-6 text-sm text-[color:var(--fg-muted)]">
                   هنوز جلسه‌ی انجام‌شده‌ای ثبت نشده است.
                 </p>
               ) : (
@@ -483,7 +483,7 @@ export default async function ReportsPage({
 
           {profit.byService.length > 0 && (
             <Card className="mt-6" padded={false}>
-              <div className="border-b border-[color:var(--line)] p-6">
+              <div className="border-b border-[color:var(--line)] p-4 sm:p-6">
                 <h3 className="font-bold">سود هر خدمت</h3>
                 <p className="mt-1.5 text-xs leading-6 text-[color:var(--fg-muted)]">
                   درآمد منهای بهای مواد و پورسانت پرسنل — پرسودترین‌ها اول.
@@ -594,11 +594,11 @@ export default async function ReportsPage({
 
               <div className="mt-6 grid gap-6 lg:grid-cols-2">
                 <Card padded={false}>
-                  <h3 className="border-b border-[color:var(--line)] p-6 font-bold">
+                  <h3 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
                     بیشترین شکایت‌ها
                   </h3>
                   {satisfaction.complaints.length === 0 ? (
-                    <p className="p-6 text-sm text-[color:var(--fg-muted)]">
+                    <p className="p-4 sm:p-6 text-sm text-[color:var(--fg-muted)]">
                       هیچ‌کس از چیزی شکایت نکرده است.
                     </p>
                   ) : (
@@ -621,11 +621,11 @@ export default async function ReportsPage({
                 </Card>
 
                 <Card padded={false}>
-                  <h3 className="border-b border-[color:var(--line)] p-6 font-bold">
+                  <h3 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
                     بیشترین تعریف‌ها
                   </h3>
                   {satisfaction.praises.length === 0 ? (
-                    <p className="p-6 text-sm text-[color:var(--fg-muted)]">هنوز چیزی ثبت نشده.</p>
+                    <p className="p-4 sm:p-6 text-sm text-[color:var(--fg-muted)]">هنوز چیزی ثبت نشده.</p>
                   ) : (
                     <ul className="divide-y divide-[color:var(--line)]">
                       {satisfaction.praises.slice(0, 8).map((row) => (
@@ -648,7 +648,7 @@ export default async function ReportsPage({
 
               <div className="mt-6 grid gap-6 lg:grid-cols-2">
                 <Card padded={false}>
-                  <h3 className="border-b border-[color:var(--line)] p-6 font-bold">
+                  <h3 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
                     رضایت به تفکیک خدمت
                     <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
                       (ضعیف‌ترین‌ها اول)
@@ -670,7 +670,7 @@ export default async function ReportsPage({
                 </Card>
 
                 <Card padded={false}>
-                  <h3 className="border-b border-[color:var(--line)] p-6 font-bold">
+                  <h3 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
                     رضایت به تفکیک پرسنل
                     <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
                       (ضعیف‌ترین‌ها اول)

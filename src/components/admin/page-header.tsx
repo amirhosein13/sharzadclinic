@@ -8,7 +8,7 @@ export function AdminPageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+    <div className="mb-6 flex flex-col justify-between gap-4 sm:mb-8 sm:flex-row sm:items-end">
       <div>
         <h1 className="text-2xl font-extrabold sm:text-3xl">{title}</h1>
         {description && (
@@ -32,7 +32,7 @@ export function Card({
   return (
     <div
       className={`rounded-3xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] shadow-soft ${
-        padded ? "p-6" : ""
+        padded ? "p-4 sm:p-6" : ""
       } ${className}`}
     >
       {children}
@@ -50,7 +50,7 @@ export function EmptyState({
   description?: string;
 }) {
   return (
-    <div className="rounded-3xl border border-dashed border-[color:var(--line)] p-14 text-center">
+    <div className="rounded-3xl border border-dashed border-[color:var(--line)] p-8 text-center sm:p-14">
       <Icon className="mx-auto size-10 text-rose-300" />
       <p className="mt-4 font-semibold">{title}</p>
       {description && (

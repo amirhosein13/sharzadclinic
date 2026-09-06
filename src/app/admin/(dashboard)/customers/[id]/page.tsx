@@ -275,9 +275,9 @@ export default async function CustomerDetailPage({
         {/* تاریخچه */}
         <div className="space-y-6">
           <Card padded={false}>
-            <h2 className="border-b border-[color:var(--line)] p-6 font-bold">تاریخچه‌ی نوبت‌ها</h2>
+            <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">تاریخچه‌ی نوبت‌ها</h2>
             {customer.appointments.length === 0 ? (
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <EmptyState icon={CalendarDays} title="نوبتی ثبت نشده" />
               </div>
             ) : (
@@ -300,7 +300,7 @@ export default async function CustomerDetailPage({
 
           {/* پکیج‌های جلسات */}
           <Card padded={false}>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-4 sm:p-6">
               <h2 className="flex items-center gap-2 font-bold">
                 <PackageIcon className="size-[18px] text-gold-600" />
                 پکیج جلسات
@@ -314,7 +314,7 @@ export default async function CustomerDetailPage({
             </div>
 
             {packages.length === 0 ? (
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <EmptyState
                   icon={PackageIcon}
                   title="پکیجی ثبت نشده"
@@ -322,7 +322,7 @@ export default async function CustomerDetailPage({
                 />
               </div>
             ) : (
-              <div className="space-y-4 p-6">
+              <div className="space-y-4 p-4 sm:p-6">
                 {packages.map((pkg) => (
                   <PackageCard
                     key={pkg.id}
@@ -356,7 +356,7 @@ export default async function CustomerDetailPage({
 
           {customer.feedbacks.length > 0 && (
             <Card padded={false}>
-              <h2 className="border-b border-[color:var(--line)] p-6 font-bold">
+              <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
                 نظرهای این مشتری
                 <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
                   ({toFa(customer.feedbacks.length)} نظر)
@@ -419,7 +419,7 @@ export default async function CustomerDetailPage({
           )}
 
           <Card padded={false}>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-4 sm:p-6">
               <h2 className="font-bold">
                 رضایت‌نامه‌ها
                 <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
@@ -475,7 +475,7 @@ export default async function CustomerDetailPage({
             )}
 
             {customer.consents.length === 0 ? (
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <EmptyState
                   icon={FileSignature}
                   title="رضایت‌نامه‌ای امضا نشده"
@@ -523,7 +523,7 @@ export default async function CustomerDetailPage({
           </Card>
 
           <Card padded={false}>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-4 sm:p-6">
               <h2 className="font-bold">
                 پرونده‌ی درمانی
                 <span className="mr-2 text-xs font-normal text-[color:var(--fg-muted)]">
@@ -540,7 +540,7 @@ export default async function CustomerDetailPage({
             </div>
 
             {customer.treatments.length === 0 ? (
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <EmptyState
                   icon={FileText}
                   title="سابقه‌ای ثبت نشده"
@@ -612,7 +612,7 @@ export default async function CustomerDetailPage({
 
           {customer.payments.length > 0 && (
             <Card padded={false}>
-              <div className="flex items-center justify-between border-b border-[color:var(--line)] p-6">
+              <div className="flex items-center justify-between border-b border-[color:var(--line)] p-4 sm:p-6">
                 <h2 className="font-bold">پرداخت‌ها</h2>
                 <p className="text-sm font-bold text-rose-600 dark:text-rose-300">
                   مجموع: {formatToman(totalPaid)}

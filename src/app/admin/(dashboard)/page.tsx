@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { STATUS_META } from "@/lib/appointment-status";
 import { formatJalaliWithWeekday, formatTime, timeAgoFa } from "@/lib/date";
 import { formatToman, toFa } from "@/lib/utils";
+import { TableScroll } from "@/components/admin/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -129,7 +130,7 @@ export default async function AdminDashboard() {
       )}
 
       {attention.length === 0 && setup?.allDone !== false && (
-        <div className="mb-6 flex items-center gap-4 rounded-3xl border border-emerald-300 bg-emerald-50 p-6 dark:border-emerald-400/30 dark:bg-emerald-500/10">
+        <div className="mb-6 flex items-center gap-4 rounded-3xl border border-emerald-300 bg-emerald-50 p-4 sm:p-6 dark:border-emerald-400/30 dark:bg-emerald-500/10">
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-500 text-white">
             <CircleCheck className="size-5" />
           </span>
@@ -147,7 +148,7 @@ export default async function AdminDashboard() {
           <Link
             key={stat.label}
             href={stat.href}
-            className="group rounded-3xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-6 shadow-soft transition-all hover:-translate-y-1 hover:shadow-lift"
+            className="group rounded-3xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-4 sm:p-6 shadow-soft transition-all hover:-translate-y-1 hover:shadow-lift"
           >
             <div className="flex items-start justify-between">
               <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 text-white">
@@ -208,7 +209,7 @@ export default async function AdminDashboard() {
       </div>
 
       <Card className="mt-6" padded={false}>
-        <div className="flex items-center justify-between border-b border-[color:var(--line)] p-6">
+        <div className="flex items-center justify-between border-b border-[color:var(--line)] p-4 sm:p-6">
           <h2 className="flex items-center gap-2 font-bold">
             <CircleCheck className="size-[18px] text-rose-500" />
             نوبت‌های پیش‌رو
@@ -223,25 +224,25 @@ export default async function AdminDashboard() {
         </div>
 
         {upcoming.length === 0 ? (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <EmptyState icon={CalendarDays} title="نوبت پیش‌رویی ثبت نشده" />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[46rem] text-sm">
+          <TableScroll>
+            <table className="w-full min-w-[40rem] text-sm">
               <thead className="bg-[color:var(--bg-sunken)] text-xs text-[color:var(--fg-muted)]">
                 <tr>
-                  <th className="px-6 py-3 text-right font-medium">مشتری</th>
-                  <th className="px-6 py-3 text-right font-medium">خدمت</th>
-                  <th className="px-6 py-3 text-right font-medium">متخصص</th>
-                  <th className="px-6 py-3 text-right font-medium">زمان</th>
-                  <th className="px-6 py-3 text-right font-medium">وضعیت</th>
+                  <th className="px-3 sm:px-6 py-3 text-right font-medium">مشتری</th>
+                  <th className="px-3 sm:px-6 py-3 text-right font-medium">خدمت</th>
+                  <th className="px-3 sm:px-6 py-3 text-right font-medium">متخصص</th>
+                  <th className="px-3 sm:px-6 py-3 text-right font-medium">زمان</th>
+                  <th className="px-3 sm:px-6 py-3 text-right font-medium">وضعیت</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--line)]">
                 {upcoming.map((appt) => (
                   <tr key={appt.id} className="transition-colors hover:bg-[color:var(--bg-sunken)]">
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-4">
                       <p className="font-medium">
                         {appt.customer.firstName} {appt.customer.lastName}
                       </p>
@@ -249,20 +250,20 @@ export default async function AdminDashboard() {
                         {toFa(appt.customer.phone)}
                       </p>
                     </td>
-                    <td className="px-6 py-4">{appt.service.title}</td>
-                    <td className="px-6 py-4 text-[color:var(--fg-muted)]">{appt.staff?.name ?? "—"}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-4">{appt.service.title}</td>
+                    <td className="px-3 sm:px-6 py-4 text-[color:var(--fg-muted)]">{appt.staff?.name ?? "—"}</td>
+                    <td className="px-3 sm:px-6 py-4">
                       <p>{formatJalaliWithWeekday(appt.startsAt)}</p>
                       <p className="text-xs text-[color:var(--fg-muted)]">ساعت {formatTime(appt.startsAt)}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-4">
                       <Badge tone={STATUS_META[appt.status].tone}>{STATUS_META[appt.status].label}</Badge>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </Card>
     </>

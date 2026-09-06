@@ -9,6 +9,7 @@ import { toggleCustomerBlock } from "@/app/actions/admin";
 import { Badge } from "@/components/ui/badge";
 import { formatJalaliLong } from "@/lib/date";
 import { toFa } from "@/lib/utils";
+import { TableScroll } from "@/components/admin/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -87,22 +88,22 @@ export default async function CustomersPage({
         />
       ) : (
         <Card padded={false}>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[48rem] text-sm">
+          <TableScroll>
+            <table className="w-full min-w-[26rem] text-sm lg:min-w-[42rem]">
               <thead className="bg-[color:var(--bg-sunken)] text-xs text-[color:var(--fg-muted)]">
                 <tr>
-                  <th className="px-5 py-3 text-right font-medium">نام</th>
-                  <th className="px-5 py-3 text-right font-medium">موبایل</th>
-                  <th className="px-5 py-3 text-right font-medium">نوبت‌ها</th>
-                  <th className="px-5 py-3 text-right font-medium">پرونده</th>
-                  <th className="px-5 py-3 text-right font-medium">عضویت</th>
-                  <th className="px-5 py-3 text-right font-medium"> </th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">نام</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">موبایل</th>
+                  <th className="hidden px-3 py-3 text-right font-medium sm:px-5 lg:table-cell">نوبت‌ها</th>
+                  <th className="hidden px-3 py-3 text-right font-medium sm:px-5 lg:table-cell">پرونده</th>
+                  <th className="hidden px-3 py-3 text-right font-medium sm:px-5 lg:table-cell">عضویت</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium"> </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--line)]">
                 {customers.map((customer) => (
                   <tr key={customer.id} className="transition-colors hover:bg-[color:var(--bg-sunken)]">
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <Link
                         href={`/admin/customers/${customer.id}`}
                         className="font-medium hover:text-rose-500"
@@ -113,16 +114,20 @@ export default async function CustomersPage({
                         {customer.legacyId && <Badge tone="plum">منتقل‌شده</Badge>}
                         {customer.isBlocked && <Badge tone="red">محدود</Badge>}
                       </div>
+                      {/* روی گوشی ستون‌های شمارش پنهان‌اند */}
+                      <p className="mt-1 text-xs text-[color:var(--fg-muted)] lg:hidden">
+                        {toFa(customer._count.appointments)} نوبت • {toFa(customer._count.treatments)} پرونده
+                      </p>
                     </td>
-                    <td className="px-5 py-4" dir="ltr">
+                    <td className="px-3 sm:px-5 py-4" dir="ltr">
                       <span className="text-right">{toFa(customer.phone)}</span>
                     </td>
-                    <td className="px-5 py-4">{toFa(customer._count.appointments)}</td>
-                    <td className="px-5 py-4">{toFa(customer._count.treatments)}</td>
-                    <td className="px-5 py-4 text-xs text-[color:var(--fg-muted)]">
+                    <td className="hidden px-3 py-4 sm:px-5 lg:table-cell">{toFa(customer._count.appointments)}</td>
+                    <td className="hidden px-3 py-4 sm:px-5 lg:table-cell">{toFa(customer._count.treatments)}</td>
+                    <td className="hidden px-3 py-4 text-xs text-[color:var(--fg-muted)] sm:px-5 lg:table-cell">
                       {formatJalaliLong(customer.createdAt)}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <ActionButton
                         action={toggleCustomerBlock.bind(null, customer.id)}
                         title={customer.isBlocked ? "برداشتن محدودیت" : "محدودکردن رزرو آنلاین"}
@@ -143,7 +148,7 @@ export default async function CustomersPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-[color:var(--line)] px-5 py-4">

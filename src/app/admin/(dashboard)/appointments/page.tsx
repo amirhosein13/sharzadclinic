@@ -12,6 +12,7 @@ import { STATUS_META, STATUS_ORDER } from "@/lib/appointment-status";
 import { formatJalaliWithWeekday, formatTime } from "@/lib/date";
 import { cn, toFa } from "@/lib/utils";
 import type { AppointmentStatus } from "@prisma/client";
+import { TableScroll } from "@/components/admin/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -133,26 +134,26 @@ export default async function AppointmentsPage({
         />
       ) : (
         <Card padded={false}>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[58rem] text-sm">
+          <TableScroll>
+            <table className="w-full min-w-[34rem] text-sm lg:min-w-[51rem]">
               <thead className="bg-[color:var(--bg-sunken)] text-xs text-[color:var(--fg-muted)]">
                 <tr>
-                  <th className="px-5 py-3 text-right font-medium">کد</th>
-                  <th className="px-5 py-3 text-right font-medium">مشتری</th>
-                  <th className="px-5 py-3 text-right font-medium">خدمت</th>
-                  <th className="px-5 py-3 text-right font-medium">متخصص</th>
-                  <th className="px-5 py-3 text-right font-medium">زمان</th>
-                  <th className="px-5 py-3 text-right font-medium">وضعیت</th>
-                  <th className="px-5 py-3 text-right font-medium"> </th>
+                  <th className="hidden px-3 py-3 text-right font-medium sm:px-5 lg:table-cell">کد</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">مشتری</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">خدمت</th>
+                  <th className="hidden px-3 py-3 text-right font-medium sm:px-5 lg:table-cell">متخصص</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">زمان</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">وضعیت</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium"> </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--line)]">
                 {appointments.map((appt) => (
                   <tr key={appt.id} className="transition-colors hover:bg-[color:var(--bg-sunken)]">
-                    <td className="px-5 py-4">
+                    <td className="hidden px-3 py-4 sm:px-5 lg:table-cell">
                       <span className="font-mono text-xs font-bold tracking-wider">{appt.code}</span>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="min-w-[8.5rem] px-3 py-4 sm:px-5">
                       <Link
                         href={`/admin/customers/${appt.customerId}`}
                         className="font-medium hover:text-rose-500"
@@ -162,19 +163,23 @@ export default async function AppointmentsPage({
                       <p className="text-xs text-[color:var(--fg-muted)]" dir="ltr">
                         {toFa(appt.customer.phone)}
                       </p>
+                      {/* روی گوشی این دو ستون پنهان‌اند، پس همین‌جا نشانشان می‌دهیم */}
+                      <p className="text-xs text-[color:var(--fg-muted)] lg:hidden">
+                        <span className="font-mono tracking-wider">{appt.code}</span>
+                      </p>
                     </td>
-                    <td className="px-5 py-4">{appt.service.title}</td>
-                    <td className="px-5 py-4 text-[color:var(--fg-muted)]">{appt.staff?.name ?? "—"}</td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">{appt.service.title}</td>
+                    <td className="hidden px-3 py-4 text-[color:var(--fg-muted)] sm:px-5 lg:table-cell">{appt.staff?.name ?? "—"}</td>
+                    <td className="px-3 sm:px-5 py-4">
                       <p className="whitespace-nowrap">{formatJalaliWithWeekday(appt.startsAt)}</p>
                       <p className="text-xs text-[color:var(--fg-muted)]">
                         {formatTime(appt.startsAt)} تا {formatTime(appt.endsAt)}
                       </p>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <StatusSelect id={appt.id} value={appt.status} />
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <div className="flex gap-2">
                         <PaymentForm
                           appointmentId={appt.id}
@@ -205,7 +210,7 @@ export default async function AppointmentsPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-[color:var(--line)] px-5 py-4 text-sm">

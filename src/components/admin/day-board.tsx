@@ -206,7 +206,7 @@ export function DayBoard({
             role="dialog"
             aria-modal="true"
             aria-label={`نوبت ${selected.code}`}
-            className="relative w-full max-w-md rounded-[1.75rem] border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-6 shadow-2xl"
+            className="relative w-full max-w-md rounded-[1.75rem] border border-[color:var(--line)] bg-[color:var(--bg-elevated)] p-4 sm:p-6 shadow-2xl"
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">

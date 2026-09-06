@@ -42,7 +42,7 @@ export function Modal({
           wide ? "max-w-3xl" : "max-w-xl"
         }`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[color:var(--line)] p-6">
+        <div className="flex items-start justify-between gap-4 border-b border-[color:var(--line)] p-5 sm:p-6">
           <div>
             <h2 className="text-lg font-bold">{title}</h2>
             {description && (
@@ -58,7 +58,7 @@ export function Modal({
             <X className="size-5" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-5 sm:p-6">{children}</div>
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { timeAgoFa } from "@/lib/date";
 import { toFa } from "@/lib/utils";
+import { TableScroll } from "@/components/admin/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -41,21 +42,21 @@ export default async function AdminUsersPage() {
         <EmptyState icon={Users} title="کاربری ثبت نشده" />
       ) : (
         <Card padded={false}>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[46rem] text-sm">
+          <TableScroll>
+            <table className="w-full min-w-[40rem] text-sm">
               <thead className="bg-[color:var(--bg-sunken)] text-xs text-[color:var(--fg-muted)]">
                 <tr>
-                  <th className="px-5 py-3 text-right font-medium">نام</th>
-                  <th className="px-5 py-3 text-right font-medium">ایمیل</th>
-                  <th className="px-5 py-3 text-right font-medium">نقش</th>
-                  <th className="px-5 py-3 text-right font-medium">آخرین ورود</th>
-                  <th className="px-5 py-3 text-right font-medium"> </th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">نام</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">ایمیل</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">نقش</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">آخرین ورود</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium"> </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--line)]">
                 {users.map((user) => (
                   <tr key={user.id} className="transition-colors hover:bg-[color:var(--bg-sunken)]">
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <p className="font-medium">
                         {user.name}
                         {user.id === current.id && (
@@ -64,10 +65,10 @@ export default async function AdminUsersPage() {
                       </p>
                       {!user.isActive && <Badge tone="red">غیرفعال</Badge>}
                     </td>
-                    <td className="px-5 py-4 text-xs" dir="ltr">
+                    <td className="px-3 sm:px-5 py-4 text-xs" dir="ltr">
                       <span className="block text-right">{user.email}</span>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <Badge tone={user.role === "ADMIN" ? "gold" : "plum"}>{ROLE_LABELS[user.role]}</Badge>
                       {user.staff && (
                         <p className="mt-1 text-[11px] text-[color:var(--fg-muted)]">{user.staff.name}</p>
@@ -78,10 +79,10 @@ export default async function AdminUsersPage() {
                         </p>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-xs text-[color:var(--fg-muted)]">
+                    <td className="px-3 sm:px-5 py-4 text-xs text-[color:var(--fg-muted)]">
                       {user.lastLoginAt ? timeAgoFa(user.lastLoginAt) : "هرگز"}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <div className="flex gap-2">
                         <UserForm
                           staff={staff}
@@ -111,7 +112,7 @@ export default async function AdminUsersPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </Card>
       )}
 

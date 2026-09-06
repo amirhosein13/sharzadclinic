@@ -10,6 +10,7 @@ import { buildSiteStats } from "@/lib/site-stats";
 import { noShowCost, noShowReport } from "@/lib/no-shows";
 import { formatJalaliLong } from "@/lib/date";
 import { cn, formatToman, toFa } from "@/lib/utils";
+import { TableScroll } from "@/components/admin/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -139,10 +140,10 @@ export default async function AnalyticsPage({
 
           <div className="mb-6 grid gap-6 lg:grid-cols-2">
             <Card padded={false}>
-              <h2 className="border-b border-[color:var(--line)] p-6 font-bold">
+              <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
                 نرخ اشغال روزهای هفته
               </h2>
-              <ul className="space-y-4 p-6">
+              <ul className="space-y-4 p-4 sm:p-6">
                 {utilization.byWeekday.map((row) => (
                   <li key={row.weekday}>
                     <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
@@ -158,10 +159,10 @@ export default async function AnalyticsPage({
             </Card>
 
             <Card padded={false}>
-              <h2 className="border-b border-[color:var(--line)] p-6 font-bold">
+              <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">
                 نرخ اشغال ساعت‌ها
               </h2>
-              <ul className="space-y-3 p-6">
+              <ul className="space-y-3 p-4 sm:p-6">
                 {utilization.byHour.map((row) => (
                   <li key={row.hour} className="flex items-center gap-3">
                     <span className="w-24 shrink-0 text-xs text-[color:var(--fg-muted)]" dir="ltr">
@@ -179,14 +180,14 @@ export default async function AnalyticsPage({
 
           {utilization.byStaff.length > 0 && (
             <Card padded={false} className="mb-6">
-              <div className="border-b border-[color:var(--line)] p-6">
+              <div className="border-b border-[color:var(--line)] p-4 sm:p-6">
                 <h2 className="font-bold">نرخ اشغال پرسنل</h2>
                 <p className="mt-1.5 text-xs leading-6 text-[color:var(--fg-muted)]">
                   از کم‌کارترین به پرکارترین. عدد پایین یعنی شیفتش زیاد است یا خدماتش کم
                   درخواست دارد — نه لزوماً اینکه بد کار می‌کند.
                 </p>
               </div>
-              <ul className="space-y-4 p-6">
+              <ul className="space-y-4 p-4 sm:p-6">
                 {utilization.byStaff.map((row) => (
                   <li key={row.staffId}>
                     <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
@@ -206,7 +207,7 @@ export default async function AnalyticsPage({
 
       {/* ── سایت ──────────────────────────────────────────── */}
       <Card padded={false} className="mb-6">
-        <div className="border-b border-[color:var(--line)] p-6">
+        <div className="border-b border-[color:var(--line)] p-4 sm:p-6">
           <h2 className="flex items-center gap-2 font-bold">
             <Eye className="size-4" />
             کدام صفحه مشتری می‌آورد؟
@@ -218,7 +219,7 @@ export default async function AnalyticsPage({
         </div>
 
         {site.byService.length === 0 ? (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <EmptyState
               icon={MousePointerClick}
               title="هنوز آماری جمع نشده"
@@ -226,23 +227,23 @@ export default async function AnalyticsPage({
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[34rem] text-sm">
+          <TableScroll>
+            <table className="w-full min-w-[30rem] text-sm">
               <thead className="bg-[color:var(--bg-sunken)] text-xs text-[color:var(--fg-muted)]">
                 <tr>
-                  <th className="px-5 py-3 text-right font-medium">خدمت</th>
-                  <th className="px-5 py-3 text-right font-medium">بازدید</th>
-                  <th className="px-5 py-3 text-right font-medium">رزرو</th>
-                  <th className="px-5 py-3 text-right font-medium">نرخ تبدیل</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">خدمت</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">بازدید</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">رزرو</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">نرخ تبدیل</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--line)]">
                 {site.byService.map((row) => (
                   <tr key={row.slug}>
-                    <td className="px-5 py-3.5 font-medium">{row.title}</td>
-                    <td className="px-5 py-3.5 tabular-nums">{toFa(row.views)}</td>
-                    <td className="px-5 py-3.5 tabular-nums">{toFa(row.bookings)}</td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-3 sm:px-5 py-3.5 font-medium">{row.title}</td>
+                    <td className="px-3 sm:px-5 py-3.5 tabular-nums">{toFa(row.views)}</td>
+                    <td className="px-3 sm:px-5 py-3.5 tabular-nums">{toFa(row.bookings)}</td>
+                    <td className="px-3 sm:px-5 py-3.5">
                       <span
                         className={cn(
                           "font-medium tabular-nums",
@@ -260,7 +261,7 @@ export default async function AnalyticsPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         )}
       </Card>
 
@@ -308,7 +309,7 @@ export default async function AnalyticsPage({
 
       {/* ── بدقول‌ها ───────────────────────────────────────── */}
       <Card padded={false}>
-        <div className="border-b border-[color:var(--line)] p-6">
+        <div className="border-b border-[color:var(--line)] p-4 sm:p-6">
           <h2 className="flex items-center gap-2 font-bold">
             <UserX className="size-4" />
             مشتری‌هایی که نمی‌آیند
@@ -319,7 +320,7 @@ export default async function AnalyticsPage({
         </div>
 
         {noShows.length === 0 ? (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <EmptyState
               icon={CalendarX2}
               title="کسی سابقه‌ی نیامدنِ مکرر ندارد"

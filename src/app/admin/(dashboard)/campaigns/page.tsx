@@ -71,10 +71,10 @@ export default async function CampaignsPage() {
       </div>
 
       <Card padded={false}>
-        <h2 className="border-b border-[color:var(--line)] p-6 font-bold">ارسال‌های اخیر</h2>
+        <h2 className="border-b border-[color:var(--line)] p-4 sm:p-6 font-bold">ارسال‌های اخیر</h2>
 
         {campaigns.length === 0 ? (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <EmptyState
               icon={Megaphone}
               title="هنوز ارسال گروهی نداشته‌اید"

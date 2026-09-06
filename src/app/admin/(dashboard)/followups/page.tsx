@@ -55,7 +55,7 @@ export default async function FollowUpsPage() {
       {/* نوبت‌های تأییدنشده‌ی نزدیک */}
       {unconfirmed.length > 0 && (
         <Card className="mb-8" padded={false}>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--line)] p-4 sm:p-6">
             <h2 className="flex items-center gap-2 font-bold">
               <CalendarClock className="size-[18px] text-amber-600" />
               نوبت‌های نزدیک که هنوز تأیید نشده‌اند

@@ -5,6 +5,7 @@ import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-heade
 import { Badge } from "@/components/ui/badge";
 import { timeAgoFa } from "@/lib/date";
 import { toFa } from "@/lib/utils";
+import { TableScroll } from "@/components/admin/table-scroll";
 
 export const dynamic = "force-dynamic";
 
@@ -76,21 +77,21 @@ export default async function NotificationsPage() {
         <EmptyState icon={MessageSquare} title="هنوز پیامی ارسال نشده" />
       ) : (
         <Card padded={false}>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[44rem] text-sm">
+          <TableScroll>
+            <table className="w-full min-w-[39rem] text-sm">
               <thead className="bg-[color:var(--bg-sunken)] text-xs text-[color:var(--fg-muted)]">
                 <tr>
-                  <th className="px-5 py-3 text-right font-medium">کانال</th>
-                  <th className="px-5 py-3 text-right font-medium">نوع پیام</th>
-                  <th className="px-5 py-3 text-right font-medium">گیرنده</th>
-                  <th className="px-5 py-3 text-right font-medium">وضعیت</th>
-                  <th className="px-5 py-3 text-right font-medium">زمان</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">کانال</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">نوع پیام</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">گیرنده</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">وضعیت</th>
+                  <th className="px-3 sm:px-5 py-3 text-right font-medium">زمان</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--line)]">
                 {logs.map((log) => (
                   <tr key={log.id} className="transition-colors hover:bg-[color:var(--bg-sunken)]">
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <span className="inline-flex items-center gap-1.5 text-xs">
                         {log.channel === "SMS" ? (
                           <MessageSquare className="size-3.5 text-rose-500" />
@@ -100,11 +101,11 @@ export default async function NotificationsPage() {
                         {log.channel === "SMS" ? "پیامک" : "ایمیل"}
                       </span>
                     </td>
-                    <td className="px-5 py-4">{TEMPLATE_LABELS[log.template] ?? log.template}</td>
-                    <td className="px-5 py-4 text-xs" dir="ltr">
+                    <td className="px-3 sm:px-5 py-4">{TEMPLATE_LABELS[log.template] ?? log.template}</td>
+                    <td className="px-3 sm:px-5 py-4 text-xs" dir="ltr">
                       <span className="block text-right">{toFa(log.recipient)}</span>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 sm:px-5 py-4">
                       <Badge tone={STATUS_META[log.status]?.tone ?? "neutral"}>
                         {STATUS_META[log.status]?.label ?? log.status}
                       </Badge>
@@ -114,14 +115,14 @@ export default async function NotificationsPage() {
                         </p>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-xs text-[color:var(--fg-muted)]">
+                    <td className="px-3 sm:px-5 py-4 text-xs text-[color:var(--fg-muted)]">
                       {timeAgoFa(log.createdAt)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </Card>
       )}
     </>

@@ -41,7 +41,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ]);
 
   return (
-    <div className="flex min-h-dvh bg-[color:var(--bg-sunken)]">
+    <div className="min-h-dvh bg-[color:var(--bg-sunken)] lg:flex">
       <Sidebar
         user={{ name: user.name, email: user.email, role: user.role }}
         badges={{
@@ -57,9 +57,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         }}
       />
       <div className="min-w-0 flex-1">
-        <div className="mx-auto max-w-7xl p-5 sm:p-8">
+        <div className="mx-auto max-w-7xl p-4 sm:p-8">
           {can(user.role, "customers") && (
-            <div className="mb-6 max-w-xl">
+            <div className="mb-4 max-w-xl sm:mb-6">
               <GlobalSearch />
             </div>
           )}
