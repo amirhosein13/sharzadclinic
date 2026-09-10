@@ -80,8 +80,21 @@ git clone --branch claude/beauty-clinic-website-7ej1e7 \
 ```bash
 apt install -y tmux
 tmux new -s setup
-bash /tmp/sharzad-setup/deploy/setup-server.sh
 ```
+
+و **داخل tmux** — با دادن جواب‌ها از همان اول، تا اسکریپت وسط راه
+منتظر تو نماند:
+
+```bash
+bash /tmp/sharzad-setup/deploy/setup-server.sh \
+  --domain=shahrzadlaser.ir \
+  --email=you@example.com \
+  2>&1 | tee /root/setup.log
+```
+
+اگر آرگومان‌ها را ندهی، اول سه سؤال می‌پرسد و **تا جواب ندهی هیچ کاری
+نمی‌کند** — از بیرون شبیه هنگ‌کردن به نظر می‌رسد. دادن آرگومان‌ها این
+مشکل را کلاً حذف می‌کند.
 
 **اگر اینترنتت قطع شد:** پنجره را ببند، دوباره وصل شو و بزن:
 

@@ -29,17 +29,43 @@ trap 'die "خطا در خط $LINENO. چیزی نصفه‌کاره ماند — �
 [[ "${VERSION_ID:-}" == "24.04" ]] || warn "این اسکریپت روی Ubuntu 24.04 نوشته شده (تو: ${VERSION_ID:-نامعلوم})."
 
 # ─── ۰) گرفتن اطلاعات ────────────────────────────────────────
-read -rp "دامنه (بدون www و بدون https)، مثلاً shahrzadlaser.ir : " DOMAIN
-[[ -n "$DOMAIN" ]] || die "دامنه لازم است."
-read -rp "ایمیل برای گواهی SSL (هشدار انقضا به این می‌آید): " SSL_EMAIL
-[[ -n "$SSL_EMAIL" ]] || die "ایمیل لازم است."
-read -rp "ایمیل ورود مدیر به پنل [admin@$DOMAIN]: " ADMIN_EMAIL
+# می‌شود همه را از خط فرمان داد تا اسکریپت اصلاً سؤالی نپرسد:
+#   bash setup-server.sh --domain=example.ir --email=a@b.c
+# این برای اجرای طولانی مهم است: اسکریپتی که وسط tmux منتظر جواب بماند،
+# ساعت‌ها همان‌جا می‌ایستد و کاربر فکر می‌کند هنگ کرده.
+DOMAIN=""; SSL_EMAIL=""; ADMIN_EMAIL=""
+for arg in "$@"; do
+  case "$arg" in
+    --domain=*)      DOMAIN="${arg#*=}" ;;
+    --email=*)       SSL_EMAIL="${arg#*=}" ;;
+    --admin-email=*) ADMIN_EMAIL="${arg#*=}" ;;
+    -h|--help)
+      echo "استفاده: bash setup-server.sh [--domain=example.ir] [--email=you@mail.com] [--admin-email=admin@example.ir]"
+      exit 0 ;;
+  esac
+done
+
+if [[ -z "$DOMAIN" ]]; then
+  echo
+  echo "──────────────────────────────────────────────"
+  echo "  چند سؤال، بعد بقیه‌اش خودکار است"
+  echo "──────────────────────────────────────────────"
+  read -rp "دامنه (بدون www و بدون https)، مثلاً shahrzadlaser.ir : " DOMAIN || true
+fi
+[[ -n "$DOMAIN" ]] || die "دامنه لازم است. یا با --domain=... بده."
+
+if [[ -z "$SSL_EMAIL" ]]; then
+  read -rp "ایمیل برای گواهی SSL (هشدار انقضا به این می‌آید): " SSL_EMAIL || true
+fi
+[[ -n "$SSL_EMAIL" ]] || die "ایمیل لازم است. یا با --email=... بده."
+
+if [[ -z "$ADMIN_EMAIL" ]]; then
+  read -rp "ایمیل ورود مدیر به پنل [admin@$DOMAIN]: " ADMIN_EMAIL || true
+fi
 ADMIN_EMAIL=${ADMIN_EMAIL:-admin@$DOMAIN}
 
 echo
 info "دامنه: $DOMAIN | مدیر: $ADMIN_EMAIL"
-read -rp "درست است؟ (y/n) " -n1 CONFIRM; echo
-[[ "$CONFIRM" == "y" ]] || die "لغو شد."
 
 # ─── ۱) بسته‌های پایه ────────────────────────────────────────
 # سرور تازه‌نصب معمولاً وسط unattended-upgrades است و قفل apt را گرفته.
