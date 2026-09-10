@@ -1,0 +1,64 @@
+# سرویس سایت کلینیک — با systemd همیشه بالا می‌ماند و بعد از ری‌استارت سرور
+# خودکار روشن می‌شود.
+#
+# نصب:
+#   sudo cp deploy/sharzad.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now sharzad
+
+[Unit]
+Description=سایت کلینیک زیبایی شهرزاد
+# بدون دیتابیس بالا نمی‌آید؛ ترتیب مهم است
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+# روی سرور ۱ هسته‌ای، ری‌استارت پشت‌سرهم بی‌فایده است؛ اگر در ۵ دقیقه بیش از
+# ۵ بار افتاد یعنی مشکل واقعی دارد و باید دستی نگاهش کرد
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Service]
+Type=simple
+User=sharzad
+Group=sharzad
+WorkingDirectory=/var/www/sharzad
+EnvironmentFile=/var/www/sharzad/.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=TZ=Asia/Tehran
+ExecStart=/usr/bin/node /var/www/sharzad/node_modules/next/dist/bin/next start
+# خاموش‌کردن تمیز: به خودِ next سیگنال می‌رود، نه به یک npm واسط
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# اگر برنامه به هر دلیلی بمیرد، ۵ ثانیه بعد خودش برمی‌گردد
+Restart=always
+RestartSec=5
+
+# لاگ‌ها در journalctl می‌نشینند:  sudo journalctl -u sharzad -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sharzad
+
+# ─── سفت‌کاری امنیتی ───
+# اگر روزی از داخل برنامه رخنه‌ای پیدا شود، دستش به بقیه‌ی سرور نرسد
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# فقط جاهایی که واقعاً باید بنویسد
+# این مسیرها دقیقاً همان‌هایی‌اند که src/lib/upload.ts و src/lib/backup.ts
+# می‌نویسند. اگر جا بیفتند، آپلود عکس پرونده در پروداکشن بی‌صدا شکست می‌خورد.
+ReadWritePaths=/var/www/sharzad/.next
+ReadWritePaths=/var/www/sharzad/public/uploads
+ReadWritePaths=/var/www/sharzad/storage
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

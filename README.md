@@ -706,6 +706,20 @@ liara deploy   # فایل liara.json از قبل آماده است
 متغیرهای محیطی روی پنل سرویس: `DATABASE_URL`، `AUTH_SECRET`، `NEXT_PUBLIC_SITE_URL`.
 بعد از اولین دیپلوی یک بار `npx prisma migrate deploy` را روی سرور اجرا کن.
 
+### سرور مجازی (روش پیشنهادی)
+
+اسکریپت آماده است و همه‌چیز را نصب می‌کند — Node، PostgreSQL، Nginx، SSL،
+فایروال، سرویس و کرون‌ها:
+
+```bash
+apt update && apt install -y git && \
+git clone --branch claude/beauty-clinic-website-7ej1e7 \
+  https://github.com/amirhosein13/sharzadclinic.git /tmp/sharzad-setup && \
+bash /tmp/sharzad-setup/deploy/setup-server.sh
+```
+
+راهنمای کامل با عیب‌یابی: [`deploy/README.md`](deploy/README.md)
+
 ### VPS با داکر
 
 ```bash
