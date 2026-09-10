@@ -189,23 +189,40 @@ fi
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 
+# adduser پوشه‌ی خانه را به نام sharzad می‌سازد، ولی این مرحله با root
+# اجرا می‌شود. گیت از نسخه‌ی ۲.۳۵ به بعد کار کردن روی مخزنی که مالکش
+# کاربر دیگری است را رد می‌کند («dubious ownership») — حتی برای root.
+# پس تا وقتی کارِ گیت تمام نشده، پوشه مال root است.
+chown root:root "$APP_DIR"
+git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+git config --global --add safe.directory "$SRC_DIR" 2>/dev/null || true
+
+# آدرس واقعی مخزن: از نسخه‌ای که کاربر گرفته برمی‌داریم، وگرنه پیش‌فرض.
+# مسیر محلی (‎/tmp/...) به‌درد origin نمی‌خورد چون بعداً پاک می‌شود.
+ORIGIN=$(git -C "$SRC_DIR" remote get-url origin 2>/dev/null || echo "$REPO")
+[[ "$ORIGIN" == /* ]] && ORIGIN="$REPO"
+
 if [[ -d "$APP_DIR/.git" ]]; then
   info "به‌روزرسانی کد..."
-  sudo -u "$APP_USER" git -C "$APP_DIR" fetch origin "$BRANCH" --quiet
-  sudo -u "$APP_USER" git -C "$APP_DIR" reset --hard "origin/$BRANCH" --quiet
-elif git -C "$SRC_DIR" rev-parse --git-dir >/dev/null 2>&1; then
-  info "کپی کد از نسخه‌ای که همین الان گرفتی..."
-  rm -rf "${APP_DIR:?}"/{*,.[!.]*} 2>/dev/null || true
-  # کلونِ محلی: هیچ رمز و توکنی نمی‌خواهد
-  git clone --branch "$BRANCH" "$SRC_DIR" "$APP_DIR" --quiet
-  # ولی origin باید به گیت‌هاب اشاره کند تا بعداً git pull کار کند
-  ORIGIN=$(git -C "$SRC_DIR" remote get-url origin 2>/dev/null || echo "$REPO")
+  # اول origin را درست کن، بعد fetch — وگرنه ممکن است از مسیر موقتی بکشد
   git -C "$APP_DIR" remote set-url origin "$ORIGIN"
+  git -C "$APP_DIR" fetch origin "$BRANCH" --quiet
+  git -C "$APP_DIR" reset --hard "origin/$BRANCH" --quiet
 else
-  info "گرفتن کد از گیت‌هاب..."
-  rm -rf "${APP_DIR:?}"/{*,.[!.]*} 2>/dev/null || true
-  git clone --branch "$BRANCH" --depth 1 "$REPO" "$APP_DIR" --quiet
+  if git -C "$SRC_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    # کلونِ محلی: هیچ رمز و توکنی نمی‌خواهد، حتی اگر مخزن خصوصی باشد
+    info "کپی کد از نسخه‌ای که همین الان گرفتی..."
+    rm -rf "${APP_DIR:?}"/{*,.[!.]*} 2>/dev/null || true
+    git clone --branch "$BRANCH" "$SRC_DIR" "$APP_DIR" --quiet
+  else
+    info "گرفتن کد از گیت‌هاب..."
+    rm -rf "${APP_DIR:?}"/{*,.[!.]*} 2>/dev/null || true
+    git clone --branch "$BRANCH" --depth 1 "$REPO" "$APP_DIR" --quiet
+  fi
+  # origin باید به گیت‌هاب اشاره کند تا git pull بعدی کار کند
+  git -C "$APP_DIR" remote set-url origin "$ORIGIN"
 fi
+ok "کد آماده است (origin: $ORIGIN)"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 ok "کد روی سرور است"
 
