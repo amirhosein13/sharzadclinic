@@ -216,12 +216,16 @@ if [[ -f "$ENV_FILE" ]]; then
 else
   info "ساخت .env..."
   AUTH_SECRET=$(openssl rand -base64 32)
+  # رمز پیش‌فرض (Admin@12345) در مخزن عمومی نوشته شده، پس روی سرور
+  # نباید از آن استفاده شود. یک رمز تصادفی می‌سازیم و آخر کار نشان می‌دهیم.
+  ADMIN_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=' | head -c 16)
   cat > "$ENV_FILE" <<ENVEOF
 # ساخته‌شده توسط deploy/setup-server.sh — $(date -u +%F)
 DATABASE_URL="postgresql://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME?schema=public"
 AUTH_SECRET="$AUTH_SECRET"
 NEXT_PUBLIC_SITE_URL="https://$DOMAIN"
 ADMIN_EMAIL="$ADMIN_EMAIL"
+ADMIN_PASSWORD="$ADMIN_PASSWORD"
 NODE_ENV="production"
 TZ="Asia/Tehran"
 
@@ -356,7 +360,12 @@ echo
 echo "  سایت:      https://$DOMAIN"
 echo "  پنل:       https://$DOMAIN/admin"
 echo "  ایمیل:     $ADMIN_EMAIL"
-echo "  رمز اولیه: Admin@12345   ← همین امروز عوضش کن"
+if [[ -n "${ADMIN_PASSWORD:-}" ]]; then
+  echo "  رمز:       $ADMIN_PASSWORD"
+  echo "             ↑ همین حالا جایی امن ذخیره‌اش کن — دوباره نشان داده نمی‌شود"
+else
+  echo "  رمز:       همانی که در .env گذاشته بودی"
+fi
 echo
 echo "  وضعیت سرویس:  systemctl status sharzad"
 echo "  لاگ زنده:      journalctl -u sharzad -f"
