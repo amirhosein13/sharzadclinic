@@ -13,6 +13,15 @@
  *    --out=migration-report                          پوشه‌ی فایل‌های CSV
  *    --raw-amounts                                   مبالغ را اصلاح نکن
  *
+ *  بردن داده به سروری که SQL Server ندارد، در دو گام:
+ *    npm run import:legacy -- --dry-run --record=legacy-snapshot.json.gz
+ *        یک بار جایی که به SQL Server دسترسی هست؛ یک فایل فشرده می‌سازد.
+ *    npm run import:legacy -- --from=legacy-snapshot.json.gz
+ *        هرجای دیگر — بدون داکر، بدون SQL Server، بدون شبکه.
+ *
+ *  ⚠ فایل عکس فوری اطلاعات کاملِ مشتری‌هاست. در گیت نگذارش و بعد از
+ *    مهاجرت پاکش کن.
+ *
  *  اتصال از متغیرهای LEGACY_MSSQL_* در فایل .env خوانده می‌شود.
  *  نگاشت جدول‌ها در scripts/legacy-mapping.ts و قانون‌های پاک‌سازی در
  *  scripts/legacy-clean.ts است.
@@ -24,6 +33,7 @@
 import "../src/lib/timezone";
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import sql from "mssql";
 import { PrismaClient } from "@prisma/client";
 import {
@@ -42,6 +52,8 @@ const INSPECT = args.includes("--inspect");
 const REPORT_ONLY = args.includes("--report");
 const DRY_RUN = args.includes("--dry-run") || REPORT_ONLY;
 const RAW_AMOUNTS = args.includes("--raw-amounts");
+const RECORD_TO = args.find((a) => a.startsWith("--record="))?.split("=")[1] ?? "";
+const FROM_SNAPSHOT = args.find((a) => a.startsWith("--from="))?.split("=")[1] ?? "";
 const OUT_DIR = args.find((a) => a.startsWith("--out="))?.split("=")[1] ?? "migration-report";
 const ONLY = (args.find((a) => a.startsWith("--only="))?.split("=")[1] ?? "")
   .split(",")
@@ -74,15 +86,54 @@ const stats = {
   staff: { created: 0 },
 };
 
-// ─── اتصال ───────────────────────────────────────────────────────
+// ─── منبع داده ───────────────────────────────────────────────────
+//
+//  مهاجرت دو منبع دارد:
+//    ۱. خودِ SQL Server — وقتی به برنامه‌ی قدیمی دسترسی داریم
+//    ۲. فایل «عکس فوری» — یک بار از SQL Server گرفته می‌شود و بعد
+//       هرجا لازم شد (مثلاً روی سرور مجازی که داکر و SQL Server ندارد)
+//       بدون هیچ وابستگی‌ای پخش می‌شود.
+//
+//  کلیدِ عکس فوری، متنِ خودِ کوئری است. چون هر دو حالت از یک کد رد
+//  می‌شوند، کوئری‌ها ذاتاً یکی هستند و از هم در نمی‌روند.
 
-async function connect(): Promise<sql.ConnectionPool> {
+type Source = {
+  label: string;
+  query<T>(text: string): Promise<T[]>;
+  close(): Promise<void>;
+};
+
+/**
+ * تاریخ و باینری در JSON ساده گم می‌شوند؛ علامت‌گذاری‌شان می‌کنیم.
+ *
+ * نکته‌ی ظریف: JSON.stringify قبل از رسیدن به replacer، خودش toJSON را
+ * روی Date و Buffer صدا می‌زند — پس آرگومان value همیشه رشته است و
+ * instanceof هیچ‌وقت درست نمی‌شود. مقدار خام را باید از this[key] گرفت.
+ */
+function encodeCell(this: Record<string, unknown>, key: string, value: unknown) {
+  const raw = this?.[key];
+  if (raw instanceof Date) return { __type: "date", v: raw.toISOString() };
+  if (Buffer.isBuffer(raw)) return { __type: "buffer", v: raw.toString("base64") };
+  return value;
+}
+
+function decodeCell(_key: string, value: unknown) {
+  if (value && typeof value === "object" && "__type" in value) {
+    const cell = value as { __type: string; v: string };
+    if (cell.__type === "date") return new Date(cell.v);
+    if (cell.__type === "buffer") return Buffer.from(cell.v, "base64");
+  }
+  return value;
+}
+
+async function mssqlSource(): Promise<Source> {
   const { LEGACY_MSSQL_SERVER, LEGACY_MSSQL_DATABASE, LEGACY_MSSQL_USER } = process.env;
 
   if (!LEGACY_MSSQL_SERVER || !LEGACY_MSSQL_DATABASE || !LEGACY_MSSQL_USER) {
     console.error(
       "❌ اطلاعات اتصال به SQL Server کامل نیست.\n" +
-        "   متغیرهای LEGACY_MSSQL_SERVER، LEGACY_MSSQL_DATABASE و LEGACY_MSSQL_USER را در .env پر کن."
+        "   متغیرهای LEGACY_MSSQL_SERVER، LEGACY_MSSQL_DATABASE و LEGACY_MSSQL_USER را در .env پر کن.\n" +
+        "   یا اگر فایل عکس فوری داری: --from=legacy-snapshot.json.gz"
     );
     process.exit(1);
   }
@@ -101,17 +152,112 @@ async function connect(): Promise<sql.ConnectionPool> {
   };
 
   log("🔌", `اتصال به ${LEGACY_MSSQL_SERVER}/${LEGACY_MSSQL_DATABASE}...`);
-  return sql.connect(config);
+  const pool = await sql.connect(config);
+
+  return {
+    label: `${LEGACY_MSSQL_SERVER}/${LEGACY_MSSQL_DATABASE}`,
+    async query<T>(text: string) {
+      const result = await pool.request().query<T>(text);
+      return result.recordset ?? [];
+    },
+    close: () => pool.close(),
+  };
 }
 
-async function rows<T>(pool: sql.ConnectionPool, query: string): Promise<T[]> {
-  const result = await pool.request().query<T>(query);
-  return result.recordset ?? [];
+/** روی SQL Server می‌نشیند و هرچه خوانده شد را برای پخش‌کردن نگه می‌دارد */
+async function recordingSource(file: string): Promise<Source> {
+  const inner = await mssqlSource();
+  const captured: { q: string; rows: unknown[] }[] = [];
+
+  return {
+    label: inner.label,
+    async query<T>(text: string) {
+      const result = await inner.query<T>(text);
+      captured.push({ q: text, rows: result as unknown[] });
+      return result;
+    },
+    async close() {
+      await inner.close();
+      const payload = {
+        version: 1,
+        createdAt: new Date().toISOString(),
+        source: inner.label,
+        queries: captured,
+      };
+      const gz = zlib.gzipSync(Buffer.from(JSON.stringify(payload, encodeCell)), { level: 9 });
+      fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
+      fs.writeFileSync(file, gz);
+      const rowCount = captured.reduce((sum, c) => sum + c.rows.length, 0);
+      log("📦", `عکس فوری نوشته شد: ${file}`);
+      log("  ", `${toFa(captured.length)} کوئری، ${toFa(rowCount)} سطر، ${toFa(Math.round(gz.length / 1024))} کیلوبایت`);
+    },
+  };
+}
+
+/** از فایل عکس فوری می‌خواند — بدون هیچ نیازی به SQL Server */
+function snapshotSource(file: string): Source {
+  if (!fs.existsSync(file)) {
+    console.error(`❌ فایل عکس فوری پیدا نشد: ${file}`);
+    process.exit(1);
+  }
+
+  const raw = zlib.gunzipSync(fs.readFileSync(file)).toString();
+  const payload = JSON.parse(raw, decodeCell) as {
+    version: number;
+    createdAt: string;
+    source: string;
+    queries: { q: string; rows: unknown[] }[];
+  };
+
+  if (payload.version !== 1) {
+    console.error(`❌ نسخه‌ی عکس فوری (${payload.version}) با این اسکریپت نمی‌خواند.`);
+    process.exit(1);
+  }
+
+  // یک کوئری ممکن است چند بار اجرا شده باشد؛ به ترتیب پس می‌دهیم
+  const byQuery = new Map<string, unknown[][]>();
+  for (const entry of payload.queries) {
+    const list = byQuery.get(entry.q) ?? [];
+    list.push(entry.rows);
+    byQuery.set(entry.q, list);
+  }
+  const used = new Map<string, number>();
+
+  log("📂", `خواندن از عکس فوری ${file}`);
+  log("  ", `گرفته‌شده در ${payload.createdAt} از ${payload.source}`);
+
+  return {
+    label: `عکس فوری ${file}`,
+    async query<T>(text: string) {
+      const list = byQuery.get(text);
+      if (!list) {
+        throw new Error(
+          "این کوئری در عکس فوری نیست — یعنی عکس فوری با نسخه‌ی فعلی اسکریپت نمی‌خواند.\n" +
+            "  دوباره با --record بگیرش.\n" +
+            `  کوئری: ${text.replace(/\s+/g, " ").slice(0, 160)}`
+        );
+      }
+      const seen = used.get(text) ?? 0;
+      used.set(text, seen + 1);
+      return (list[Math.min(seen, list.length - 1)] ?? []) as T[];
+    },
+    async close() {},
+  };
+}
+
+async function openSource(): Promise<Source> {
+  if (FROM_SNAPSHOT) return snapshotSource(FROM_SNAPSHOT);
+  if (RECORD_TO) return recordingSource(RECORD_TO);
+  return mssqlSource();
+}
+
+async function rows<T>(pool: Source, query: string): Promise<T[]> {
+  return pool.query<T>(query);
 }
 
 // ─── بررسی ساختار ────────────────────────────────────────────────
 
-async function inspect(pool: sql.ConnectionPool) {
+async function inspect(pool: Source) {
   const tables = await rows<{ name: string; rows: number }>(
     pool,
     `SELECT t.name AS name, SUM(p.rows) AS rows
@@ -151,7 +297,7 @@ const customerIdByIdentity = new Map<string, string>();
 /** نام نرمال‌شده → شناسه‌های جدید، برای وقتی شماره نداریم */
 const customerIdsByName = new Map<string, string[]>();
 
-async function importCustomers(pool: sql.ConnectionPool) {
+async function importCustomers(pool: Source) {
   const list = await rows<LegacyCustomer>(
     pool,
     `SELECT moshtaryid, moshtaryname, moshtaryfamily, phonenumber, nemiad
@@ -286,7 +432,7 @@ function pushByName(firstName: string, lastName: string, id: string) {
 const serviceIdByLegacy = new Map<number, string>();
 const serviceDuration = new Map<string, number>();
 
-async function importServices(pool: sql.ConnectionPool) {
+async function importServices(pool: Source) {
   const list = await rows<{ hozeid: number; hozename: string | null; ghaymathoze: number; modatdore: number }>(
     pool,
     `SELECT hozeid, hozename, ghaymathoze, modatdore FROM ${TABLES.services} ORDER BY hozeid`
@@ -310,9 +456,20 @@ async function importServices(pool: sql.ConnectionPool) {
       continue;
     } else {
       // هیچ خدمتی نباید باعث گم‌شدن سابقه شود؛ اگر نبود، می‌سازیمش
+      // روی دیتابیسی که هنوز seed نشده هیچ دسته‌ای وجود ندارد و
+      // findFirstOrThrow با خطای گنگ P2025 مهاجرت را می‌کشت. خودمان
+      // یک دسته‌ی خاموش می‌سازیم تا هیچ سابقه‌ای گم نشود.
       const category =
         (await prisma.serviceCategory.findFirst({ where: { slug: "laser" } })) ??
-        (await prisma.serviceCategory.findFirstOrThrow({}));
+        (await prisma.serviceCategory.findFirst({ orderBy: { order: "asc" } })) ??
+        (await prisma.serviceCategory.create({
+          data: {
+            slug: "legacy",
+            title: "خدمات منتقل‌شده از برنامه‌ی قدیمی",
+            isActive: false,
+            order: 999,
+          },
+        }));
       service = await prisma.service.create({
         data: {
           slug: slugify(title) || `legacy-${row.hozeid}`,
@@ -336,7 +493,7 @@ async function importServices(pool: sql.ConnectionPool) {
 
 // ─── مراجعه‌ها (سابقه + پول) ─────────────────────────────────────
 
-async function importVisits(pool: sql.ConnectionPool) {
+async function importVisits(pool: Source) {
   const list = await rows<{
     harbarid: number; moshtaryid: number; hozeid: number; pardakhty: number; tarikh: Date;
   }>(
@@ -417,7 +574,7 @@ async function importVisits(pool: sql.ConnectionPool) {
 
 // ─── نوبت‌ها ─────────────────────────────────────────────────────
 
-async function importAppointments(pool: sql.ConnectionPool) {
+async function importAppointments(pool: Source) {
   const list = await rows<{
     rezervvaghtid: number; hozeid: number; khodevaght: Date;
     idmoshtary: number; namemoshtary: string | null; family: string | null; phonenumber: string | null;
@@ -524,7 +681,7 @@ async function expenseCategory(): Promise<string> {
   return found.id;
 }
 
-async function importExpenses(pool: sql.ConnectionPool) {
+async function importExpenses(pool: Source) {
   const list = await rows<{ rizkhargid: number; tarikh: Date; mablag: number; tozihat: string | null }>(
     pool,
     `SELECT rizkhargid, tarikh, mablag, tozihat FROM ${TABLES.expenses} ORDER BY rizkhargid`
@@ -560,7 +717,7 @@ async function importExpenses(pool: sql.ConnectionPool) {
   if (list.length) log("✅", `هزینه‌ها: ${toFa(stats.expenses.created)} ثبت`);
 }
 
-async function importStaff(pool: sql.ConnectionPool) {
+async function importStaff(pool: Source) {
   const list = await rows<{ karmandid: number; karmandname: string | null; karmandfamily: string | null }>(
     pool,
     `SELECT karmandid, karmandname, karmandfamily FROM ${TABLES.staff} ORDER BY karmandid`
@@ -656,13 +813,17 @@ function writeReport() {
 // ─── اجرا ────────────────────────────────────────────────────────
 
 async function main() {
-  const pool = await connect();
+  const pool = await openSource();
 
   try {
     if (INSPECT) {
       await inspect(pool);
       return;
     }
+
+    // هنگام ضبط، کوئری‌های بررسی ساختار را هم برمی‌داریم تا بعداً
+    // --inspect --from=... هم کار کند و کاربر با خطای گنگ روبه‌رو نشود.
+    if (RECORD_TO) await inspect(pool);
 
     if (DRY_RUN) {
       log("🧪", REPORT_ONLY ? "حالت گزارش — چیزی در دیتابیس نوشته نمی‌شود" : "حالت آزمایشی — چیزی نوشته نمی‌شود");

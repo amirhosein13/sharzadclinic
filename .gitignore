@@ -22,3 +22,7 @@ next-env.d.ts
 .tsbuildinfo
 *.tsbuildinfo
 /legacy-export/
+
+# عکس فوریِ داده‌ی برنامه‌ی قدیمی — اطلاعات کامل مشتری‌هاست، هرگز در گیت نرود
+legacy-snapshot*.json.gz
+*.bak

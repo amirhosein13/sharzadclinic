@@ -172,9 +172,42 @@ cd /var/www/sharzad && sudo -u sharzad npm run reset-password -- --email ایم�
 
 ## انتقال داده‌ی برنامه‌ی قدیمی
 
-بخش «مهاجرت داده از برنامه‌ی قدیمی» در README اصلی را ببین.
-خلاصه‌اش: فایل `.bak` را روی سرور بیاور، `LEGACY_MSSQL_*` را در `.env` پر کن،
-اول `npm run import:legacy -- --report` بزن و گزارش را نگاه کن، بعد اجرای واقعی.
+روی سرور مجازی معمولاً SQL Server نداری (و در ایران کشیدن ایمیج داکرش هم
+اغلب جواب نمی‌دهد). برای همین مهاجرت دو گام دارد:
+
+### گام ۱ — یک بار، جایی که به برنامه‌ی قدیمی دسترسی هست
+
+روی همان کامپیوترِ کلینیک که برنامه‌ی قدیمی رویش است (یا هر جایی که
+`.bak` را در SQL Server برگردانده‌ای):
+
+```bash
+# LEGACY_MSSQL_* را در .env پر کن، بعد:
+npm run import:legacy -- --dry-run --record=legacy-snapshot.json.gz
+```
+
+یک فایل فشرده‌ی چندصد کیلوبایتی می‌سازد که همه‌ی چیزی که مهاجرت لازم دارد
+تویش هست. همان‌جا گزارش `بررسی-دستی.csv` را هم نگاه کن.
+
+### گام ۲ — روی سرور
+
+فایل را ببر بالا و اجرا کن — نه داکر می‌خواهد، نه SQL Server، نه اینترنت:
+
+```bash
+scp -P 3031 legacy-snapshot.json.gz root@سرور:/var/www/sharzad/
+
+cd /var/www/sharzad
+sudo -u sharzad npm run import:legacy -- --report --from=legacy-snapshot.json.gz   # فقط گزارش
+sudo -u sharzad npm run import:legacy -- --from=legacy-snapshot.json.gz            # اجرای واقعی
+```
+
+مهاجرت idempotent است؛ اگر نصفه ماند دوباره بزن، رکورد تکراری نمی‌سازد.
+
+> ⚠️ `legacy-snapshot.json.gz` اطلاعات کامل همه‌ی مشتری‌هاست — اسم، شماره،
+> سابقه و مبلغ. در گیت نگذارش، ایمیلش نکن، و بعد از مهاجرت پاکش کن:
+> `shred -u legacy-snapshot.json.gz`
+
+اگر جایی هستی که هم SQL Server داری هم دیتابیس مقصد، مثل قبل بدون
+`--record`/`--from` هم کار می‌کند.
 
 ---
 
