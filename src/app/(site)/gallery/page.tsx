@@ -8,7 +8,10 @@ import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CalendarHeart, ImageOff } from "lucide-react";
 
-export const revalidate = 300;
+// چیدمان (site) کوکی نشستِ مشتری را می‌خواند (نام مشتری در هدر)، پس این
+// صفحه هیچ‌وقت واقعاً استاتیک نمی‌شود. با revalidate، Next سرِ هر درخواست
+// خطای static-to-dynamic می‌انداخت و رندر را دور می‌ریخت.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "نمونه کارها",

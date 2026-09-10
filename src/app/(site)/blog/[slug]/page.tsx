@@ -11,14 +11,11 @@ import { ButtonLink } from "@/components/ui/button";
 import { formatJalaliLong } from "@/lib/date";
 import { decodeSlug, toFa } from "@/lib/utils";
 
-export const revalidate = 300;
+// چیدمان (site) کوکی نشستِ مشتری را می‌خواند (نام مشتری در هدر)، پس این
+// صفحه هیچ‌وقت واقعاً استاتیک نمی‌شود. با revalidate، Next سرِ هر درخواست
+// خطای static-to-dynamic می‌انداخت و رندر را دور می‌ریخت.
+export const dynamic = "force-dynamic";
 
-export async function generateStaticParams() {
-  const posts = await prisma.post
-    .findMany({ where: { isPublished: true }, select: { slug: true } })
-    .catch(() => []);
-  return posts.map((p) => ({ slug: p.slug }));
-}
 
 export async function generateMetadata({
   params,

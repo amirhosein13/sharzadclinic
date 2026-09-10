@@ -19,7 +19,10 @@ import { Badge } from "@/components/ui/badge";
 import { formatJalaliLong } from "@/lib/date";
 import { toFa } from "@/lib/utils";
 
-export const revalidate = 300;
+// چیدمان (site) کوکی نشستِ مشتری را می‌خواند (نام مشتری در هدر)، پس این
+// صفحه هیچ‌وقت واقعاً استاتیک نمی‌شود. با revalidate، Next سرِ هر درخواست
+// خطای static-to-dynamic می‌انداخت و رندر را دور می‌ریخت.
+export const dynamic = "force-dynamic";
 
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Zap, Syringe, Sparkles, TrendingUp, Scissors, Heart, Stethoscope, Gem,

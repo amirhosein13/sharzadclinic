@@ -17,15 +17,11 @@ import { ServiceCard } from "@/components/service-card";
 import { Prose } from "@/components/prose";
 import { decodeSlug, formatDuration, formatPriceRange } from "@/lib/utils";
 
-export const revalidate = 300;
+// چیدمان (site) کوکی نشستِ مشتری را می‌خواند (نام مشتری در هدر)، پس این
+// صفحه هیچ‌وقت واقعاً استاتیک نمی‌شود. با revalidate، Next سرِ هر درخواست
+// خطای static-to-dynamic می‌انداخت و رندر را دور می‌ریخت.
+export const dynamic = "force-dynamic";
 
-export async function generateStaticParams() {
-  const services = await prisma.service.findMany({
-    where: { isActive: true },
-    select: { slug: true },
-  }).catch(() => []);
-  return services.map((s) => ({ slug: s.slug }));
-}
 
 export async function generateMetadata({
   params,
