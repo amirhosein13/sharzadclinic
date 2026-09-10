@@ -276,6 +276,23 @@ mkswap /swapfile && swapon /swapfile
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
 
+**`npm ci` مدام `ECONNRESET` یا `ETIMEDOUT` می‌دهد و حجم بالا نمی‌رود**
+یعنی مخزنی که تنظیم شده از این سرور در دسترس نیست. ببین کدام جواب می‌دهد:
+
+```bash
+for R in https://registry.npmjs.org https://registry.yarnpkg.com \
+         https://registry.npmmirror.com; do
+  printf "%-38s %s\n" "$R" \
+    "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$R/ms/-/ms-2.1.3.tgz" 2>&1 | cut -c1-40)"
+done
+```
+
+هر کدام `200` داد را بگذار و دوباره اجرا کن:
+
+```bash
+npm config set registry <آدرسی-که-جواب-داد> --location=global
+```
+
 **`npm ci` گیر می‌کند یا خطای شبکه می‌دهد**
 رجیستری npm از داخل ایران فیلتر است. اسکریپت خودش این را می‌گیرد و آینه
 تنظیم می‌کند، ولی اگر باز هم مشکل داشتی:

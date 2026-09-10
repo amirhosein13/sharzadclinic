@@ -121,10 +121,33 @@ if ! command -v node >/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d v)" -lt 2
 fi
 ok "Node $(node -v)"
 
-# اگر رجیستری npm از داخل ایران باز نشد، آینه‌ی جایگزین
-if ! timeout 20 npm ping >/dev/null 2>&1; then
-  warn "registry.npmjs.org جواب نداد — آینه‌ی جایگزین تنظیم شد."
-  npm config set registry https://registry.npmmirror.com --location=global
+# ─── انتخاب مخزن npm ─────────────────────────────────────────
+# از داخل ایران بعضی مخزن‌ها بسته‌اند. اشتباهِ قبلی این بود که یک آینه
+# انتخاب می‌شد بدون تست؛ اگر آن هم بسته باشد، npm ساعت‌ها تلاش می‌کند و
+# هیچ چیزی دانلود نمی‌شود. حالا هر کدام را با دانلود یک بسته‌ی واقعی
+# می‌سنجیم و اولین جواب‌دهنده را برمی‌داریم.
+pick_registry() {
+  local r
+  for r in "https://registry.npmjs.org" \
+           "https://registry.yarnpkg.com" \
+           "https://registry.npmmirror.com"; do
+    if [[ "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
+             "$r/ms/-/ms-2.1.3.tgz" 2>/dev/null)" == "200" ]]; then
+      echo "$r"; return 0
+    fi
+  done
+  return 1
+}
+
+info "بررسی مخزن npm..."
+if REGISTRY=$(pick_registry); then
+  npm config set registry "$REGISTRY" --location=global
+  ok "مخزن npm: $REGISTRY"
+else
+  die "هیچ مخزن npm از این سرور در دسترس نیست.
+   اینترنت سرور را چک کن، یا اگر مخزن داخلی داری دستی تنظیمش کن:
+     npm config set registry <آدرس> --location=global
+   بعد دوباره همین اسکریپت را اجرا کن."
 fi
 
 # ─── ۳) فایروال ──────────────────────────────────────────────
