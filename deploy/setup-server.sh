@@ -272,8 +272,11 @@ ENVEOF
 fi
 
 # ─── ۸) نصب و ساخت ───────────────────────────────────────────
-info "نصب پکیج‌ها (چند دقیقه طول می‌کشد)..."
-sudo -u "$APP_USER" bash -lc "cd $APP_DIR && npm ci --no-audit --no-fund"
+# npm ci وقتی خروجی‌اش ترمینال واقعی نیست هیچ چیزی چاپ نمی‌کند و کاربر
+# چند دقیقه به یک صفحه‌ی ساکت نگاه می‌کند و فکر می‌کند هنگ کرده.
+# با --loglevel=http هر بسته‌ای که می‌آید یک خط می‌نویسد.
+info "نصب پکیج‌ها (روی ۱ هسته ۳ تا ۸ دقیقه — خط‌های زیر یعنی در حال کار است)..."
+sudo -u "$APP_USER" bash -lc "cd $APP_DIR && npm ci --no-audit --no-fund --loglevel=http"
 
 info "ساخت جدول‌های دیتابیس..."
 sudo -u "$APP_USER" bash -lc "cd $APP_DIR && npx prisma migrate deploy"
