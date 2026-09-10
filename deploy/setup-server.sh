@@ -66,12 +66,53 @@ if ! timeout 20 npm ping >/dev/null 2>&1; then
 fi
 
 # ─── ۳) فایروال ──────────────────────────────────────────────
-info "تنظیم فایروال..."
-ufw allow OpenSSH >/dev/null
+# ⚠️ خطرناک‌ترین قسمت اسکریپت: اگر پورت SSH را باز نکنیم و فایروال را
+#    روشن کنیم، همان لحظه از سرور بیرون می‌افتیم و راه برگشتی نیست.
+#    بعضی ارائه‌دهنده‌ها (مثل ایران‌سرور) SSH را روی پورت غیر از ۲۲
+#    می‌گذارند، پس نباید ۲۲ را فرض کرد — باید پیدایش کرد.
+detect_ssh_ports() {
+  local ports=""
+
+  # معتبرترین منبع: خودِ sshd می‌گوید روی چه پورتی گوش می‌دهد
+  if command -v sshd >/dev/null 2>&1; then
+    ports=$(sshd -T 2>/dev/null | awk '/^port /{print $2}')
+  fi
+
+  # اگر نشد، از سوکت‌های در حال گوش‌دادن
+  if [[ -z "$ports" ]] && command -v ss >/dev/null 2>&1; then
+    ports=$(ss -tlnpH 2>/dev/null | awk '/sshd/{split($4,a,":"); print a[length(a)]}' | sort -u)
+  fi
+
+  # پورتی که همین الان از آن وصل شده‌ایم، همیشه باید باز بماند
+  # SSH_CONNECTION = "آی‌پی‌مبدأ پورت‌مبدأ آی‌پی‌مقصد پورت‌مقصد"
+  if [[ -n "${SSH_CONNECTION:-}" ]]; then
+    ports="$ports $(awk '{print $4}' <<<"$SSH_CONNECTION")"
+  fi
+
+  [[ -z "${ports// /}" ]] && ports=22
+  tr ' ' '\n' <<<"$ports" | grep -E '^[0-9]+$' | sort -un | tr '\n' ' '
+}
+
+SSH_PORTS=$(detect_ssh_ports)
+info "پورت(های) SSH پیداشده: $SSH_PORTS"
+
+for port in $SSH_PORTS; do
+  ufw allow "$port/tcp" >/dev/null
+done
 ufw allow 'Nginx Full' >/dev/null
+
+# آخرین بررسی: اگر به هر دلیلی پورتِ اتصال فعلی در فهرست نیست، فایروال
+# را اصلاً روشن نکن. قفل‌شدن بیرون از سرور بدتر از نداشتن فایروال است.
+if [[ -n "${SSH_CONNECTION:-}" ]]; then
+  CURRENT_PORT=$(awk '{print $4}' <<<"$SSH_CONNECTION")
+  if ! grep -qw "$CURRENT_PORT" <<<"$SSH_PORTS"; then
+    die "پورت اتصال فعلی ($CURRENT_PORT) در فهرست نیست. فایروال روشن نشد تا قفل نشوی."
+  fi
+fi
+
 ufw --force enable >/dev/null
 systemctl enable --now fail2ban >/dev/null 2>&1 || true
-ok "فایروال: فقط ۲۲، ۸۰ و ۴۴۳ باز است"
+ok "فایروال روشن شد — باز: ${SSH_PORTS}۸۰ و ۴۴۳"
 
 # ─── ۴) کاربر برنامه ─────────────────────────────────────────
 # برنامه با کاربر بی‌دسترسی اجرا می‌شود، نه root
