@@ -110,7 +110,9 @@ export async function createBackup(options: { includeFiles?: boolean } = {}): Pr
   const stamp = `${toEn(formatJalali(now, "yyyy-MM-dd"))}-${String(now.getHours()).padStart(2, "0")}${String(
     now.getMinutes(),
   ).padStart(2, "0")}`;
-  const filename = `sharzad-backup-${stamp}.zip`;
+  // نوع در نام فایل می‌آید تا هنگام پاک‌کردن نسخه‌های قدیمی، نسخه‌های
+  // «سبک» جای نسخه‌های «کامل» را نگیرند
+  const filename = `sharzad-backup-${stamp}-${includeFiles ? "full" : "light"}.zip`;
   const path = join(BACKUP_DIR, filename);
 
   const { data, counts } = await exportTables();
@@ -152,11 +154,23 @@ export async function createBackup(options: { includeFiles?: boolean } = {}): Pr
   return { path, filename, bytes: info.size, manifest };
 }
 
+export type BackupKind = "full" | "light";
+
 export type StoredBackup = {
   filename: string;
   bytes: number;
   createdAt: Date;
+  /** «کامل» یعنی عکس‌ها هم داخلش هست */
+  kind: BackupKind;
 };
+
+/**
+ * نسخه‌های قبل از افزودن پسوند، همه کامل بودند (پیش‌فرض `--light` نبود)،
+ * پس نبودِ پسوند یعنی کامل.
+ */
+export function backupKind(filename: string): BackupKind {
+  return /-light\.zip$/.test(filename) ? "light" : "full";
+}
 
 /** فهرست پشتیبان‌های ذخیره‌شده روی سرور، تازه‌ترین اول */
 export async function listBackups(): Promise<StoredBackup[]> {
@@ -167,7 +181,7 @@ export async function listBackups(): Promise<StoredBackup[]> {
         .filter((n) => n.endsWith(".zip"))
         .map(async (filename) => {
           const info = await stat(join(BACKUP_DIR, filename));
-          return { filename, bytes: info.size, createdAt: info.mtime };
+          return { filename, bytes: info.size, createdAt: info.mtime, kind: backupKind(filename) };
         }),
     );
     return files.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -177,9 +191,18 @@ export async function listBackups(): Promise<StoredBackup[]> {
 }
 
 /** فقط چند تای آخر را نگه می‌دارد تا دیسک پر نشود */
+/**
+ * نسخه‌های قدیمی را پاک می‌کند — ولی هر نوع را جدا می‌شمارد.
+ *
+ * اگر همه را با هم بشماریم، کرونِ «هر شب سبک، هفته‌ای یک بار کامل» بعد از
+ * دو هفته تنها نسخه‌های سبک را نگه می‌داشت و هیچ نسخه‌ای با عکسِ پرونده‌ها
+ * باقی نمی‌ماند — بی‌سروصدا.
+ */
 export async function pruneBackups(keep = 14): Promise<number> {
   const files = await listBackups();
-  const extra = files.slice(keep);
+  const extra = (["full", "light"] as const).flatMap((kind) =>
+    files.filter((f) => f.kind === kind).slice(keep),
+  );
   for (const file of extra) {
     await unlink(join(BACKUP_DIR, file.filename)).catch(() => undefined);
   }

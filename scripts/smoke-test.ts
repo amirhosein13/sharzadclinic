@@ -44,7 +44,9 @@ import { EVENTS } from "../src/lib/events";
 import { WEEKDAYS_FA } from "../src/lib/date";
 import { GUIDE, guideFor } from "../src/lib/guide";
 import { can } from "../src/lib/permissions";
-import { readdirSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { BACKUP_DIR, listBackups, pruneBackups } from "../src/lib/backup";
 import {
   promoteToGallery, publishCandidates, withdrawPhotoConsent,
 } from "../src/lib/photo-publish";
@@ -2109,6 +2111,52 @@ async function main() {
     "دو نفر با نام واقعاً متفاوت یکی نمی‌شوند",
     normalizeName("فاطمه تقوی") !== normalizeName("آتوسا تقوی")
   );
+
+  // ── نگهداری نسخه‌های پشتیبان ────────────────────────────────
+  // سناریوی واقعیِ کرون: هر شب سبک، هفته‌ای یک بار کامل. اگر هرس‌کردن نوع را
+  // نشناسد، بعد از دو هفته هیچ نسخه‌ای با عکسِ پرونده‌ها باقی نمی‌ماند.
+  const backupDir = BACKUP_DIR;
+  mkdirSync(backupDir, { recursive: true });
+  // بدترین حالتِ واقعی: نسخه‌ی کامل ماهی یک بار (چون حجیم است) و سبک هر شب.
+  // آن‌وقت تعداد نسخه‌های سبکِ جدیدتر از حدِ نگهداری بیشتر می‌شود و اگر هرس
+  // نوع را نشناسد، تنها نسخه‌ی دارای عکس را پاک می‌کند.
+  const madeUp: string[] = [];
+  const stamp = (day: number, kind: string) =>
+    `sharzad-backup-1400-01-${String(day + 1).padStart(2, "0")}-0${kind === "full" ? 1 : 2}00-${kind}.zip`;
+  const put = (day: number, kind: "full" | "light") => {
+    const name = stamp(day, kind);
+    writeFileSync(join(backupDir, name), "x");
+    // mtime دستی، چون همه در یک لحظه ساخته می‌شوند
+    const when = new Date(Date.now() - (40 - day) * 86_400_000);
+    utimesSync(join(backupDir, name), when, when);
+    madeUp.push(name);
+  };
+
+  put(0, "full");
+  for (let day = 1; day <= 20; day++) put(day, "light");
+
+  const beforePrune = await listBackups();
+  check(
+    "نوع نسخه از روی نام تشخیص داده می‌شود",
+    beforePrune.filter((b) => b.kind === "full").length >= 1 &&
+      beforePrune.filter((b) => b.kind === "light").length >= 20
+  );
+
+  await pruneBackups(14);
+  const afterPrune = await listBackups();
+  // دقیقاً همان نسخه‌ی کاملی که ساختیم باید بماند؛ «یک نسخه‌ی کامل هست»
+  // کافی نیست چون ممکن است نسخه‌ی واقعیِ دیگری در پوشه باشد
+  check(
+    "بعد از هرس، نسخه‌ی دارای عکس پاک نمی‌شود",
+    afterPrune.some((b) => b.filename === stamp(0, "full"))
+  );
+  check(
+    "از هر نوع حداکثر ۱۴ تا می‌ماند",
+    afterPrune.filter((b) => b.kind === "light").length <= 14 &&
+      afterPrune.filter((b) => b.kind === "full").length <= 14
+  );
+
+  for (const name of madeUp) rmSync(join(backupDir, name), { force: true });
 
   await prisma.appointment.deleteMany({ where: { source: "smoke" } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129998877" } } });

@@ -4,6 +4,7 @@ import { guardPage } from "@/lib/guard";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { BackupButton } from "@/components/admin/backup-button";
 import { formatBytes, listBackups } from "@/lib/backup";
+import { Badge } from "@/components/ui/badge";
 import { formatJalaliLong, timeAgoFa } from "@/lib/date";
 import { toFa } from "@/lib/utils";
 
@@ -107,8 +108,14 @@ export default async function BackupPage() {
                   <p className="truncate text-sm font-medium" dir="ltr">
                     {file.filename}
                   </p>
-                  <p className="mt-1 text-xs text-[color:var(--fg-muted)]">
-                    {formatJalaliLong(file.createdAt)} • {formatBytes(file.bytes)}
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[color:var(--fg-muted)]">
+                    <span>
+                      {formatJalaliLong(file.createdAt)} • {formatBytes(file.bytes)}
+                    </span>
+                    {/* مدیر باید بتواند نسخه‌ی دارای عکس را از نسخه‌ی سبک تشخیص بدهد */}
+                    <Badge tone={file.kind === "full" ? "green" : "neutral"}>
+                      {file.kind === "full" ? "با عکس‌ها" : "فقط اطلاعات"}
+                    </Badge>
                   </p>
                 </div>
                 <a
