@@ -4,14 +4,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import {
-  createCustomerSession, destroyCustomerSession, getCustomerSession, issueOtp, verifyOtp,
+  claimChosenCustomer, createCustomerSession, destroyCustomerSession, getCustomerSession,
+  issueOtp, verifyOtp, type CustomerChoice,
 } from "@/lib/customer-auth";
 import { notifyBookingCancelled, notifyOtp } from "@/lib/notifications";
 import { isValidIranMobile, normalizePhone, toEn } from "@/lib/utils";
 
 export type OtpState =
   | { step: "phone"; message?: string }
-  | { step: "code"; phone: string; message?: string; devCode?: string };
+  | { step: "code"; phone: string; message?: string; devCode?: string }
+  /** چند پرونده روی این شماره هست و باید یکی انتخاب شود */
+  | { step: "choose"; phone: string; choices: CustomerChoice[]; ticket: string; message?: string };
 
 /** مرحله‌ی اول: دریافت شماره و ارسال کد */
 export async function requestOtp(_prev: OtpState, formData: FormData): Promise<OtpState> {
@@ -26,7 +29,7 @@ export async function requestOtp(_prev: OtpState, formData: FormData): Promise<O
   const result = await issueOtp(phone);
   if (!result.ok) return { step: "phone", message: result.message };
 
-  const exists = await prisma.customer.findUnique({ where: { phone }, select: { id: true } });
+  const exists = await prisma.customer.findFirst({ where: { phone }, select: { id: true } });
 
   let simulated = false;
   if (exists && result.code) {
@@ -63,6 +66,27 @@ export async function confirmOtp(_prev: OtpState, formData: FormData): Promise<O
 
   const result = await verifyOtp(phone, code);
   if (!result.ok) return { step: "code", phone, message: result.message };
+
+  if ("choices" in result) {
+    return { step: "choose", phone, choices: result.choices, ticket: result.ticket };
+  }
+
+  await createCustomerSession(result.customer);
+  redirect("/account");
+}
+
+/** مرحله‌ی سوم (فقط برای شماره‌های مشترک): پرونده‌ی انتخاب‌شده */
+export async function chooseCustomerFile(
+  prev: OtpState,
+  formData: FormData,
+): Promise<OtpState> {
+  if (prev.step !== "choose") return { step: "phone" };
+
+  const customerId = String(formData.get("customerId") ?? "");
+  const result = await claimChosenCustomer(prev.ticket, customerId);
+  if (!result.ok || !("customer" in result)) {
+    return { ...prev, message: result.ok ? "پرونده انتخاب نشد." : result.message };
+  }
 
   await createCustomerSession(result.customer);
   redirect("/account");

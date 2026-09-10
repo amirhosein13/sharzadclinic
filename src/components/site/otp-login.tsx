@@ -2,8 +2,10 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowRight, KeyRound, Loader2, Smartphone, TriangleAlert } from "lucide-react";
-import { confirmOtp, requestOtp, type OtpState } from "@/app/actions/customer";
+import { ArrowRight, KeyRound, Loader2, Smartphone, TriangleAlert, UserRound } from "lucide-react";
+import {
+  chooseCustomerFile, confirmOtp, requestOtp, type OtpState,
+} from "@/app/actions/customer";
 import { Field, Input } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { toFa } from "@/lib/utils";
@@ -11,16 +13,69 @@ import { toFa } from "@/lib/utils";
 const INITIAL: OtpState = { step: "phone" };
 
 export function OtpLogin() {
-  const [state, action] = useActionState<OtpState, FormData>(
-    async (prev, formData) =>
-      formData.get("code") !== null ? confirmOtp(prev, formData) : requestOtp(prev, formData),
-    INITIAL
-  );
+  const [state, action] = useActionState<OtpState, FormData>(async (prev, formData) => {
+    if (formData.get("customerId") !== null) return chooseCustomerFile(prev, formData);
+    if (formData.get("code") !== null) return confirmOtp(prev, formData);
+    return requestOtp(prev, formData);
+  }, INITIAL);
 
-  return state.step === "phone" ? (
-    <PhoneStep action={action} message={state.message} />
-  ) : (
-    <CodeStep action={action} state={state} />
+  if (state.step === "phone") return <PhoneStep action={action} message={state.message} />;
+  if (state.step === "choose") return <ChooseStep action={action} state={state} />;
+  return <CodeStep action={action} state={state} />;
+}
+
+/**
+ * وقتی چند پرونده روی یک شماره ثبت است (مثلاً مادر و دختر)، بعد از تأیید کد
+ * از خودِ فرد می‌پرسیم کدام پرونده مال اوست.
+ */
+function ChooseStep({
+  action,
+  state,
+}: {
+  action: (formData: FormData) => void;
+  state: Extract<OtpState, { step: "choose" }>;
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="mx-auto grid size-14 place-items-center rounded-3xl bg-rose-50 text-rose-500 dark:bg-rose-500/10">
+        <UserRound className="size-7" />
+      </div>
+
+      <div className="text-center">
+        <h1 className="text-xl font-bold">کدام پرونده مال شماست؟</h1>
+        <p className="mt-2 text-sm leading-7 text-[color:var(--fg-muted)]">
+          روی شماره‌ی <span dir="ltr">{toFa(state.phone)}</span> بیش از یک پرونده ثبت شده است.
+        </p>
+      </div>
+
+      {state.message && <ErrorNote>{state.message}</ErrorNote>}
+
+      <div className="space-y-2.5">
+        {state.choices.map((choice) => (
+          <form key={choice.id} action={action}>
+            <button
+              type="submit"
+              name="customerId"
+              value={choice.id}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] p-4 text-right transition-colors hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+            >
+              <span className="min-w-0">
+                <span className="block truncate font-semibold">{choice.name}</span>
+                {choice.hint && (
+                  <span className="block text-xs text-[color:var(--fg-muted)]">{choice.hint}</span>
+                )}
+              </span>
+              <ArrowRight className="size-4 shrink-0 text-rose-400" />
+            </button>
+          </form>
+        ))}
+      </div>
+
+      <p className="text-center text-xs leading-6 text-[color:var(--fg-muted)]">
+        اگر پرونده‌ی شما اینجا نیست یا شماره‌ی خودتان را دارید، به کلینیک بگویید تا
+        شماره‌ی پرونده‌تان را جدا کند.
+      </p>
+    </div>
   );
 }
 

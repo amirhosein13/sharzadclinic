@@ -92,6 +92,27 @@ export function normalizePhone(raw: string): string {
   return p;
 }
 
+/**
+ * نام فارسی را برای «آیا این همان آدم است؟» یکدست می‌کند.
+ *
+ * سه چیز باعث می‌شود دو نوشتنِ یک نام برابر شمرده نشوند: عربی‌نویسیِ ی و ک،
+ * نیم‌فاصله، و فاصله‌ی اضافه («آزادمنجیری» و «آزاد منجیری»). هر سه اینجا
+ * برداشته می‌شوند. اعراب هم حذف می‌شود چون گاهی تایپ می‌شود و گاهی نه.
+ *
+ * فقط برای مقایسه است؛ چیزی که ذخیره یا نمایش داده می‌شود همان نوشته‌ی اصلی است.
+ */
+export function normalizeName(raw: string): string {
+  return (raw ?? "")
+    .replace(/[\u064B-\u065F\u0670]/g, "") // اعراب
+    .replace(/[يى]/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/[ۀة]/g, "ه")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/[\s\u200c\u200f\u200e]+/g, "") // فاصله، نیم‌فاصله و نشانه‌های جهت
+    .trim()
+    .toLowerCase();
+}
+
 export function isValidIranMobile(raw: string): boolean {
   return /^09\d{9}$/.test(normalizePhone(raw));
 }

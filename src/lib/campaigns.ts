@@ -36,6 +36,9 @@ export function audienceWhere(filter: CampaignFilter): Prisma.CustomerWhereInput
     { isBlocked: false },
     // خواسته‌ی مشتری بر همه‌چیز مقدم است
     { smsOptOut: false },
+    // پرونده‌های منتقل‌شده از برنامه‌ی قدیمی گاهی شماره‌ی ثابت یا ناقص دارند؛
+    // پیامک به آن‌ها فقط هزینه است و در گزارش «ارسال‌نشده» می‌نشیند
+    { phone: { startsWith: "09" } },
   ];
 
   if (filter.serviceId) {

@@ -62,9 +62,40 @@ export async function issueOtp(rawPhone: string): Promise<OtpRequest & { code?: 
   return { ok: true, expiresInSeconds: OTP_TTL_MINUTES * 60, code };
 }
 
+export type CustomerChoice = { id: string; name: string; hint: string };
+
 export type OtpVerify =
   | { ok: true; customer: CustomerSession }
+  /** چند پرونده روی این شماره هست؛ خودِ فرد باید بگوید کدام است. */
+  | { ok: true; choices: CustomerChoice[]; ticket: string }
   | { ok: false; message: string };
+
+/** عمر بلیت انتخاب پرونده. کوتاه است چون فقط برای همان یک کلیک لازم است. */
+const CHOICE_TTL_SECONDS = 5 * 60;
+
+/**
+ * بلیتِ «این شماره کد را درست وارد کرد».
+ *
+ * بدون این، مرحله‌ی انتخاب پرونده تبدیل می‌شد به دری برای دور زدن کد یکبارمصرف:
+ * هر کسی می‌توانست شناسه‌ی یک پرونده را بفرستد و وارد شود.
+ */
+async function signChoiceTicket(phone: string): Promise<string> {
+  return new SignJWT({ phone, kind: "choose" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(`${CHOICE_TTL_SECONDS}s`)
+    .sign(secretKey());
+}
+
+async function readChoiceTicket(ticket: string): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(ticket, secretKey());
+    if (payload.kind !== "choose" || typeof payload.phone !== "string") return null;
+    return payload.phone;
+  } catch {
+    return null;
+  }
+}
 
 export async function verifyOtp(rawPhone: string, rawCode: string): Promise<OtpVerify> {
   const phone = normalizePhone(rawPhone);
@@ -95,25 +126,64 @@ export async function verifyOtp(rawPhone: string, rawCode: string): Promise<OtpV
 
   await prisma.otpCode.update({ where: { id: record.id }, data: { consumedAt: new Date() } });
 
-  const customer = await prisma.customer.findUnique({ where: { phone } });
-  if (!customer) {
+  // یک شماره می‌تواند چند پرونده داشته باشد (مادر و دختری که هنوز شماره‌ی
+  // خودش را ندارد). قدیمی‌ترین پرونده اول می‌آید چون معمولاً صاحب شماره است.
+  const customers = await prisma.customer.findMany({
+    where: { phone },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (customers.length === 0) {
     return {
       ok: false,
       message: "با این شماره سابقه‌ای در کلینیک ثبت نشده است. ابتدا یک نوبت رزرو کنید.",
     };
   }
-  if (customer.isBlocked) {
+
+  const allowed = customers.filter((c) => !c.isBlocked);
+  if (allowed.length === 0) {
     return { ok: false, message: "دسترسی این شماره محدود شده است. لطفاً تماس بگیرید." };
   }
 
-  return {
-    ok: true,
-    customer: {
-      id: customer.id,
-      phone: customer.phone,
-      name: `${customer.firstName} ${customer.lastName}`,
-    },
-  };
+  if (allowed.length > 1) {
+    return {
+      ok: true,
+      ticket: await signChoiceTicket(phone),
+      choices: allowed.map((c) => ({
+        id: c.id,
+        name: `${c.firstName} ${c.lastName}`,
+        hint: c.legacyFileNo ? `پرونده‌ی ${toFa(c.legacyFileNo)}` : "",
+      })),
+    };
+  }
+
+  return { ok: true, customer: sessionOf(allowed[0]) };
+}
+
+function sessionOf(c: { id: string; phone: string; firstName: string; lastName: string }) {
+  return { id: c.id, phone: c.phone, name: `${c.firstName} ${c.lastName}` };
+}
+
+/**
+ * مرحله‌ی دوم برای شماره‌های مشترک: پرونده‌ای که کاربر انتخاب کرده.
+ * بلیت ثابت می‌کند همین شماره چند لحظه پیش کد را درست زده است.
+ */
+export async function claimChosenCustomer(
+  ticket: string,
+  customerId: string,
+): Promise<OtpVerify> {
+  const phone = await readChoiceTicket(ticket);
+  if (!phone) {
+    return { ok: false, message: "زمان انتخاب پرونده تمام شد. دوباره وارد شوید." };
+  }
+
+  // شرطِ phone حیاتی است: بلیت فقط برای پرونده‌های همین شماره اعتبار دارد
+  const customer = await prisma.customer.findFirst({ where: { id: customerId, phone } });
+  if (!customer || customer.isBlocked) {
+    return { ok: false, message: "این پرونده در دسترس نیست. دوباره وارد شوید." };
+  }
+
+  return { ok: true, customer: sessionOf(customer) };
 }
 
 export async function createCustomerSession(customer: CustomerSession): Promise<void> {

@@ -75,34 +75,40 @@ enum Gender {
 }
 
 model Customer {
-  id           String    @id @default(cuid())
-  legacyId     String?   @unique // کلید رکورد در دیتابیس قدیمی
-  firstName    String
-  lastName     String
-  phone        String    @unique
-  email        String?
-  nationalCode String?
-  gender       Gender    @default(FEMALE)
-  birthDate    DateTime?
-  address      String?
-  notes        String? // یادداشت پزشکی/پذیرش
-  allergies    String?
+  id                  String    @id @default(cuid())
+  legacyId            String?   @unique // کلید رکورد در دیتابیس قدیمی
+  /// شماره‌ی پرونده در برنامه‌ی قدیمی — همانی که روی پرونده‌ی کاغذی نوشته شده.
+  /// در برنامه‌ی قدیمی یکتا نبود، پس اینجا فقط برای جستجو نگه داشته می‌شود.
+  legacyFileNo        String?
+  firstName           String
+  lastName            String
+  /// یکتا نیست: در خانواده‌های ایرانی یک شماره بین چند نفر مشترک است
+  /// (مادر و دختری که هنوز شماره‌ی خودش را ندارد). هنگام ورود به پنل مشتری،
+  /// اگر چند پرونده روی یک شماره باشد از خودِ فرد می‌پرسیم کدام پرونده.
+  phone               String
+  email               String?
+  nationalCode        String?
+  gender              Gender    @default(FEMALE)
+  birthDate           DateTime?
+  address             String?
+  notes               String? // یادداشت پزشکی/پذیرش
+  allergies           String?
   /// «از کجا با ما آشنا شدید؟» — کلید از REFERRAL_SOURCES
-  referralSource String?
+  referralSource      String?
   /// کد اختصاصی این مشتری برای معرفی دوستان. با اولین نیاز ساخته می‌شود.
-  referralCode   String? @unique
+  referralCode        String?   @unique
   /// «پیامک تبلیغاتی برایم نفرست». پیامک‌های ضروری (کد ورود، یادآوری نوبت)
   /// را تحت تأثیر قرار نمی‌دهد.
-  smsOptOut      Boolean @default(false)
+  smsOptOut           Boolean   @default(false)
   /// اجازه‌ی انتشار عکس‌های قبل/بعد در سایت.
   /// null = نپرسیده‌ایم، true = اجازه داده، false = نداده یا پس گرفته.
   /// وضعیت فعلی این است؛ سند حقوقی‌اش در رضایت‌نامه‌ی امضاشده می‌ماند.
   photoPublishAllowed Boolean?
   /// توضیح آزاد، مثلاً نام معرف
-  referralNote   String?
-  isBlocked    Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  referralNote        String?
+  isBlocked           Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   appointments Appointment[]
   treatments   TreatmentRecord[]
@@ -116,10 +122,12 @@ model Customer {
   discountUses DiscountUse[]
   waitlist     WaitlistEntry[]
 
-  referralsMade     Referral[] @relation("Referrer")
-  referralReceived  Referral?  @relation("Referred")
-  campaignMessages  CampaignRecipient[]
+  referralsMade    Referral[]          @relation("Referrer")
+  referralReceived Referral?           @relation("Referred")
+  campaignMessages CampaignRecipient[]
 
+  @@index([phone])
+  @@index([legacyFileNo])
   @@index([lastName, firstName])
   @@index([createdAt])
   @@index([referralSource])
@@ -692,6 +700,7 @@ model ExpenseCategory {
 /// یک قلم هزینه‌ی کلینیک
 model Expense {
   id         String          @id @default(cuid())
+  legacyId   String?         @unique // کلید رکورد در برنامه‌ی قدیمی
   categoryId String
   category   ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   /// اگر هزینه به یک پرسنل مربوط است (حقوق، پاداش)
@@ -933,12 +942,12 @@ model ConsentSignature {
   customer   Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   /// نام و کد ملی همان‌طور که هنگام امضا وارد شده
-  fullName      String
-  nationalCode  String?
+  fullName          String
+  nationalCode      String?
   /// تصویر امضا به شکل data URL
-  signatureData String?
+  signatureData     String?
   /// متن رضایت‌نامه در لحظه‌ی امضا، تا تغییر بعدی قالب سند را عوض نکند
-  bodySnapshot  String
+  bodySnapshot      String
   /// در همین امضا، اجازه‌ی انتشار عکس هم داده شد؟ سند این موافقت است.
   allowPhotoPublish Boolean @default(false)
 
@@ -1057,7 +1066,7 @@ model CashClose {
   note String?
 
   closedById String?
-  closedBy   User?   @relation(fields: [closedById], references: [id], onDelete: SetNull)
+  closedBy   User?    @relation(fields: [closedById], references: [id], onDelete: SetNull)
   closedAt   DateTime @default(now())
 
   @@index([day])
@@ -1120,9 +1129,9 @@ model Campaign {
   message String
 
   /// فیلترِ انتخاب گروه، همان‌طور که کاربر انتخاب کرده
-  serviceId       String?
-  inactiveMonths  Int?
-  onlyWithVisits  Boolean @default(false)
+  serviceId      String?
+  inactiveMonths Int?
+  onlyWithVisits Boolean @default(false)
 
   status CampaignStatus @default(DRAFT)
 
@@ -1152,7 +1161,7 @@ model CampaignRecipient {
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   /// queued | sent | failed
-  status String  @default("queued")
+  status String    @default("queued")
   error  String?
   sentAt DateTime?
 
@@ -1170,7 +1179,7 @@ model SiteEvent {
   id String @id @default(cuid())
 
   /// service_view | booking_start | booking_service | booking_time | booking_submit | booking_done
-  kind String
+  kind        String
   /// اگر به یک خدمت مربوط است
   serviceSlug String?
 

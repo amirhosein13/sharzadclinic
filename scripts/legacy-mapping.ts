@@ -1,135 +1,68 @@
 /**
  * ───────────────────────────────────────────────────────────────
- *  نقشه‌ی مهاجرت از دیتابیس SQL Server اپلیکیشن قدیمی
+ *  نقشه‌ی مهاجرت از برنامه‌ی قدیمی کلینیک (shahrzadclinicnappcontext)
  * ───────────────────────────────────────────────────────────────
  *
- *  ⚠️  این تنها فایلی است که باید ویرایش کنی.
+ *  این نقشه از روی دیتابیس واقعی نوشته شده، نه حدس. جدول‌های برنامه‌ی
+ *  قدیمی و معنی‌شان:
  *
- *  مراحل:
- *   ۱. اول `npm run import:legacy -- --inspect` را بزن تا لیست جدول‌ها
- *      و ستون‌های دیتابیس قدیمی چاپ شود.
- *   ۲. بر اساس خروجی، نام جدول‌ها و ستون‌ها را در همین فایل اصلاح کن.
- *   ۳. `npm run import:legacy -- --dry-run` را بزن تا بدون نوشتن در
- *      دیتابیس، ببینی چه چیزی قرار است منتقل شود.
- *   ۴. در نهایت `npm run import:legacy` را اجرا کن.
+ *    moshtaries    مشتری‌ها          → Customer
+ *    allref        شماره‌ی پرونده    → Customer.legacyFileNo
+ *    hozes         «حوزه» = خدمت     → Service (با خدمات موجود تطبیق داده می‌شود)
+ *    days          روزها             → فقط برای تاریخِ harbaroomade
+ *    harbaroomades «هر بار آمده»     → TreatmentRecord + Payment
+ *    rezervvaghts  رزرو وقت          → Appointment
+ *    rizdaramads   ریز درآمد         → Payment (بدون مشتری، نادیده گرفته می‌شود)
+ *    rizkhargs     ریز خرج           → Expense
+ *    karmandans    کارمندان          → Staff
  *
- *  مهاجرت idempotent است: هر رکورد با `legacyId` یکتا ثبت می‌شود،
- *  پس اجرای چندباره رکورد تکراری نمی‌سازد.
+ *  نکته‌های مهمی که در داده‌ی واقعی پیدا شد و در import-legacy.ts رعایت می‌شوند:
+ *
+ *   • allref.beref شماره‌ی پرونده‌ای است که منشی می‌بیند و allref.anotherid
+ *     کلید واقعی مشتری. این نگاشت در برنامه‌ی قدیمی خراب بود: یک شماره برای
+ *     دو نفر، و یک نفر با چند شماره. پس شماره فقط برای جستجو نگه داشته
+ *     می‌شود و کلیدِ هویت نیست.
+ *
+ *   • rezervvaght.beky اسم متخصص نیست؛ کپی نام کوچک مشتری است. استفاده نمی‌شود.
+ *
+ *   • rezervvaght.idmoshtary در یک‌سومِ رکوردها صفر است، چون برنامه‌ی قدیمی
+ *     مشتری را با نامِ تقریبی پیدا می‌کرد. با نام نرمال‌شده دوباره وصل می‌شود.
+ *
+ *   • rezervvaght.dayid همیشه خالی است. تاریخ فقط در khodevaght است.
  */
 
-export type LegacyMapping = {
-  /** نام جدول در دیتابیس قدیمی */
-  table: string;
-  /** ستون کلید اصلی */
-  idColumn: string;
-  /** نگاشت ستون‌ها */
-  columns: Record<string, string>;
-};
-
-/** جدول مشتریان/بیماران */
-export const CUSTOMERS: LegacyMapping = {
-  table: "Customers",
-  idColumn: "CustomerID",
-  columns: {
-    firstName: "FirstName",
-    lastName: "LastName",
-    phone: "Mobile",
-    email: "Email",
-    nationalCode: "NationalCode",
-    birthDate: "BirthDate",
-    address: "Address",
-    notes: "Description",
-    gender: "Gender", // مقدار عددی/متنی — در normalizeGender پایین تبدیل می‌شود
-    createdAt: "RegisterDate",
-  },
-};
-
-/** جدول نوبت‌ها (اختیاری — اگر نداری این را null کن) */
-export const APPOINTMENTS: LegacyMapping | null = {
-  table: "Appointments",
-  idColumn: "AppointmentID",
-  columns: {
-    customerLegacyId: "CustomerID",
-    serviceLegacyId: "ServiceID",
-    serviceTitle: "ServiceName", // اگر ID نداری، با نام خدمت تطبیق داده می‌شود
-    startsAt: "AppointmentDate",
-    durationMinutes: "Duration",
-    status: "Status",
-    note: "Description",
-  },
-};
-
-/** جدول خدمات (اختیاری) */
-export const SERVICES: LegacyMapping | null = {
-  table: "Services",
-  idColumn: "ServiceID",
-  columns: {
-    title: "ServiceName",
-    price: "Price",
-    durationMinutes: "Duration",
-  },
-};
-
-/** جدول سوابق درمان / جلسات (اختیاری) */
-export const TREATMENTS: LegacyMapping | null = {
-  table: "Visits",
-  idColumn: "VisitID",
-  columns: {
-    customerLegacyId: "CustomerID",
-    serviceLegacyId: "ServiceID",
-    performedAt: "VisitDate",
-    sessionNo: "SessionNumber",
-    description: "Description",
-  },
-};
-
-/** جدول پرداخت‌ها (اختیاری) */
-export const PAYMENTS: LegacyMapping | null = {
-  table: "Payments",
-  idColumn: "PaymentID",
-  columns: {
-    customerLegacyId: "CustomerID",
-    amount: "Amount",
-    paidAt: "PaymentDate",
-    method: "PaymentType",
-    reference: "TrackingCode",
-    note: "Description",
-  },
-};
-
-// ─── تبدیل‌کننده‌های مقدار ────────────────────────────────────────
-
-/** جنسیت اپ قدیمی → enum جدید */
-export function normalizeGender(raw: unknown): "FEMALE" | "MALE" | "OTHER" {
-  const value = String(raw ?? "").trim().toLowerCase();
-  if (["0", "f", "female", "زن", "خانم", "مونث"].includes(value)) return "FEMALE";
-  if (["1", "m", "male", "مرد", "آقا", "مذکر"].includes(value)) return "MALE";
-  return "FEMALE"; // پیش‌فرض کلینیک زیبایی
-}
-
-/** وضعیت نوبت اپ قدیمی → enum جدید */
-export function normalizeStatus(
-  raw: unknown
-): "PENDING" | "CONFIRMED" | "DONE" | "CANCELLED" | "NO_SHOW" {
-  const value = String(raw ?? "").trim().toLowerCase();
-  if (["1", "confirmed", "تایید", "تأیید", "تاییدشده"].includes(value)) return "CONFIRMED";
-  if (["2", "done", "completed", "انجام شد", "انجام‌شده", "تمام"].includes(value)) return "DONE";
-  if (["3", "cancelled", "canceled", "لغو", "لغوشده"].includes(value)) return "CANCELLED";
-  if (["4", "noshow", "no_show", "غیبت", "عدم مراجعه"].includes(value)) return "NO_SHOW";
-  return "DONE"; // نوبت‌های قدیمی معمولاً گذشته‌اند
-}
-
-/** روش پرداخت اپ قدیمی → enum جدید */
-export function normalizePaymentMethod(raw: unknown): "CASH" | "CARD" | "ONLINE" | "OTHER" {
-  const value = String(raw ?? "").trim().toLowerCase();
-  if (["0", "cash", "نقد", "نقدی"].includes(value)) return "CASH";
-  if (["1", "card", "pos", "کارت", "کارتخوان", "کارت‌خوان"].includes(value)) return "CARD";
-  if (["2", "online", "آنلاین", "اینترنتی"].includes(value)) return "ONLINE";
-  return "OTHER";
-}
+/** نام جدول‌های برنامه‌ی قدیمی */
+export const TABLES = {
+  customers: "moshtaries",
+  fileNumbers: "allref",
+  services: "hozes",
+  days: "days",
+  visits: "harbaroomades",
+  reservations: "rezervvaghts",
+  income: "rizdaramads",
+  expenses: "rizkhargs",
+  staff: "karmandans",
+} as const;
 
 /**
- * مبلغ اپ قدیمی → تومان.
- * اگر اپ قدیمی مبالغ را «ریال» ذخیره می‌کرده، این را روی 10 بگذار.
+ * خدمات برنامه‌ی قدیمی → نامک خدمت در سایت جدید.
+ *
+ * برنامه‌ی قدیمی فقط دو «حوزه» داشت. اگر نامی اینجا نباشد، خدمت تازه‌ای
+ * در دسته‌ی «عمومی» ساخته می‌شود تا هیچ سابقه‌ای گم نشود.
  */
-export const AMOUNT_DIVISOR = 1;
+export const SERVICE_SLUG_BY_NAME: Record<string, string> = {
+  "لیزر": "laser",
+  "بوتاکس": "botox",
+};
+
+/**
+ * وضعیت نوبت‌های منتقل‌شده.
+ *
+ * برنامه‌ی قدیمی وضعیت نداشت — نوبت لغوشده را پاک می‌کرد. پس هر نوبتی که
+ * مانده، یعنی برگزار شده. DONE هم امن‌ترین انتخاب است: NO_SHOW باعث می‌شد
+ * گزارش «مشتری‌های بدقول» با داده‌ی قدیمیِ نامطمئن پر شود.
+ */
+export const IMPORTED_APPOINTMENT_STATUS = "DONE" as const;
+
+/** طول پیش‌فرض نوبت‌های قدیمی، وقتی خدمت طول مشخصی ندارد */
+export const DEFAULT_DURATION_MINUTES = 30;

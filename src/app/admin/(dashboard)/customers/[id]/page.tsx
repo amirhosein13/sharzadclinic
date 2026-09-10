@@ -63,6 +63,14 @@ export default async function CustomerDetailPage({
 
   if (!customer) notFound();
 
+  // پرونده‌های دیگری که روی همین شماره ثبت شده‌اند (مثلاً مادر و دختر).
+  // منشی باید بداند وگرنه ممکن است سابقه را در پرونده‌ی اشتباه بنویسد.
+  const samePhone = await prisma.customer.findMany({
+    where: { phone: customer.phone, NOT: { id: customer.id } },
+    select: { id: true, firstName: true, lastName: true, legacyFileNo: true },
+    orderBy: { createdAt: "asc" },
+  });
+
   const [services, staff, packages, consentTemplates, currentUser] = await Promise.all([
     prisma.service.findMany({
       where: { isActive: true },
@@ -218,8 +226,39 @@ export default async function CustomerDetailPage({
                 <Row label="تاریخ تولد" value={formatJalaliLong(customer.birthDate)} />
               )}
               {customer.address && <Row label="آدرس" value={customer.address} />}
+              {customer.legacyFileNo && (
+                <Row label="شماره‌ی پرونده‌ی قدیمی" value={toFa(customer.legacyFileNo)} />
+              )}
               {customer.legacyId && <Row label="شناسه‌ی قدیمی" value={customer.legacyId} ltr />}
             </dl>
+
+            {samePhone.length > 0 && (
+              <div className="mt-5 rounded-2xl border border-amber-300/60 bg-amber-50/60 p-4 dark:border-amber-400/20 dark:bg-amber-500/5">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
+                  این شماره پرونده‌ی دیگری هم دارد
+                </p>
+                <p className="mt-1 text-[11px] leading-6 text-[color:var(--fg-muted)]">
+                  مطمئن شوید سابقه را در پرونده‌ی درست ثبت می‌کنید.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {samePhone.map((other) => (
+                    <Link
+                      key={other.id}
+                      href={`/admin/customers/${other.id}`}
+                      className="rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] px-3 py-1.5 text-xs transition-colors hover:border-rose-300"
+                    >
+                      {other.firstName} {other.lastName}
+                      {other.legacyFileNo && (
+                        <span className="text-[color:var(--fg-muted)]">
+                          {" "}
+                          — پرونده‌ی {toFa(other.legacyFileNo)}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mt-5 flex flex-wrap gap-2 border-t border-[color:var(--line)] pt-5">
               {customer.isBlocked && <Badge tone="red">محدودشده</Badge>}

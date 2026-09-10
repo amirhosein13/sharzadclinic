@@ -7,7 +7,7 @@ import { attachReferral } from "@/lib/referrals";
 import { noShowProfile } from "@/lib/no-shows";
 import { getAvailableSlots, releaseExpiredHolds } from "@/lib/availability";
 import { atTime, formatJalaliDateTime, parseYmdKey } from "@/lib/date";
-import { generateBookingCode } from "@/lib/utils";
+import { generateBookingCode, normalizeName } from "@/lib/utils";
 import { notifyBookingCreated, notifyBookingEmail } from "@/lib/notifications";
 import { createCustomerSession, getCustomerSession } from "@/lib/customer-auth";
 import { getSettings } from "@/lib/settings";
@@ -71,28 +71,44 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
   const endsAt = new Date(startsAt.getTime() + service.durationMinutes * 60_000);
 
   try {
-    const before = await prisma.customer.findUnique({
+    // یک شماره می‌تواند چند پرونده داشته باشد، پس فقط با شماره نمی‌شود گفت
+    // این کیست. با شماره و نام با هم پیدا می‌کنیم؛ اگر دختری با شماره‌ی مادرش
+    // رزرو کند، پرونده‌ی خودش ساخته می‌شود نه اینکه نام مادر عوض شود.
+    const onThisPhone = await prisma.customer.findMany({
       where: { phone: input.phone },
-      select: { id: true, isBlocked: true, _count: { select: { appointments: true } } },
+      select: {
+        id: true, firstName: true, lastName: true, isBlocked: true,
+        _count: { select: { appointments: true } },
+      },
     });
 
-    if (before?.isBlocked) {
+    const wanted = normalizeName(`${input.firstName} ${input.lastName}`);
+    const before = onThisPhone.find(
+      (c) => normalizeName(`${c.firstName} ${c.lastName}`) === wanted,
+    );
+
+    // محدودیت روی شماره است، نه روی یک پرونده: اگر کلینیک شماره‌ای را بسته،
+    // با عوض کردن نام نباید بشود دورش زد
+    if (onThisPhone.some((c) => c.isBlocked)) {
       return { ok: false, message: "امکان ثبت نوبت آنلاین برای این شماره وجود ندارد. لطفاً تماس بگیرید." };
     }
 
     // «از کجا آشنا شدید» فقط یک بار، هنگام ساخت پرونده، ثبت می‌شود؛ جواب
     // اولین بار درست‌ترین جواب است و رزروهای بعدی نباید بازنویسی‌اش کنند
     const referralSource = normalizeSource(input.referralSource);
-    const customer = await prisma.customer.upsert({
-      where: { phone: input.phone },
-      update: { firstName: input.firstName, lastName: input.lastName },
-      create: {
-        firstName: input.firstName,
-        lastName: input.lastName,
-        phone: input.phone,
-        referralSource,
-      },
-    });
+    const customer = before
+      ? await prisma.customer.update({
+          where: { id: before.id },
+          data: { firstName: input.firstName, lastName: input.lastName },
+        })
+      : await prisma.customer.create({
+          data: {
+            firstName: input.firstName,
+            lastName: input.lastName,
+            phone: input.phone,
+            referralSource,
+          },
+        });
 
     // کد معرف: خطایش نباید جلوی ثبت نوبت را بگیرد — نوبت مهم‌تر از هدیه است
     if (input.referralCode && !before) {
@@ -163,7 +179,9 @@ export async function createBooking(formData: FormData): Promise<BookingResult> 
 
     // ورود خودکار فقط برای مشتری تازه‌وارد. اگر شماره سابقه داشته باشد،
     // ورود بدون تأیید پیامکی یعنی هرکسی می‌توانست پرونده‌ی دیگری را ببیند.
-    const isNewCustomer = !before || before._count.appointments === 0;
+    // معیار، کلِ شماره است نه فقط این پرونده: روی شماره‌ای که پرونده‌ی
+    // فعالی دارد، یک نام تازه هم نباید کلید ورود بشود.
+    const isNewCustomer = onThisPhone.every((c) => c._count.appointments === 0);
     if (!session && isNewCustomer) {
       await createCustomerSession({
         id: customer.id,

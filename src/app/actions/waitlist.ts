@@ -7,6 +7,7 @@ import { fieldErrors, publicWaitlistSchema, waitlistSchema } from "@/lib/validat
 import { parseJalaliInput, parseYmdKey } from "@/lib/date";
 import { notifyWaitlistOpening } from "@/lib/notifications";
 import { safeRevalidate } from "@/lib/revalidate";
+import { normalizeName } from "@/lib/utils";
 import type { FormResult } from "./content";
 
 const OK = (message: string): FormResult => ({ ok: true, message });
@@ -142,11 +143,20 @@ export async function joinWaitlist(formData: FormData): Promise<FormResult> {
     if (to < from) return FAIL("تاریخ پایان قبل از شروع است.", { toDate: "قبل از تاریخ شروع" });
     to.setHours(23, 59, 59, 999);
 
-    const customer = await prisma.customer.upsert({
+    // با شماره و نام با هم، چون یک شماره می‌تواند چند پرونده داشته باشد
+    const onThisPhone = await prisma.customer.findMany({
       where: { phone: v.phone },
-      update: {},
-      create: { firstName: v.firstName, lastName: v.lastName, phone: v.phone },
+      select: { id: true, firstName: true, lastName: true },
     });
+    const wanted = normalizeName(`${v.firstName} ${v.lastName}`);
+    const match = onThisPhone.find(
+      (c) => normalizeName(`${c.firstName} ${c.lastName}`) === wanted,
+    );
+    const customer =
+      match ??
+      (await prisma.customer.create({
+        data: { firstName: v.firstName, lastName: v.lastName, phone: v.phone },
+      }));
 
     // درخواست تکراری برای همان خدمت و بازه ثبت نمی‌شود
     const duplicate = await prisma.waitlistEntry.findFirst({

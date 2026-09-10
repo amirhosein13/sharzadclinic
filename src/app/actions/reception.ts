@@ -8,7 +8,7 @@ import {
 } from "@/lib/validators";
 import { atTime, parseJalaliInput, parseYmdKey } from "@/lib/date";
 import { normalizeSource } from "@/lib/referral-sources";
-import { generateBookingCode } from "@/lib/utils";
+import { generateBookingCode, normalizeName } from "@/lib/utils";
 import { deletePrivateFile } from "@/lib/upload";
 import { consumeForService } from "@/lib/inventory";
 import type { FormResult } from "./content";
@@ -86,15 +86,17 @@ export async function saveCustomer(formData: FormData): Promise<FormResult> {
       referralNote: nullable(v.referralNote),
     };
 
-    // شماره‌ی تکراری را پیش از نوشتن می‌گیریم تا پیام روشن‌تری بدهیم
-    const clash = await prisma.customer.findFirst({
+    // یک شماره می‌تواند چند پرونده داشته باشد (مادر و دختر)، پس صرفِ تکرارِ
+    // شماره خطا نیست. چیزی که خطاست، دو پرونده با شماره و نامِ یکسان است.
+    const onThisPhone = await prisma.customer.findMany({
       where: { phone: v.phone, NOT: id ? { id } : undefined },
       select: { firstName: true, lastName: true },
     });
-    if (clash) {
+    const wanted = normalizeName(`${v.firstName} ${v.lastName}`);
+    if (onThisPhone.some((c) => normalizeName(`${c.firstName} ${c.lastName}`) === wanted)) {
       return FAIL(
-        `این شماره قبلاً برای «${clash.firstName} ${clash.lastName}» ثبت شده است.`,
-        { phone: "شماره تکراری است" }
+        `«${v.firstName} ${v.lastName}» با همین شماره از قبل پرونده دارد.`,
+        { phone: "این پرونده تکراری است" }
       );
     }
 
@@ -109,7 +111,18 @@ export async function saveCustomer(formData: FormData): Promise<FormResult> {
     });
     revalidatePath("/admin/customers");
     revalidatePath(`/admin/customers/${saved.id}`);
-    return OK(id ? "اطلاعات مشتری به‌روزرسانی شد." : `مشتری «${v.firstName} ${v.lastName}» ثبت شد.`);
+    // اگر پرونده‌ی دیگری روی همین شماره هست، منشی باید بداند — شاید همان
+    // آدم است و با املای دیگری ثبت شده
+    const alsoHere = onThisPhone.length
+      ? ` توجه: این شماره پرونده‌ی دیگری هم دارد (${onThisPhone
+          .map((c) => `${c.firstName} ${c.lastName}`)
+          .join("، ")}).`
+      : "";
+
+    return OK(
+      (id ? "اطلاعات مشتری به‌روزرسانی شد." : `مشتری «${v.firstName} ${v.lastName}» ثبت شد.`) +
+        alsoHere,
+    );
   }) as Promise<FormResult>;
 }
 

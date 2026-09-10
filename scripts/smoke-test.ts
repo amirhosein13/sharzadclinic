@@ -52,6 +52,7 @@ import {
   audienceWhere, decorateMessage, sendBatch, startCampaign,
 } from "../src/lib/campaigns";
 import { buildCashDay, closeCashDay, recentCloses, unclosedDays } from "../src/lib/cash";
+import { cleanAmount, cleanDate, cleanPhone, normalizeName } from "./legacy-clean";
 
 const prisma = new PrismaClient();
 
@@ -440,7 +441,7 @@ async function main() {
   }));
   check("ثبت لیست انتظار از سایت", joined.ok);
 
-  const wlCustomer = await prisma.customer.findUnique({ where: { phone: WL_PHONE } });
+  const wlCustomer = await prisma.customer.findFirst({ where: { phone: WL_PHONE } });
   check("مشتری تازه برای لیست انتظار ساخته شد", !!wlCustomer);
 
   const again = await joinWaitlist(fd({
@@ -1203,7 +1204,7 @@ async function main() {
     referralSource: "google",
   }));
   check("رزرو با منبع ثبت می‌شود", srcBooking.ok);
-  const bookedCustomer = await prisma.customer.findUnique({ where: { phone: "09129990065" } });
+  const bookedCustomer = await prisma.customer.findFirst({ where: { phone: "09129990065" } });
   check("منبع روی پرونده‌ی مشتری تازه نشست", bookedCustomer?.referralSource === "google");
 
   // رزرو دوم نباید جواب اول را بازنویسی کند
@@ -1213,7 +1214,7 @@ async function main() {
     firstName: "تازه", lastName: "وارد", phone: "09129990065",
     referralSource: "instagram",
   }));
-  const srcAfterSecond = await prisma.customer.findUnique({ where: { phone: "09129990065" } });
+  const srcAfterSecond = await prisma.customer.findFirst({ where: { phone: "09129990065" } });
   check("رزرو بعدی جواب اولیه را عوض نمی‌کند", srcAfterSecond?.referralSource === "google");
 
   await prisma.appointment.deleteMany({ where: { customer: { phone: "09129990065" } } });
@@ -1369,7 +1370,27 @@ async function main() {
   await prisma.appointment.deleteMany({ where: { customer: { phone: { in: CAMP_PHONES } } } });
   await prisma.customer.deleteMany({ where: { phone: { in: CAMP_PHONES } } });
 
-  const campOtherService = await prisma.service.findFirstOrThrow({ where: { slug: "botox" } });
+  // خدمتِ مخصوص همین تست: اگر از خدمات واقعی استفاده کنیم، هر مشتری واقعی
+  // که آن خدمت را گرفته وارد گروهِ کمپین می‌شود و تست دیگر ایزوله نیست
+  await prisma.service.deleteMany({ where: { slug: { startsWith: "smoke-camp-" } } });
+  const campService = await prisma.service.create({
+    data: {
+      slug: "smoke-camp-a",
+      title: "SMOKE-CAMP خدمت الف",
+      categoryId: service.categoryId,
+      isActive: false,
+      isBookable: false,
+    },
+  });
+  const campOtherService = await prisma.service.create({
+    data: {
+      slug: "smoke-camp-b",
+      title: "SMOKE-CAMP خدمت ب",
+      categoryId: service.categoryId,
+      isActive: false,
+      isBookable: false,
+    },
+  });
   const longAgo = new Date();
   longAgo.setMonth(longAgo.getMonth() - 8);
   const recently = new Date(Date.now() - 5 * 86_400_000);
@@ -1380,10 +1401,10 @@ async function main() {
   // ۴: لیزر، خیلی وقت است نیامده، ولی انصراف داده ← هیچ‌وقت نباید بیاید
   const campCustomers = await Promise.all(
     [
-      { phone: CAMP_PHONES[0], serviceId: service.id, when: longAgo, optOut: false },
-      { phone: CAMP_PHONES[1], serviceId: service.id, when: recently, optOut: false },
+      { phone: CAMP_PHONES[0], serviceId: campService.id, when: longAgo, optOut: false },
+      { phone: CAMP_PHONES[1], serviceId: campService.id, when: recently, optOut: false },
       { phone: CAMP_PHONES[2], serviceId: campOtherService.id, when: longAgo, optOut: false },
-      { phone: CAMP_PHONES[3], serviceId: service.id, when: longAgo, optOut: true },
+      { phone: CAMP_PHONES[3], serviceId: campService.id, when: longAgo, optOut: true },
     ].map(async (row, index) => {
       const c = await prisma.customer.create({
         data: {
@@ -1416,7 +1437,7 @@ async function main() {
     return new Set(rows.map((r) => r.id));
   };
 
-  const laserInactive = await inGroup({ serviceId: service.id, inactiveMonths: 6 });
+  const laserInactive = await inGroup({ serviceId: campService.id, inactiveMonths: 6 });
   check("مشتریِ همان خدمت که مدت‌هاست نیامده انتخاب می‌شود", laserInactive.has(campIds[0]));
   check("مشتریِ تازه‌آمده در فیلتر «۶ ماه» نمی‌آید", !laserInactive.has(campIds[1]));
   check("مشتریِ خدمت دیگر انتخاب نمی‌شود", !laserInactive.has(campIds[2]));
@@ -1440,7 +1461,7 @@ async function main() {
     data: {
       title: "SMOKE-CAMP آزمایشی",
       message: decorated,
-      serviceId: service.id,
+      serviceId: campService.id,
       inactiveMonths: 6,
     },
   });
@@ -1473,7 +1494,7 @@ async function main() {
 
   // انصراف بعد از قفل‌شدن فهرست هم باید رعایت شود
   const campaign2 = await prisma.campaign.create({
-    data: { title: "SMOKE-CAMP دوم", message: decorated, onlyWithVisits: true },
+    data: { title: "SMOKE-CAMP دوم", message: decorated, serviceId: campService.id },
   });
   await startCampaign(campaign2.id);
   await prisma.customer.update({ where: { id: campIds[1] }, data: { smsOptOut: true } });
@@ -1493,6 +1514,7 @@ async function main() {
   await prisma.notificationLog.deleteMany({ where: { recipient: { in: CAMP_PHONES } } });
   await prisma.appointment.deleteMany({ where: { customerId: { in: campIds } } });
   await prisma.customer.deleteMany({ where: { id: { in: campIds } } });
+  await prisma.service.deleteMany({ where: { slug: { startsWith: "smoke-camp-" } } });
 
 
   // ── سلامت سیستم ────────────────────────────────────────────
@@ -2038,6 +2060,54 @@ async function main() {
   check(
     "هر مورد فهرست کارها عدد و لینک دارد",
     adminItems.every((item) => item.count > 0 && item.href.startsWith("/admin"))
+  );
+
+  // ── پاک‌سازی داده‌ی برنامه‌ی قدیمی ──────────────────────────
+  // این قانون‌ها روی داده‌ی واقعیِ مادرِ کلینیک اجرا می‌شوند؛ اگر خراب شوند
+  // تاریخچه‌ی ۲۷۰۰ مشتری و ۲۳۸ میلیون تومان درآمد اشتباه منتقل می‌شود.
+
+  const jalaliRaw = cleanDate(new Date(1400, 7, 17, 12, 30));
+  check(
+    "تاریخ شمسیِ خام درست تبدیل می‌شود",
+    jalaliRaw.value?.toISOString().slice(0, 10) === "2021-11-08"
+  );
+  check("ساعتِ تاریخ شمسی حفظ می‌شود", jalaliRaw.value?.getHours() === 12);
+
+  const doubled = cleanDate(new Date(2643, 6, 3));
+  check(
+    "سالِ دوبار تبدیل‌شده ۶۲۱ سال برمی‌گردد",
+    doubled.value?.getFullYear() === 2022 && doubled.value?.getMonth() === 6
+  );
+
+  const shortYear = cleanDate(new Date(1022, 2, 3));
+  check("سالِ ناقص («۴۰۱») بازیابی می‌شود", shortYear.value?.getFullYear() === 2022);
+
+  check("سالِ بی‌معنی رد می‌شود", cleanDate(new Date(634, 2, 3)).value === null);
+  check("تاریخ درست دست‌نخورده می‌ماند", cleanDate(new Date(2022, 2, 17)).note === null);
+
+  check("ستاره از وسط شماره پاک می‌شود", cleanPhone("0*9375185565").value === "09375185565");
+  check("فاصله‌ی ابتدای شماره پاک می‌شود", cleanPhone(" 09363652565").kind === "mobile");
+  check("موبایلِ ناقص «معتبر» شمرده نمی‌شود", cleanPhone("0935873609").kind === "invalid");
+  check("شماره‌ی ثابت جدا تشخیص داده می‌شود", cleanPhone("34800545").kind === "landline");
+  check("شماره‌ی «۰» یعنی شماره‌ای نبوده", cleanPhone("0").value === "");
+  check("شماره‌ی درست دست‌نخورده می‌ماند", cleanPhone("09121110005").note === null);
+
+  check("مبلغ زیر هزار، هزارتومان است", cleanAmount(450).value === 450_000);
+  check("اصلاح مبلغ یادداشت می‌گذارد", (cleanAmount(450).note ?? "").includes("450"));
+  check("مبلغ درست دست‌نخورده می‌ماند", cleanAmount(450_000).note === null);
+  check("مبلغ صفر صفر می‌ماند", cleanAmount(0).value === 0);
+
+  check(
+    "«آزادمنجیری» و «آزاد منجیری» یک نفرند",
+    normalizeName("سحر آزادمنجیری") === normalizeName("سحر آزاد منجیری")
+  );
+  check(
+    "ی و ک عربی با فارسی یکی شمرده می‌شوند",
+    normalizeName("تيبه كمالي") === normalizeName("تیبه کمالی")
+  );
+  check(
+    "دو نفر با نام واقعاً متفاوت یکی نمی‌شوند",
+    normalizeName("فاطمه تقوی") !== normalizeName("آتوسا تقوی")
   );
 
   await prisma.appointment.deleteMany({ where: { source: "smoke" } });

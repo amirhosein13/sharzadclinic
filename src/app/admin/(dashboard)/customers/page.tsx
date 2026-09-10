@@ -8,7 +8,7 @@ import { CustomerForm } from "@/components/admin/forms/customer-form";
 import { toggleCustomerBlock } from "@/app/actions/admin";
 import { Badge } from "@/components/ui/badge";
 import { formatJalaliLong } from "@/lib/date";
-import { toFa } from "@/lib/utils";
+import { toEn, toFa } from "@/lib/utils";
 import { TableScroll } from "@/components/admin/table-scroll";
 
 export const dynamic = "force-dynamic";
@@ -24,14 +24,32 @@ export default async function CustomersPage({
   const { q, page: pageParam } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
 
+  // منشی ممکن است شماره را فارسی تایپ کند
+  const digits = q ? toEn(q).trim() : "";
+
+  // چند رقمِ کوتاه معمولاً شماره‌ی پرونده است، نه تکه‌ای از وسط شماره‌ی موبایل.
+  // اگر «شامل» بگیریم، جستجوی «۱۳۸» هر شماره‌ای که ۱۳۸ در خود دارد را می‌آورد
+  // و شماره‌ی پرونده‌ی درست لای ده‌ها نتیجه گم می‌شود.
+  const phoneMatch =
+    digits.length >= 6 ? { contains: digits } : { endsWith: digits };
+
   const where = q
     ? {
         OR: [
           { firstName: { contains: q, mode: "insensitive" as const } },
           { lastName: { contains: q, mode: "insensitive" as const } },
-          { phone: { contains: q } },
-          { nationalCode: { contains: q } },
-          { legacyId: { contains: q } },
+          { phone: phoneMatch },
+          { nationalCode: { contains: digits } },
+          // شناسه‌ی داخلی برنامه‌ی قدیمی («moshtary-۱۳۸») — دقیق، نه شامل،
+          // وگرنه جستجوی «۱۳۸» همه‌ی ۱۳۸۰ تا ۱۳۸۹ را هم می‌آورد
+          { legacyId: { endsWith: `-${digits}` } },
+          // شماره‌ی پرونده‌ی قدیمی؛ چون یک نفر ممکن است چند شماره داشته باشد
+          // با «،» کنار هم ذخیره شده‌اند و اینجا دقیقاً همان عدد را می‌گیریم،
+          // نه عددی که این رقم‌ها را در خود دارد
+          { legacyFileNo: digits },
+          { legacyFileNo: { startsWith: `${digits}،` } },
+          { legacyFileNo: { endsWith: `،${digits}` } },
+          { legacyFileNo: { contains: `،${digits}،` } },
         ],
       }
     : {};
@@ -47,6 +65,17 @@ export default async function CustomersPage({
     prisma.customer.count({ where }),
     prisma.customer.count({ where: { legacyId: { not: null } } }),
   ]);
+
+  // اگر منشی دقیقاً یک شماره‌ی پرونده زده، همان باید اول فهرست باشد و نه
+  // لای نتیجه‌های هم‌رقم. مرتب‌سازی روی همین صفحه انجام می‌شود؛ برای جستجوی
+  // شماره‌ی پرونده نتیجه‌ها آن‌قدر کم‌اند که به صفحه‌ی دوم نمی‌رسند.
+  if (digits) {
+    const isExact = (value: string | null) =>
+      !!value && value.split("،").includes(digits);
+    customers.sort(
+      (a, b) => Number(isExact(b.legacyFileNo)) - Number(isExact(a.legacyFileNo)),
+    );
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -67,7 +96,7 @@ export default async function CustomersPage({
             <input
               name="q"
               defaultValue={q}
-              placeholder="نام، شماره موبایل، کد ملی یا شناسه‌ی قدیمی..."
+              placeholder="نام، موبایل، کد ملی یا شماره‌ی پرونده‌ی قدیمی..."
               className="w-full rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-elevated)] py-3 pr-11 pl-4 text-sm focus:border-rose-400 focus:outline-none"
             />
           </div>
@@ -115,6 +144,11 @@ export default async function CustomersPage({
                         {customer.isBlocked && <Badge tone="red">محدود</Badge>}
                       </div>
                       {/* روی گوشی ستون‌های شمارش پنهان‌اند */}
+                      {customer.legacyFileNo && (
+                        <p className="mt-1 text-xs text-[color:var(--fg-muted)]">
+                          پرونده‌ی قدیمی: {toFa(customer.legacyFileNo)}
+                        </p>
+                      )}
                       <p className="mt-1 text-xs text-[color:var(--fg-muted)] lg:hidden">
                         {toFa(customer._count.appointments)} نوبت • {toFa(customer._count.treatments)} پرونده
                       </p>
