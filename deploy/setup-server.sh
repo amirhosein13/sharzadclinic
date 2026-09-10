@@ -44,10 +44,23 @@ read -rp "درست است؟ (y/n) " -n1 CONFIRM; echo
 # ─── ۱) بسته‌های پایه ────────────────────────────────────────
 # سرور تازه‌نصب معمولاً وسط unattended-upgrades است و قفل apt را گرفته.
 # به‌جای خطا دادن، صبر می‌کنیم.
+# نکته: با نام پردازه (pgrep -f unattended-upgr) چک نکن — الگو داخل خطِ
+# فرمانِ خودِ همین حلقه هم هست و pgrep خودش را می‌بیند، پس حلقه هیچ‌وقت
+# تمام نمی‌شود. خودِ قفل را چک می‌کنیم که شرطِ واقعی هم همان است.
+apt_locked() {
+  if command -v fuser >/dev/null 2>&1; then
+    fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+      || fuser /var/lib/apt/lists/lock >/dev/null 2>&1
+  else
+    # اگر psmisc نصب نباشد، از روی پردازه — با کروشه تا خودش را نگیرد
+    pgrep -f "[u]nattended-upgr" >/dev/null 2>&1 \
+      || pgrep -x "[a]pt-get" >/dev/null 2>&1
+  fi
+}
+
 wait_for_apt() {
   local waited=0
-  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
-     || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+  while apt_locked; do
     if [[ $waited -eq 0 ]]; then
       info "به‌روزرسانی خودکار اوبونتو در حال اجراست — صبر می‌کنیم (چند دقیقه)..."
     fi
