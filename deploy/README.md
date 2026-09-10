@@ -46,18 +46,39 @@ ssh -p 3031 root@IP-سرور
 
 ---
 
-## مرحله ۳ — یک دستور
+## مرحله ۳ — گرفتن کد
 
-روی سرور، این را کپی کن:
+مخزن **خصوصی** است، پس گیت‌هاب توکن می‌خواهد. رمز حساب گیت‌هاب کار نمی‌کند —
+گیت‌هاب سال‌هاست رمز را برای git قبول نمی‌کند.
+
+**ساخت توکن** (یک بار، روی مرورگر خودت):
+
+1. `github.com` → عکس پروفایل → **Settings**
+2. پایین‌ترین گزینه: **Developer settings**
+3. **Personal access tokens** → **Tokens (classic)** → **Generate new token (classic)**
+4. یک نام بگذار (مثلاً `سرور کلینیک`)، مدت اعتبار را انتخاب کن
+5. تیک **`repo`** را بزن (فقط همین یکی)
+6. **Generate token** → توکن را کپی کن (فقط همان یک بار نشان داده می‌شود)
+
+**روی سرور:**
 
 ```bash
-apt update && apt install -y git && \
 git clone --branch claude/beauty-clinic-website-7ej1e7 \
-  https://github.com/amirhosein13/sharzadclinic.git /tmp/sharzad-setup && \
+  https://github.com/amirhosein13/sharzadclinic.git /tmp/sharzad-setup
+```
+
+- `Username` → نام کاربری گیت‌هابت
+- `Password` → **توکن** را بچسبان (نه رمز حساب)
+
+## مرحله ۴ — اجرای اسکریپت
+
+```bash
 bash /tmp/sharzad-setup/deploy/setup-server.sh
 ```
 
-سه سؤال می‌پرسد:
+اسکریپت کد را از همان نسخه‌ای که گرفتی کپی می‌کند، پس **دوباره توکن نمی‌خواهد**.
+
+اسکریپت سه سؤال می‌پرسد:
 
 1. **دامنه** — مثلاً `shahrzadlaser.ir` (بدون `www` و بدون `https://`)
 2. **ایمیل برای SSL** — هشدار انقضای گواهی به این می‌آید

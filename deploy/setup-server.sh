@@ -42,10 +42,32 @@ read -rp "درست است؟ (y/n) " -n1 CONFIRM; echo
 [[ "$CONFIRM" == "y" ]] || die "لغو شد."
 
 # ─── ۱) بسته‌های پایه ────────────────────────────────────────
+# سرور تازه‌نصب معمولاً وسط unattended-upgrades است و قفل apt را گرفته.
+# به‌جای خطا دادن، صبر می‌کنیم.
+wait_for_apt() {
+  local waited=0
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+     || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+    if [[ $waited -eq 0 ]]; then
+      info "به‌روزرسانی خودکار اوبونتو در حال اجراست — صبر می‌کنیم (چند دقیقه)..."
+    fi
+    sleep 5
+    waited=$((waited + 5))
+    if [[ $waited -ge 900 ]]; then
+      die "۱۵ دقیقه صبر کردیم و قفل apt آزاد نشد. سرور را ری‌استارت کن و دوباره بزن."
+    fi
+  done
+  [[ $waited -gt 0 ]] && ok "قفل apt آزاد شد (${waited} ثانیه صبر)"
+  return 0
+}
+
 info "به‌روزرسانی سیستم..."
 export DEBIAN_FRONTEND=noninteractive
+wait_for_apt
 apt-get update -qq
+wait_for_apt
 apt-get upgrade -y -qq
+wait_for_apt
 apt-get install -y -qq curl git ufw nginx postgresql postgresql-contrib \
   unzip ca-certificates gnupg openssl fail2ban certbot python3-certbot-nginx
 ok "بسته‌های پایه نصب شد"
@@ -55,6 +77,7 @@ ok "بسته‌های پایه نصب شد"
 if ! command -v node >/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d v)" -lt 20 ]]; then
   info "نصب Node.js 22..."
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
+  wait_for_apt
   apt-get install -y -qq nodejs
 fi
 ok "Node $(node -v)"
@@ -147,14 +170,28 @@ else
 fi
 
 # ─── ۶) گرفتن کد ─────────────────────────────────────────────
+# مخزن خصوصی است. اسکریپت از داخل یک نسخه‌ی گرفته‌شده اجرا می‌شود، پس
+# همان را کپی می‌کنیم و دوباره سراغ گیت‌هاب نمی‌رویم — وگرنه کاربر باید
+# دو بار توکن وارد کند.
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SRC_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
+
 if [[ -d "$APP_DIR/.git" ]]; then
   info "به‌روزرسانی کد..."
   sudo -u "$APP_USER" git -C "$APP_DIR" fetch origin "$BRANCH" --quiet
   sudo -u "$APP_USER" git -C "$APP_DIR" reset --hard "origin/$BRANCH" --quiet
+elif git -C "$SRC_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  info "کپی کد از نسخه‌ای که همین الان گرفتی..."
+  rm -rf "${APP_DIR:?}"/{*,.[!.]*} 2>/dev/null || true
+  # کلونِ محلی: هیچ رمز و توکنی نمی‌خواهد
+  git clone --branch "$BRANCH" "$SRC_DIR" "$APP_DIR" --quiet
+  # ولی origin باید به گیت‌هاب اشاره کند تا بعداً git pull کار کند
+  ORIGIN=$(git -C "$SRC_DIR" remote get-url origin 2>/dev/null || echo "$REPO")
+  git -C "$APP_DIR" remote set-url origin "$ORIGIN"
 else
   info "گرفتن کد از گیت‌هاب..."
-  rm -rf "$APP_DIR"/{*,.[!.]*} 2>/dev/null || true
-  sudo -u "$APP_USER" git clone --branch "$BRANCH" --depth 1 "$REPO" "$APP_DIR" --quiet
+  rm -rf "${APP_DIR:?}"/{*,.[!.]*} 2>/dev/null || true
+  git clone --branch "$BRANCH" --depth 1 "$REPO" "$APP_DIR" --quiet
 fi
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 ok "کد روی سرور است"
