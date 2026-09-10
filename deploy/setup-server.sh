@@ -121,35 +121,6 @@ if ! command -v node >/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d v)" -lt 2
 fi
 ok "Node $(node -v)"
 
-# ─── انتخاب مخزن npm ─────────────────────────────────────────
-# از داخل ایران بعضی مخزن‌ها بسته‌اند. اشتباهِ قبلی این بود که یک آینه
-# انتخاب می‌شد بدون تست؛ اگر آن هم بسته باشد، npm ساعت‌ها تلاش می‌کند و
-# هیچ چیزی دانلود نمی‌شود. حالا هر کدام را با دانلود یک بسته‌ی واقعی
-# می‌سنجیم و اولین جواب‌دهنده را برمی‌داریم.
-pick_registry() {
-  local r
-  for r in "https://registry.npmjs.org" \
-           "https://registry.yarnpkg.com" \
-           "https://registry.npmmirror.com"; do
-    if [[ "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
-             "$r/ms/-/ms-2.1.3.tgz" 2>/dev/null)" == "200" ]]; then
-      echo "$r"; return 0
-    fi
-  done
-  return 1
-}
-
-info "بررسی مخزن npm..."
-if REGISTRY=$(pick_registry); then
-  npm config set registry "$REGISTRY" --location=global
-  ok "مخزن npm: $REGISTRY"
-else
-  die "هیچ مخزن npm از این سرور در دسترس نیست.
-   اینترنت سرور را چک کن، یا اگر مخزن داخلی داری دستی تنظیمش کن:
-     npm config set registry <آدرس> --location=global
-   بعد دوباره همین اسکریپت را اجرا کن."
-fi
-
 # ─── ۳) فایروال ──────────────────────────────────────────────
 # ⚠️ خطرناک‌ترین قسمت اسکریپت: اگر پورت SSH را باز نکنیم و فایروال را
 #    روشن کنیم، همان لحظه از سرور بیرون می‌افتیم و راه برگشتی نیست.
@@ -321,11 +292,55 @@ ENVEOF
 fi
 
 # ─── ۸) نصب و ساخت ───────────────────────────────────────────
-# npm ci وقتی خروجی‌اش ترمینال واقعی نیست هیچ چیزی چاپ نمی‌کند و کاربر
-# چند دقیقه به یک صفحه‌ی ساکت نگاه می‌کند و فکر می‌کند هنگ کرده.
-# با --loglevel=http هر بسته‌ای که می‌آید یک خط می‌نویسد.
-info "نصب پکیج‌ها (روی ۱ هسته ۳ تا ۸ دقیقه — خط‌های زیر یعنی در حال کار است)..."
-sudo -u "$APP_USER" bash -lc "cd $APP_DIR && npm ci --no-audit --no-fund --loglevel=http"
+# ─── انتخاب مخزن npm ─────────────────────────────────────────
+# از داخل ایران بعضی مخزن‌ها بسته‌اند. اشتباهِ قبلی این بود که یک آینه
+# انتخاب می‌شد بدون تست؛ اگر آن هم بسته باشد، npm ساعت‌ها تلاش می‌کند و
+# هیچ چیزی دانلود نمی‌شود. حالا هر کدام را با دانلود یک بسته‌ی واقعی
+# می‌سنجیم و اولین جواب‌دهنده را برمی‌داریم.
+pick_registry() {
+  local r
+  for r in "https://registry.npmjs.org" \
+           "https://registry.yarnpkg.com" \
+           "https://registry.npmmirror.com"; do
+    # -L لازم است: بعضی آینه‌ها اول ۳۰۲ می‌دهند و به CDN می‌فرستند.
+    # حجم را هم چک می‌کنیم چون ۲۰۰ با بدنه‌ی خالی یعنی عملاً کار نمی‌کند.
+    if [[ "$(curl -sSL -o /dev/null -w '%{http_code}:%{size_download}' --max-time 25 \
+             "$r/ms/-/ms-2.1.3.tgz" 2>/dev/null)" == 200:[1-9]* ]]; then
+      echo "$r"; return 0
+    fi
+  done
+  return 1
+}
+
+
+# اگر پکیج‌ها از قبل کامل باشند (مثلاً دستی کپی شده‌اند چون سرور به مخزن
+# npm نمی‌رسد)، نه مخزن لازم است نه نصب دوباره. بدون این، npm ci همان
+# پکیج‌هایی را که با زحمت رسانده‌ای پاک می‌کند.
+deps_ready() {
+  local d="$APP_DIR/node_modules"
+  [[ -d "$d/next" && -d "$d/prisma" && -d "$d/tsx" && -d "$d/@prisma/client" ]]
+}
+
+if deps_ready; then
+  ok "پکیج‌ها از قبل نصب‌اند ($(du -sh "$APP_DIR/node_modules" | cut -f1)) — نصب رد شد"
+else
+  info "بررسی مخزن npm..."
+  if REGISTRY=$(pick_registry); then
+    npm config set registry "$REGISTRY" --location=global
+    ok "مخزن npm: $REGISTRY"
+  else
+    die "هیچ مخزن npm از این سرور در دسترس نیست.
+   یا مخزن داخلی را دستی تنظیم کن:
+     npm config set registry <آدرس> --location=global
+   یا پکیج‌ها را جای دیگری بساز و در $APP_DIR/node_modules بگذار،
+   بعد دوباره همین اسکریپت را اجرا کن."
+  fi
+
+  # npm ci وقتی خروجی‌اش ترمینال واقعی نیست هیچ چیزی چاپ نمی‌کند و کاربر
+  # چند دقیقه به یک صفحه‌ی ساکت نگاه می‌کند و فکر می‌کند هنگ کرده.
+  info "نصب پکیج‌ها (روی ۱ هسته ۳ تا ۸ دقیقه — خط‌های زیر یعنی در حال کار است)..."
+  sudo -u "$APP_USER" bash -lc "cd $APP_DIR && npm ci --no-audit --no-fund --loglevel=http"
+fi
 
 info "ساخت جدول‌های دیتابیس..."
 sudo -u "$APP_USER" bash -lc "cd $APP_DIR && npx prisma migrate deploy"
