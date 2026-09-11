@@ -28,7 +28,8 @@
     "reminders": "tsx --conditions=react-server scripts/send-reminders.ts",
     "digest": "tsx --conditions=react-server scripts/daily-digest.ts",
     "campaign": "tsx --conditions=react-server scripts/campaign.ts",
-    "demo:feedback": "tsx --conditions=react-server scripts/demo-feedback.ts"
+    "demo:feedback": "tsx --conditions=react-server scripts/demo-feedback.ts",
+    "clear-demo": "tsx --conditions=react-server scripts/clear-demo-data.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
