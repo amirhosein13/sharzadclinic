@@ -56,6 +56,7 @@ import {
 import { buildCashDay, closeCashDay, recentCloses, unclosedDays } from "../src/lib/cash";
 import { cleanAmount, cleanDate, cleanPhone, normalizeName } from "./legacy-clean";
 import { tidyRichText } from "../src/lib/rich-text";
+import { meliErrorMessage } from "../src/lib/notifications/sms";
 
 const prisma = new PrismaClient();
 
@@ -2129,6 +2130,21 @@ async function main() {
     tidyRichText("## عنوان\n\nیک بند.\n\n- یک\n- دو") === "## عنوان\n\nیک بند.\n\n- یک\n- دو",
   );
   check("متن خالی خالی می‌ماند", tidyRichText("   ") === "");
+
+  // ─── کدهای خطای ملی پیامک ───────────────────────────────────
+  // هدف این تست‌ها «درستی ترجمه» نیست، «قابل‌اقدام‌بودن» است: هر پیام
+  // باید بگوید چه کار کنیم.
+  check("کد ۱۴ می‌گوید مشکل لینک است", meliErrorMessage("14").includes("لینک"));
+  check("کد -۱۰۹ به IP مجاز اشاره می‌کند", meliErrorMessage("-109").includes("IP"));
+  check("کد -۱۱۰ می‌گوید APIKey بگذار", meliErrorMessage("-110").includes("APIKey"));
+  check("کد ۰ به نام کاربری و رمز اشاره می‌کند", meliErrorMessage("0").includes("رمز"));
+  check("کد ۲ می‌گوید شارژ کن", meliErrorMessage("2").includes("شارژ"));
+  check("کد ۵ به شماره‌ی فرستنده اشاره می‌کند", meliErrorMessage("5").includes("فرستنده"));
+  check(
+    "کد ناشناس متن خودِ سرویس را پس می‌دهد",
+    meliErrorMessage("999", "یک خطای تازه") === "یک خطای تازه",
+  );
+  check("کد ناشناس بدون متن، خودِ کد را می‌گوید", meliErrorMessage("999").includes("999"));
 
   check(
     "«آزادمنجیری» و «آزاد منجیری» یک نفرند",
