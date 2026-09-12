@@ -56,7 +56,7 @@ import {
 import { buildCashDay, closeCashDay, recentCloses, unclosedDays } from "../src/lib/cash";
 import { cleanAmount, cleanDate, cleanPhone, normalizeName } from "./legacy-clean";
 import { tidyRichText } from "../src/lib/rich-text";
-import { meliErrorMessage } from "../src/lib/notifications/sms";
+import { getSmsDriver, meliErrorMessage } from "../src/lib/notifications/sms";
 
 const prisma = new PrismaClient();
 
@@ -2145,6 +2145,33 @@ async function main() {
     meliErrorMessage("999", "یک خطای تازه") === "یک خطای تازه",
   );
   check("کد ناشناس بدون متن، خودِ کد را می‌گوید", meliErrorMessage("999").includes("999"));
+
+  // ─── تشخیص موفقیت در پاسخ ملی پیامک ─────────────────────────
+  // RetStatus=1 یعنی «درخواست پردازش شد»، نه «پیامک رفت». وضعیتِ
+  // واقعی در Value است. یک بار روی سرور واقعی، «Value: 11» (یعنی
+  // ارسال نشده) را موفق گزارش کردیم و پیامک بی‌صدا گم شد.
+  if ((process.env.SMS_PROVIDER ?? "").toLowerCase().startsWith("meli")) {
+    const realFetch = globalThis.fetch;
+    const reply = (body: unknown) => {
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify(body), { status: 200 })) as typeof fetch;
+      return getSmsDriver().send("09123456789", "سلام");
+    };
+
+    const notSent = await reply({ Value: "11", RetStatus: 1, StrRetStatus: "Ok" });
+    check("«Value: 11» با RetStatus=1 شکست شمرده می‌شود", !notSent.ok);
+
+    const sent = await reply({ Value: "451632198765", RetStatus: 1, StrRetStatus: "Ok" });
+    check("شناسه‌ی واقعی پیام موفق شمرده می‌شود", sent.ok && sent.providerId === "451632198765");
+
+    const many = await reply({ Value: "451632198765,451632198766", RetStatus: 1 });
+    check("چند شناسه با کاما هم موفق است", many.ok);
+
+    const noCredit = await reply({ Value: "2", RetStatus: 1, StrRetStatus: "Ok" });
+    check("کد ۲ شکست است و از شارژ می‌گوید", !noCredit.ok && (noCredit.error ?? "").includes("شارژ"));
+
+    globalThis.fetch = realFetch;
+  }
 
   check(
     "«آزادمنجیری» و «آزاد منجیری» یک نفرند",

@@ -110,7 +110,7 @@ const MELI_ERRORS: Record<string, string> = {
   "7": "متن پیامک کلمه‌ی فیلترشده دارد.",
   "9": "از خطوط عمومی نمی‌شود با وب‌سرویس ارسال کرد؛ خط اختصاصی لازم است.",
   "10": "حساب کاربری در ملی پیامک فعال نیست.",
-  "11": "ارسال نشد.",
+  "11": "ملی پیامک پیام را نپذیرفت (کد ۱۱ — «ارسال نشده»). معمولاً یعنی خط فرستنده برای این حساب مجاز نیست، اعتبار صفر است، یا خط هنوز تأیید نشده. اعتبار و فهرست خطوط را با npm run sms:test ببین.",
   "12": "مدارک حساب در ملی پیامک کامل نیست.",
   "14": "متن پیامک لینک دارد و ملی پیامک لینک را رد می‌کند. برای ارسال لینک باید از پنل ملی پیامک مجوز بگیری.",
   "15": "ملی پیامک «لغو۱۱» در انتهای متن می‌خواهد (مخصوص پیامک تبلیغاتی).",
@@ -148,15 +148,21 @@ function meliPayamakDriver(
       if (!res.ok) return { ok: false, error: `خطای ${res.status} از ملی پیامک` };
 
       const data = (await res.json()) as MeliResponse;
-      const value = String(data.Value ?? "");
-      // شناسه‌ی پیام یک عدد بلند است؛ کدهای خطا عددهای کوچک‌اند
-      const looksLikeMessageId = /^\d{6,}$/.test(value);
+      const value = String(data.Value ?? "").trim();
 
-      if (data.RetStatus === 1 || looksLikeMessageId) {
-        return { ok: true, providerId: value || undefined };
-      }
-      // کد خطا ممکن است در Value بیاید یا در RetStatus؛ هر دو را امتحان
-      // می‌کنیم چون در عمل هر دو حالت دیده می‌شود.
+      // نکته‌ی حیاتی: RetStatus=1 یعنی «درخواست پردازش شد»، نه «پیامک
+      // رفت». وضعیتِ واقعی ارسال در Value است — طبق سند رسمی، در
+      // موفقیت RecID (یک عدد بلند، یا چند تا با کاما) و در شکست کدِ
+      // خطا. قبلاً به RetStatus اعتماد می‌کردیم و «Value: 11» یعنی
+      // «ارسال نشده» را موفق گزارش می‌کردیم.
+      const parts = value.split(",").map((v) => v.trim()).filter(Boolean);
+      const looksLikeRecId = parts.length > 0 && parts.every((v) => /^\d{6,}$/.test(v));
+
+      if (looksLikeRecId) return { ok: true, providerId: value };
+
+      // Value خالی با RetStatus=1: اطلاعات بهتری نداریم، موفق می‌گیریم
+      if (!value && data.RetStatus === 1) return { ok: true };
+
       const code = value || String(data.RetStatus ?? "");
       return { ok: false, error: meliErrorMessage(code, data.StrRetStatus) };
     } catch (error) {
@@ -187,6 +193,56 @@ function meliPayamakDriver(
       return call("BaseServiceNumber", { to, text: code, bodyId: otpBodyId });
     },
   };
+}
+
+/**
+ * وضعیت حساب ملی پیامک: اعتبار و فهرست خطوط اختصاصی.
+ *
+ * وقتی ارسال با کد ۱۱ («ارسال نشده») رد می‌شود، خودِ کد نمی‌گوید چرا.
+ * این دو متد — که در همان سند رسمی هستند — معمولاً جواب را می‌دهند:
+ * یا اعتبار صفر است، یا شماره‌ای که در MELIPAYAMAK_SENDER گذاشته‌ایم
+ * اصلاً جزو خطوط این حساب نیست.
+ */
+export async function meliAccountInfo(): Promise<{
+  credit?: string;
+  numbers?: string[];
+  error?: string;
+}> {
+  const username = process.env.MELIPAYAMAK_USERNAME;
+  const password = process.env.MELIPAYAMAK_PASSWORD;
+  if (!username || !password) return { error: "نام کاربری یا کلید تنظیم نشده" };
+
+  async function post(path: string) {
+    const res = await fetch(`https://rest.payamak-panel.com/api/SendSMS/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`خطای ${res.status}`);
+    return res.json();
+  }
+
+  try {
+    const [creditRes, numbersRes] = await Promise.all([
+      post("GetCredit").catch(() => null),
+      post("GetUserNumbers").catch(() => null),
+    ]);
+
+    const credit = creditRes?.Value != null ? String(creditRes.Value) : undefined;
+
+    // GetUserNumbers پاسخ تودرتو دارد: { MyBase: {...}, Data: [{Number}] }
+    const rows: unknown = numbersRes?.Data;
+    const numbers = Array.isArray(rows)
+      ? rows
+          .map((r) => (r && typeof r === "object" ? String((r as { Number?: string }).Number ?? "") : ""))
+          .filter(Boolean)
+      : undefined;
+
+    return { credit, numbers };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "ارتباط برقرار نشد" };
+  }
 }
 
 // ─── انتخاب درایور بر اساس تنظیمات ─────────────────────────────

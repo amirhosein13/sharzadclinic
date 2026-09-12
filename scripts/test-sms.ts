@@ -18,7 +18,7 @@
 // باید اولین import باشد: متغیرهای .env را قبل از هر چیز دیگری بار می‌کند
 import { envLoad } from "./load-env";
 import "../src/lib/timezone";
-import { getSmsDriver, smsRecipient } from "../src/lib/notifications/sms";
+import { getSmsDriver, meliAccountInfo, smsRecipient } from "../src/lib/notifications/sms";
 
 const args = process.argv.slice(2);
 const to = args.find((a) => a.startsWith("--to="))?.split("=")[1] ?? "";
@@ -85,6 +85,30 @@ async function main() {
         "   یعنی تنظیمات ناقص است و هیچ پیامکی ارسال نمی‌شود — سایت هم\n" +
         "   هیچ خطایی نشان نمی‌دهد. خط‌های ❌ بالا را پر کن.",
     );
+  }
+
+  // وضعیت حساب: اعتبار و خطوطی که واقعاً مال این حساب‌اند. وقتی ارسال
+  // با کد ۱۱ رد می‌شود، جواب معمولاً همین‌جاست.
+  if (driver.name === "melipayamak") {
+    console.log("\n💳 وضعیت حساب ملی پیامک");
+    const info = await meliAccountInfo();
+    if (info.error) {
+      console.log(`  ❌ خوانده نشد: ${info.error}`);
+    } else {
+      console.log(`  اعتبار:                    ${info.credit ?? "نامشخص"}`);
+      if (info.numbers?.length) {
+        console.log(`  خطوط این حساب:             ${info.numbers.join("، ")}`);
+        const sender = process.env.MELIPAYAMAK_SENDER ?? "";
+        if (sender && !info.numbers.includes(sender)) {
+          console.log(
+            `\n  ⚠️  «${sender}» که در MELIPAYAMAK_SENDER گذاشته‌ای جزو خطوط\n` +
+              "     این حساب نیست. یکی از شماره‌های بالا را بگذار.",
+          );
+        }
+      } else {
+        console.log("  خطوط این حساب:             هیچ خطی برگردانده نشد");
+      }
+    }
   }
 
   if (!to) {
