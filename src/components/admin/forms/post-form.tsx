@@ -3,6 +3,7 @@
 import { Pencil, Plus } from "lucide-react";
 import { CrudDialog, Check } from "@/components/admin/crud-dialog";
 import { ImagePicker } from "@/components/admin/image-picker";
+import { RichTextEditor } from "@/components/admin/rich-text-editor";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { savePost } from "@/app/actions/content";
@@ -32,7 +33,7 @@ export function PostForm({
     <CrudDialog
       wide
       title={editing ? `ویرایش «${post.title}»` : "نوشتن مقاله جدید"}
-      description="برای عنوان از ‎## و برای فهرست از ‎- استفاده کنید. **متن** پررنگ می‌شود."
+      description="با دکمه‌های بالای کادر متن را شکل بده، و با «پیش‌نمایش» ببین روی سایت چطور در می‌آید."
       action={savePost}
       submitLabel={editing ? "ذخیره‌ی تغییرات" : "ثبت مقاله"}
       trigger={(open) =>
@@ -68,7 +69,7 @@ export function PostForm({
           <ImagePicker name="coverImage" label="تصویر شاخص" defaultValue={post?.coverImage} />
 
           <Field label="متن مقاله" required error={errors.content}>
-            <Textarea name="content" rows={14} defaultValue={post?.content ?? ""} className="leading-8" />
+            <RichTextEditor name="content" defaultValue={post?.content ?? ""} rows={16} />
           </Field>
 
           <div className="grid gap-5 sm:grid-cols-2">

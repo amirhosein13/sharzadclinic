@@ -55,6 +55,7 @@ import {
 } from "../src/lib/campaigns";
 import { buildCashDay, closeCashDay, recentCloses, unclosedDays } from "../src/lib/cash";
 import { cleanAmount, cleanDate, cleanPhone, normalizeName } from "./legacy-clean";
+import { tidyRichText } from "../src/lib/rich-text";
 
 const prisma = new PrismaClient();
 
@@ -2098,6 +2099,36 @@ async function main() {
   check("اصلاح مبلغ یادداشت می‌گذارد", (cleanAmount(450).note ?? "").includes("450"));
   check("مبلغ درست دست‌نخورده می‌ماند", cleanAmount(450_000).note === null);
   check("مبلغ صفر صفر می‌ماند", cleanAmount(0).value === 0);
+
+  // ─── تمیزکردن متنِ کپی‌شده از هوش مصنوعی ─────────────────────
+  // اگر این‌ها درست کار نکنند، ستاره و مربع خام روی صفحه‌ی مقاله
+  // ظاهر می‌شود و کسی که متن را گذاشته نمی‌فهمد چرا.
+  check("عنوان تک‌# به ## تبدیل می‌شود", tidyRichText("# سلام") === "## سلام");
+  check("عنوان چهار‌# به ### می‌شود", tidyRichText("#### سلام") === "### سلام");
+  check("فهرست با ستاره به خط‌تیره می‌شود", tidyRichText("* یک\n* دو") === "- یک\n- دو");
+  check("فهرست با بولت فارسی هم تبدیل می‌شود", tidyRichText("• یک") === "- یک");
+  check("تورفتگی فهرست صاف می‌شود", tidyRichText("   - یک") === "- یک");
+  check("__پررنگ__ به **پررنگ** می‌شود", tidyRichText("__مهم__") === "**مهم**");
+  check("*مورب* به **پررنگ** می‌شود", tidyRichText("متن *مهم* است") === "متن **مهم** است");
+  check(
+    "**پررنگِ درست** دوباره دستکاری نمی‌شود",
+    tidyRichText("متن **مهم** است") === "متن **مهم** است",
+  );
+  check("خط جداکننده حذف می‌شود", tidyRichText("یک\n\n---\n\nدو") === "یک\n\nدو");
+  check("~~خط‌خورده~~ ساده می‌شود", tidyRichText("~~قدیمی~~") === "قدیمی");
+  check("بلوک کد باز می‌شود", tidyRichText("```\nمتن\n```") === "متن");
+  check("تصویر داخل متن حذف می‌شود", tidyRichText("![عکس](/a.png)سلام") === "سلام");
+  check(
+    "جدول به فهرست تبدیل می‌شود و محتوایش گم نمی‌شود",
+    tidyRichText("| نام | مدت |\n| --- | --- |\n| لیزر | ۳۰ دقیقه |") ===
+      "- نام — مدت\n- لیزر — ۳۰ دقیقه",
+  );
+  check("خط خالی اضافی جمع می‌شود", tidyRichText("یک\n\n\n\nدو") === "یک\n\nدو");
+  check(
+    "متنی که از قبل درست است دست‌نخورده می‌ماند",
+    tidyRichText("## عنوان\n\nیک بند.\n\n- یک\n- دو") === "## عنوان\n\nیک بند.\n\n- یک\n- دو",
+  );
+  check("متن خالی خالی می‌ماند", tidyRichText("   ") === "");
 
   check(
     "«آزادمنجیری» و «آزاد منجیری» یک نفرند",

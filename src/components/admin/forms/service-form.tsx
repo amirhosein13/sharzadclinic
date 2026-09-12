@@ -1,6 +1,7 @@
 "use client";
 
 import { Pencil, Plus } from "lucide-react";
+import { RichTextEditor } from "@/components/admin/rich-text-editor";
 import { CrudDialog, Check, MultiCheck } from "@/components/admin/crud-dialog";
 import { ImagePicker } from "@/components/admin/image-picker";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
@@ -95,7 +96,7 @@ export function ServiceForm({
             error={errors.description}
             hint="برای عنوان از ‎## و برای فهرست از ‎- استفاده کنید. خط خالی یعنی پاراگراف جدید."
           >
-            <Textarea name="description" rows={8} defaultValue={service?.description ?? ""} />
+            <RichTextEditor name="description" defaultValue={service?.description ?? ""} rows={10} showPrompt={false} />
           </Field>
 
           <ImagePicker name="image" label="تصویر خدمت" defaultValue={service?.image} />
