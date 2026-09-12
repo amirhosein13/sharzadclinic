@@ -18,10 +18,16 @@ async function sendSms(options: {
   const driver = getSmsDriver();
   const recipient = smsRecipient(options.to);
 
+  // مسیر اختصاصی کد یکبارمصرف فقط وقتی استفاده می‌شود که واقعاً در
+  // دسترس باشد. اگر نباشد (مثلاً «خدمات پایه»ی ملی پیامک خریداری
+  // نشده) همان کد به‌شکل پیامک معمولی می‌رود — چون متنش از قبل در
+  // options.message آماده است و کد را هم خودمان ساخته‌ایم.
+  const viaOtpService = !!options.otpCode && driver.otpReady;
+
   let result;
   try {
-    result = options.otpCode
-      ? await driver.sendOtp(recipient, options.otpCode)
+    result = viaOtpService
+      ? await driver.sendOtp(recipient, options.otpCode!)
       : await driver.send(recipient, options.message);
   } catch (error) {
     result = { ok: false, error: error instanceof Error ? error.message : "خطای ناشناخته" };
@@ -33,7 +39,8 @@ async function sendSms(options: {
         channel: "SMS",
         recipient,
         template: options.template,
-        // کد یکبارمصرف هرگز در لاگ ذخیره نمی‌شود
+        // کد یکبارمصرف هرگز در لاگ ذخیره نمی‌شود — چه از مسیر الگو
+        // برود چه به‌شکل پیامک معمولی
         body: options.otpCode ? "[کد یکبارمصرف]" : options.message,
         status: result.ok ? (result.simulated ? "skipped" : "sent") : "failed",
         error: result.error ?? null,
@@ -80,12 +87,19 @@ async function sendMail(options: {
 
 // ─── پیام‌های آماده ────────────────────────────────────────────
 
-/** کد ورود مشتری */
+/**
+ * کد ورود مشتری.
+ *
+ * نام کلینیک عمداً در متن هست: اگر کد به‌شکل پیامک معمولی برود (وقتی
+ * سرویس الگو در دسترس نیست)، گیرنده باید بفهمد این پیام از کجاست،
+ * وگرنه به چشمش اسپم می‌آید. متن هنوز کوتاه‌تر از یک پیامک فارسی است.
+ */
 export async function notifyOtp(phone: string, code: string): Promise<NotifyResult> {
+  const settings = await getSettings();
   return sendSms({
     to: phone,
     template: "otp",
-    message: `کد ورود شما: ${code}`,
+    message: `کد ورود شما به ${settings.clinicName}: ${code}`,
     otpCode: code,
   });
 }

@@ -72,14 +72,26 @@ export async function buildHealth(): Promise<HealthReport> {
         ? undefined
         : "پیامک‌های عادی (یادآوری، تبریک، گروهی) ارسال نمی‌شوند.",
     });
+    // نبودِ الگو دیگر خطا نیست: کد ورود را خودمان می‌سازیم و اگر سرویس
+    // الگو در دسترس نباشد، همان کد به‌شکل پیامک معمولی از خط اختصاصی
+    // می‌رود. فقط هشدار می‌دهیم، چون مسیر الگو ارزان‌تر و قابل‌اعتمادتر
+    // است و اگر خط اختصاصی مشکل داشته باشد، ورود مشتری هم می‌افتد.
+    const hasOtpTemplate = !!process.env.MELIPAYAMAK_OTP_BODY_ID;
+    const hasSender = !!process.env.MELIPAYAMAK_SENDER;
     services.push({
       key: "sms-otp",
-      title: "الگوی کد ورود",
-      level: process.env.MELIPAYAMAK_OTP_BODY_ID ? "ok" : "bad",
-      detail: process.env.MELIPAYAMAK_OTP_BODY_ID ? "تنظیم شده" : "MELIPAYAMAK_OTP_BODY_ID خالی است",
-      impact: process.env.MELIPAYAMAK_OTP_BODY_ID
+      title: "کد ورود مشتری",
+      level: hasOtpTemplate ? "ok" : hasSender ? "warn" : "bad",
+      detail: hasOtpTemplate
+        ? "از سرویس اختصاصی الگو ارسال می‌شود"
+        : hasSender
+          ? "به‌شکل پیامک معمولی از خط اختصاصی ارسال می‌شود"
+          : "نه الگو تنظیم شده نه شماره‌ی فرستنده",
+      impact: hasOtpTemplate
         ? undefined
-        : "کد ورود مشتری ارسال نمی‌شود و هیچ‌کس نمی‌تواند وارد حسابش شود.",
+        : hasSender
+          ? "کار می‌کند، ولی هزینه‌ی هر کد بیشتر از مسیر الگوست و اگر خط اختصاصی مشکل پیدا کند ورود مشتری هم می‌افتد."
+          : "کد ورود مشتری ارسال نمی‌شود و هیچ‌کس نمی‌تواند وارد حسابش شود.",
     });
   }
 

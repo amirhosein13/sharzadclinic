@@ -53,6 +53,13 @@ async function main() {
 
   const driver = getSmsDriver();
   console.log(`\n  درایور فعال:               ${driver.name}`);
+  console.log(
+    `  مسیر کد ورود:              ${
+      driver.otpReady
+        ? "سرویس اختصاصی الگو"
+        : "پیامک معمولی از خط اختصاصی (سرویس الگو در دسترس نیست)"
+    }`,
+  );
 
   // اگر تنظیمات ناقص باشد، getSmsDriver بی‌صدا به حالت کنسول برمی‌گردد.
   // این سکوت خطرناک است: سایت بالا می‌آید، هیچ خطایی نمی‌دهد، و هیچ
@@ -93,20 +100,30 @@ async function main() {
     console.log(`❌ ارسال نشد: ${plain.error}`);
   }
 
+  let otpOk = true;
   if (withOtp) {
     console.log(`\n🔑 ارسال کد ورود آزمایشی به ${recipient} ...`);
-    const otp = await driver.sendOtp(recipient, "12345");
+
+    // همان تصمیمی که sendSms در جریان واقعی می‌گیرد: اگر سرویس الگو
+    // در دسترس نباشد، کد به‌شکل پیامک معمولی می‌رود. اگر اینجا مستقیم
+    // sendOtp صدا زده می‌شد، تست چیزی را می‌سنجید که در عمل اتفاق
+    // نمی‌افتد.
+    const otp = driver.otpReady
+      ? await driver.sendOtp(recipient, "12345")
+      : await driver.send(recipient, "کد ورود شما به کلینیک شهرزاد: 12345");
+
+    otpOk = otp.ok;
     if (otp.ok) {
       console.log(`✅ پذیرفته شد${otp.providerId ? ` — شناسه: ${otp.providerId}` : ""}`);
       if (otp.simulated) console.log("   (فقط شبیه‌سازی شد)");
+      if (!driver.otpReady) console.log("   (به‌شکل پیامک معمولی رفت، نه از مسیر الگو)");
     } else {
       console.log(`❌ ارسال نشد: ${otp.error}`);
     }
   }
 
-  const bothOk = plain.ok && (!withOtp || true);
   console.log(
-    bothOk
+    plain.ok && otpOk
       ? "\n   اگر پیام روی گوشی رسید، کار تمام است. اگر «پذیرفته شد» دیدی\n" +
           "   ولی پیام نرسید، مشکل سمت اپراتور یا خط فرستنده است — با\n" +
           "   پشتیبانی ملی پیامک و همان شناسه‌ی بالا تماس بگیر.\n"

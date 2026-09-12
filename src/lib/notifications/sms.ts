@@ -11,6 +11,15 @@ export type SmsResult = {
 
 export interface SmsDriver {
   readonly name: string;
+  /**
+   * آیا سرویسِ اختصاصیِ کد یکبارمصرف در دسترس است؟
+   *
+   * در ملی پیامک این سرویس («خدمات پایه») روی پنل رایگان نیست. اگر
+   * نباشد، کد را به‌شکل پیامک معمولی از خط اختصاصی می‌فرستیم — خودِ
+   * کد را که ما می‌سازیم، «خدمات پایه» فقط یکی از راه‌های فرستادنش
+   * است. این پرچم می‌گوید کدام راه باز است.
+   */
+  readonly otpReady: boolean;
   send(to: string, message: string): Promise<SmsResult>;
   /** ارسال کد یکبارمصرف — در ایران باید از سرویس اختصاصی OTP استفاده شود */
   sendOtp(to: string, code: string): Promise<SmsResult>;
@@ -20,6 +29,7 @@ export interface SmsDriver {
 
 const consoleDriver: SmsDriver = {
   name: "console",
+  otpReady: true,
   async send(to, message) {
     console.log(`\n📱 [پیامک شبیه‌سازی‌شده] به ${to}\n${message}\n`);
     return { ok: true, simulated: true, providerId: `console-${Date.now()}` };
@@ -54,6 +64,7 @@ function kavenegarDriver(apiKey: string, sender: string, otpTemplate: string): S
 
   return {
     name: "kavenegar",
+    otpReady: !!otpTemplate,
     async send(to, message) {
       const params = new URLSearchParams({ receptor: to, sender, message });
       return call(`${base}/sms/send.json?${params}`);
@@ -158,6 +169,7 @@ function meliPayamakDriver(
 
   return {
     name: "melipayamak",
+    otpReady: !!otpBodyId,
     async send(to, message) {
       if (!sender) {
         return { ok: false, error: "شماره‌ی فرستنده (MELIPAYAMAK_SENDER) تنظیم نشده است." };
