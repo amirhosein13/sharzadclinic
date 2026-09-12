@@ -15,6 +15,8 @@
  *  و فقط «کد نرسید» به گوش می‌رسد. این اسکریپت پاسخ خودِ سرویس را
  *  عیناً چاپ می‌کند، پس می‌فهمی مشکل رمز است یا خط فرستنده یا الگو.
  */
+// باید اولین import باشد: متغیرهای .env را قبل از هر چیز دیگری بار می‌کند
+import { envLoad } from "./load-env";
 import "../src/lib/timezone";
 import { getSmsDriver, smsRecipient } from "../src/lib/notifications/sms";
 
@@ -39,6 +41,19 @@ async function main() {
 
   console.log("\n📋 تنظیمات پیامک\n");
   show("SMS_PROVIDER", provider);
+
+  // تله‌ی رایج: تنظیمات تازه ته .env اضافه می‌شود در حالی که همان کلید
+  // بالاتر هم هست. مقدارِ اولی برنده است و هیچ خطایی داده نمی‌شود.
+  const clashing = envLoad.duplicates.filter(
+    (k) => k.startsWith("SMS_") || k.startsWith("MELIPAYAMAK_") || k.startsWith("KAVENEGAR_"),
+  );
+  if (clashing.length) {
+    console.log(
+      `\n⚠️  این کلیدها بیش از یک بار در .env آمده‌اند: ${clashing.join("، ")}\n` +
+        "   مقدارِ *اولین* بار برنده است، نه آخرین. اگر تنظیمات تازه را ته\n" +
+        "   فایل اضافه کرده‌ای، خط قدیمی بالاتر را پاک کن.",
+    );
+  }
 
   if (provider === "melipayamak" || provider === "meli") {
     show("MELIPAYAMAK_USERNAME", process.env.MELIPAYAMAK_USERNAME);
