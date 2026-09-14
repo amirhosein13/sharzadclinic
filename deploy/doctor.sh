@@ -81,6 +81,44 @@ for path in / /admin /admin/services /admin/login; do
   esac
 done
 
+# ─── پاسخ از راه nginx روی HTTPS ────────────────────────────
+# این لایه بود که جا افتاده بود: ممکن است خودِ برنامه درست جواب بدهد
+# ولی چیزی بین nginx و مرورگر خرابش کند. Host را دستی می‌دهیم تا
+# همان server block واقعی انتخاب شود.
+head2 "پاسخ از راه nginx (HTTPS)"
+DOMAIN=$(grep -m1 -oP 'server_name\s+\K[^ ;]+' /etc/nginx/sites-available/sharzad 2>/dev/null || echo localhost)
+say "  دامنه: $DOMAIN"
+for path in / /admin /admin/services /admin/login; do
+  out=$(curl -sk -o /tmp/doctor-body -m 15 -w '%{http_code}|%{redirect_url}' \
+        -H "Host: $DOMAIN" "https://127.0.0.1${path}" 2>/dev/null)
+  code=${out%%|*}
+  loc=${out#*|}
+  case "$path:$code" in
+    /:200|/admin:307|/admin/services:307|/admin/login:200) ok "$path → $code${loc:+ → $loc}" ;;
+    *:404)
+      if grep -qi nginx /tmp/doctor-body 2>/dev/null; then
+        bad "$path → ۴۰۴ و این ۴۰۴ *از خودِ nginx* است، نه برنامه"
+      else
+        bad "$path → ۴۰۴ و از خودِ برنامه آمده (صفحه‌ی ۴۰۴ نکست)"
+      fi
+      ;;
+    *:000) bad "$path → nginx جواب نداد" ;;
+    *) warn "$path → $code${loc:+ → $loc}" ;;
+  esac
+done
+rm -f /tmp/doctor-body
+
+# حلقه‌ی ریدایرکت: هر کدام از nginx و Next کار خودش را درست می‌کند ولی
+# با هم بی‌نهایت حلقه می‌زنند. با curl -L قابل تشخیص است، با یک درخواست
+# تنها نه — و مرورگر هم خطای گمراه‌کننده نشان می‌دهد.
+loops=$(curl -skL -m 20 --max-redirs 20 -o /dev/null \
+        -H "Host: $DOMAIN" -w '%{num_redirects}' "https://127.0.0.1/admin" 2>/dev/null)
+if [[ ${loops:-0} -ge 5 ]]; then
+  bad "/admin در حلقه‌ی ریدایرکت افتاده ($loops ریدایرکت) — بلوک «location = /admin» در کانفیگ nginx نیست"
+else
+  ok "/admin حلقه‌ی ریدایرکت ندارد (${loops:-0} ریدایرکت)"
+fi
+
 # ─── nginx ──────────────────────────────────────────────────
 head2 "nginx"
 nginx -t >/dev/null 2>&1 && ok "تنظیمات سالم است" || bad "nginx -t خطا می‌دهد"
@@ -99,6 +137,27 @@ swap_total=$(free -m | awk '/Swap:/{print $2}')
 oom=$(journalctl -k --no-pager 2>/dev/null | grep -ciE "out of memory|killed process" || true)
 (( oom > 0 )) && bad "کرنل $oom بار فرایندی را به‌خاطر کمبود حافظه کشته — احتمالاً بیلد نیمه‌کاره مانده" || ok "هیچ فرایندی به‌خاطر حافظه کشته نشده"
 
+# ─── خطاهای تازه‌ی برنامه ───────────────────────────────────
+# اگر صفحه‌ای موقع رندر خطا بدهد، تنها جایی که دیده می‌شود همین‌جاست.
+head2 "خطاهای تازه‌ی برنامه"
+errs=$(journalctl -u sharzad --since "30 min ago" --no-pager 2>/dev/null \
+       | grep -iE "error|⨯|exception|ECONNREFUSED|PrismaClient" | tail -12)
+if [[ -n $errs ]]; then
+  printf '%s\n' "$errs" | sed 's/^/  /'
+  warn "خطاهای بالا را با صفحه‌ای که کار نمی‌کند مقایسه کن"
+else
+  ok "در نیم‌ساعت گذشته خطایی ثبت نشده"
+  say "     (اگر صفحه‌ای خطا می‌دهد: اول بازش کن، بعد این اسکریپت را بزن)"
+fi
+
+# ─── خطاهای تازه‌ی nginx ────────────────────────────────────
+head2 "خطاهای تازه‌ی nginx"
+if [[ -s /var/log/nginx/sharzad.error.log ]]; then
+  tail -8 /var/log/nginx/sharzad.error.log | sed 's/^/  /'
+else
+  ok "لاگ خطای nginx خالی است"
+fi
+
 # ─── دیسک ───────────────────────────────────────────────────
 head2 "دیسک"
 df -h / | sed -n '2p' | sed 's/^/  /'
@@ -110,6 +169,18 @@ if (( ${#problems[@]} == 0 )); then
 else
   printf '  %s مشکل پیدا شد:\n' "${#problems[@]}"
   for p in "${problems[@]}"; do printf '    • %s\n' "$p"; done
+
+  if printf '%s\n' "${problems[@]}" | grep -q "حلقه‌ی ریدایرکت"; then
+    cat <<'FIX'
+
+  ── برای حلقه‌ی ریدایرکت /admin ──
+  کانفیگ nginx را از مخزن به‌روز کن و بلوک SSL را برگردان:
+    cd /var/www/sharzad
+    sed 's/DOMAIN/shahrzadlaser.ir/g' deploy/nginx.conf > /etc/nginx/sites-available/sharzad
+    [ -f /proc/net/if_inet6 ] && sed -i 's|^    # LISTEN_IPV6.*|    listen [::]:80;|' /etc/nginx/sites-available/sharzad
+    nginx -t && certbot --nginx -d shahrzadlaser.ir -d www.shahrzadlaser.ir --redirect
+FIX
+  fi
 
   if printf '%s\n' "${problems[@]}" | grep -q "در بیلد نیست\|بیلد ناقص\|قدیمی‌تر\|.next وجود ندارد"; then
     cat <<'FIX'
