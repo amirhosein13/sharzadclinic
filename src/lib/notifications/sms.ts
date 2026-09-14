@@ -204,7 +204,10 @@ function meliPayamakDriver(
  * اصلاً جزو خطوط این حساب نیست.
  */
 export async function meliAccountInfo(): Promise<{
+  /** موجودی به تعداد پیامک (GetCredit) */
   credit?: string;
+  /** موجودی ریالی (GetCredit2) — برای تفکیک «۱۳۶ پیامک» از «۱۳۶ ریال» */
+  rials?: string;
   numbers?: string[];
   error?: string;
 }> {
@@ -224,12 +227,14 @@ export async function meliAccountInfo(): Promise<{
   }
 
   try {
-    const [creditRes, numbersRes] = await Promise.all([
+    const [creditRes, rialRes, numbersRes] = await Promise.all([
       post("GetCredit").catch(() => null),
+      post("GetCredit2").catch(() => null),
       post("GetUserNumbers").catch(() => null),
     ]);
 
     const credit = creditRes?.Value != null ? String(creditRes.Value) : undefined;
+    const rials = rialRes?.Value != null ? String(rialRes.Value) : undefined;
 
     // GetUserNumbers پاسخ تودرتو دارد: { MyBase: {...}, Data: [{Number}] }
     const rows: unknown = numbersRes?.Data;
@@ -239,7 +244,7 @@ export async function meliAccountInfo(): Promise<{
           .filter(Boolean)
       : undefined;
 
-    return { credit, numbers };
+    return { credit, rials, numbers };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "ارتباط برقرار نشد" };
   }

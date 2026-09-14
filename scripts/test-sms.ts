@@ -23,6 +23,8 @@ import { getSmsDriver, meliAccountInfo, smsRecipient } from "../src/lib/notifica
 const args = process.argv.slice(2);
 const to = args.find((a) => a.startsWith("--to="))?.split("=")[1] ?? "";
 const withOtp = args.includes("--otp");
+/** متن دلخواه — برای جدا کردن «مشکل متن» از «مشکل گیرنده یا خط» */
+const customText = args.find((a) => a.startsWith("--text="))?.slice("--text=".length) ?? "";
 
 /** رمز و کلید هیچ‌وقت کامل چاپ نمی‌شوند — این خروجی ممکن است جایی کپی شود */
 function mask(value: string | undefined) {
@@ -95,7 +97,8 @@ async function main() {
     if (info.error) {
       console.log(`  ❌ خوانده نشد: ${info.error}`);
     } else {
-      console.log(`  اعتبار:                    ${info.credit ?? "نامشخص"}`);
+      console.log(`  موجودی (تعداد پیامک):     ${info.credit ?? "نامشخص"}`);
+      console.log(`  موجودی ریالی:              ${info.rials ?? "نامشخص"}`);
       if (info.numbers?.length) {
         console.log(`  خطوط این حساب:             ${info.numbers.join("، ")}`);
         const sender = process.env.MELIPAYAMAK_SENDER ?? "";
@@ -114,7 +117,8 @@ async function main() {
   if (!to) {
     console.log(
       "\n   برای ارسال واقعی:  npm run sms:test -- --to=09123456789" +
-        "\n   و برای تست کد ورود هم:  --otp\n",
+        "\n   تست کد ورود:       --otp" +
+        "\n   متن دلخواه:        --text=\"سلام\"\n",
     );
     return;
   }
@@ -125,12 +129,15 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`\n📤 ارسال پیامک آزمایشی به ${recipient} ...`);
+  // متن پیش‌فرض عمداً ساده است: بدون لینک، بدون عدد چسبیده، بدون
+  // کلمه‌ای که فیلتر شود. اگر همین هم رد شود، مشکل از متن نیست.
   const stamp = new Date().toLocaleTimeString("fa-IR");
-  const plain = await driver.send(
-    recipient,
-    `تست اتصال سامانه‌ی کلینیک شهرزاد — ${stamp}. اگر این پیام رسید، پیامک درست کار می‌کند.`,
-  );
+  const body =
+    customText || `تست اتصال سامانه‌ی کلینیک شهرزاد — ${stamp}. اگر این پیام رسید، پیامک درست کار می‌کند.`;
+
+  console.log(`\n📤 ارسال پیامک آزمایشی به ${recipient} ...`);
+  console.log(`   متن (${body.length} کاراکتر): ${body}`);
+  const plain = await driver.send(recipient, body);
 
   if (plain.ok) {
     console.log(`✅ پذیرفته شد${plain.providerId ? ` — شناسه: ${plain.providerId}` : ""}`);
