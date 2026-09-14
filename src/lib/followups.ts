@@ -119,18 +119,40 @@ export async function generateFollowUps(): Promise<{
   // پیگیری‌هایی که قبلاً (با منطق بدونِ کرانِ بالا) ساخته شده‌اند و
   // دیگر معنی ندارند، خودشان بسته می‌شوند. بدون این، آن انبوهِ موارد
   // قدیمی تا ابد در کارتابل منشی می‌ماند و باید دستی بایگانی شود.
-  const retired = await prisma.followUp.updateMany({
-    where: {
-      status: "OPEN",
-      kind: "NEXT_SESSION",
-      appointment: { startsAt: { lt: winBackCutoff } },
-    },
-    data: {
-      status: "DISMISSED",
-      handledAt: now,
-      outcome: "خودکار بسته شد: آخرین جلسه برای «جلسه‌ی بعدی دوره» خیلی قدیمی است",
-    },
-  });
+  //
+  // handledAt عمداً ست نمی‌شود: بسته‌شدن خودکار «کارِ انجام‌شده‌ی امروز»
+  // نیست و نباید آمار تماس‌های منشی را باد کند.
+  const retireData = {
+    status: "DISMISSED" as const,
+    outcome: "خودکار بسته شد: برای کارتابل روزانه خیلی قدیمی است",
+  };
+
+  const winBackFloorForRetire = new Date(winBackCutoff);
+  winBackFloorForRetire.setMonth(winBackFloorForRetire.getMonth() - WIN_BACK_WINDOW_MONTHS);
+
+  const [retiredNext, retiredWinBack] = await Promise.all([
+    // «جلسه‌ی بعد» که نوبتِ مرجعش از مرز بازگردانی قدیمی‌تر است
+    prisma.followUp.updateMany({
+      where: {
+        status: "OPEN",
+        kind: "NEXT_SESSION",
+        appointment: { startsAt: { lt: winBackCutoff } },
+      },
+      data: retireData,
+    }),
+    // بازگردانی برای کسی که حتی داخل پنجره‌ی بازگردانی هم نیست
+    prisma.followUp.updateMany({
+      where: {
+        status: "OPEN",
+        kind: "WIN_BACK",
+        customer: {
+          appointments: { none: { status: "DONE", startsAt: { gte: winBackFloorForRetire } } },
+        },
+      },
+      data: retireData,
+    }),
+  ]);
+  const retired = retiredNext.count + retiredWinBack.count;
 
   // آخرین جلسه‌ی هر مشتری که پیش از cutoff بوده
   const candidates = await prisma.appointment.findMany({
@@ -257,7 +279,7 @@ export async function generateFollowUps(): Promise<{
       .create({
         data: {
           customerId: customer.id,
-          kind: "CUSTOM",
+          kind: "WIN_BACK",
           dueAt: now,
           reason: `بیش از ${toFa(winBackMonths)} ماه است مراجعه نکرده — برای بازگشت تماس بگیرید`,
         },
@@ -266,7 +288,7 @@ export async function generateFollowUps(): Promise<{
       .catch(() => undefined);
   }
 
-  return { noShow, nextSession, postCare, winBack, retired: retired.count };
+  return { noShow, nextSession, postCare, winBack, retired };
 }
 
 /** فهرست پیگیری‌های باز، مرتب‌شده بر اساس فوریت */

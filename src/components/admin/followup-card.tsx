@@ -17,6 +17,7 @@ const KIND_META: Record<
   NO_SHOW: { label: "مراجعه نکرد", tone: "red", icon: X },
   NEXT_SESSION: { label: "وقت جلسه‌ی بعد", tone: "rose", icon: Sparkles },
   POST_CARE: { label: "پیگیری بعد از درمان", tone: "amber", icon: Clock },
+  WIN_BACK: { label: "مدتی نیامده", tone: "amber", icon: Clock },
   CUSTOM: { label: "یادآوری دستی", tone: "plum", icon: UserRound },
 };
 

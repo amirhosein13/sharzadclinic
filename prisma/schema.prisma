@@ -866,6 +866,7 @@ enum FollowUpKind {
   NO_SHOW // مراجعه نکرد
   NEXT_SESSION // وقت جلسه‌ی بعدی دوره رسیده
   POST_CARE // پیگیری بعد از درمان
+  WIN_BACK // مدتی نیامده — تماس برای بازگشت
   CUSTOM // یادداشت دستی منشی
 }
 

@@ -915,7 +915,7 @@ async function main() {
   );
   check(
     "جلسه‌ی ۸ ماه پیش ⇒ بازگردانی، نه جلسه‌ی بعد",
-    (await kindFor(lapsed.id)) === "CUSTOM",
+    (await kindFor(lapsed.id)) === "WIN_BACK",
   );
   check(
     "جلسه‌ی ۲.۵ سال پیش ⇒ هیچ پیگیری‌ای ساخته نمی‌شود",
@@ -939,6 +939,37 @@ async function main() {
     `پیگیریِ کهنه‌ی «جلسه‌ی بعد» خودکار بسته می‌شود (${retireRun.retired})`,
     retireRun.retired >= 1 && (await kindFor(ancient.id)) === null,
   );
+
+  // یادداشت دستیِ منشی هیچ‌وقت نباید قربانی پاک‌سازی خودکار شود.
+  // تا دیروز بازگردانیِ خودکار هم نوع CUSTOM داشت و از یادداشت دستی
+  // قابل تشخیص نبود؛ نوع اختصاصی WIN_BACK همین را حل کرد.
+  const manualNote = await prisma.followUp.create({
+    data: {
+      customerId: ancient.id,
+      kind: "CUSTOM",
+      dueAt: new Date(),
+      reason: "یادداشت دستی: پیگیری فاکتور",
+    },
+  });
+  await generateFollowUps();
+  const manualAfter = await prisma.followUp.findUniqueOrThrow({ where: { id: manualNote.id } });
+  check("یادداشت دستی منشی خودکار بسته نمی‌شود", manualAfter.status === "OPEN");
+  await prisma.followUp.delete({ where: { id: manualNote.id } });
+
+  // و بازگردانیِ بیرون از پنجره باید بسته شود
+  const staleWinBack = await prisma.followUp.create({
+    data: {
+      customerId: ancient.id,
+      kind: "WIN_BACK",
+      dueAt: new Date(),
+      reason: "بازگردانیِ کهنه",
+    },
+  });
+  const wbRun = await generateFollowUps();
+  const wbAfter = await prisma.followUp.findUniqueOrThrow({ where: { id: staleWinBack.id } });
+  check("بازگردانیِ بیرون از پنجره خودکار بسته می‌شود", wbAfter.status === "DISMISSED");
+  check("بسته‌شدن خودکار به‌عنوان «انجام‌شده‌ی امروز» ثبت نمی‌شود", wbAfter.handledAt === null);
+  check(`شمارش بسته‌شده‌ها برگردانده می‌شود (${wbRun.retired})`, wbRun.retired >= 1);
 
   await prisma.followUp.deleteMany({ where: { customer: { phone: { in: [...AGE_PHONES] } } } });
   await prisma.appointment.deleteMany({ where: { customer: { phone: { in: [...AGE_PHONES] } } } });
