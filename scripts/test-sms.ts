@@ -7,6 +7,7 @@
  *    npm run sms:test                       فقط تنظیمات را نشان می‌دهد
  *    npm run sms:test -- --to=09123456789   یک پیامک واقعی می‌فرستد
  *    npm run sms:test -- --to=... --otp     کد ورود را هم تست می‌کند
+ *    npm run sms:test -- --status=2480262047   وضعیت تحویل یک پیام
  *
  *  بدون --to هیچ پیامکی ارسال نمی‌شود؛ فقط می‌گوید چه چیزی تنظیم شده
  *  و چه چیزی جا افتاده. با --to واقعاً پیام می‌رود و هزینه دارد.
@@ -18,7 +19,12 @@
 // باید اولین import باشد: متغیرهای .env را قبل از هر چیز دیگری بار می‌کند
 import { envLoad } from "./load-env";
 import "../src/lib/timezone";
-import { getSmsDriver, meliAccountInfo, smsRecipient } from "../src/lib/notifications/sms";
+import {
+  getSmsDriver,
+  meliAccountInfo,
+  meliDeliveryStatus,
+  smsRecipient,
+} from "../src/lib/notifications/sms";
 
 const args = process.argv.slice(2);
 const to = args.find((a) => a.startsWith("--to="))?.split("=")[1] ?? "";
@@ -27,6 +33,15 @@ const withOtp = args.includes("--otp");
 const customText = args.find((a) => a.startsWith("--text="))?.slice("--text=".length) ?? "";
 /** همه‌ی حالت‌های ممکنِ درخواست را امتحان می‌کند و پاسخ خام را چاپ می‌کند */
 const probe = args.includes("--probe");
+/**
+ * کد پیام‌هایی که در پنل ثبت شده‌اند — وضعیت واقعی تحویلشان را می‌پرسد.
+ * این تنها راهِ تفکیک «پذیرفته شد» از «رسید» است.
+ */
+const statusIds = (args.find((a) => a.startsWith("--status=")) ?? "")
+  .slice("--status=".length)
+  .split(",")
+  .map((v) => v.trim())
+  .filter(Boolean);
 
 /** رمز و کلید هیچ‌وقت کامل چاپ نمی‌شوند — این خروجی ممکن است جایی کپی شود */
 function mask(value: string | undefined) {
@@ -165,12 +180,29 @@ async function main() {
     }
   }
 
+  if (statusIds.length) {
+    console.log(`\n📬 وضعیت تحویل ${statusIds.length.toLocaleString("fa-IR")} پیام\n`);
+    const status = await meliDeliveryStatus(statusIds);
+    if (status.error) console.log(`  ❌ ${status.error}`);
+    for (const row of status.rows ?? []) {
+      console.log(`  ${row.recId.padEnd(14)} ${row.label}`);
+    }
+    if (status.raw) console.log(`\n  پاسخ خام: ${status.raw.slice(0, 300)}`);
+    console.log(
+      "\n   «رسیده به گوشی» یعنی کار تمام است و مشکل جای دیگری است.\n" +
+        "   «رسیده به مخابرات» یا «نرسیده» یعنی ما درست فرستاده‌ایم و\n" +
+        "   اپراتور تحویل نداده — آن وقت با همین کدها سراغ پشتیبانی برو.\n",
+    );
+    return;
+  }
+
   if (!to) {
     console.log(
       "\n   برای ارسال واقعی:  npm run sms:test -- --to=09123456789" +
         "\n   تست کد ورود:       --otp" +
         "\n   متن دلخواه:        --text=\"سلام\"" +
-        "\n   کاوش قالب:         --probe   (همه‌ی حالت‌ها را امتحان می‌کند)\n",
+        "\n   کاوش قالب:         --probe   (همه‌ی حالت‌ها را امتحان می‌کند)" +
+        "\n   وضعیت تحویل:       --status=2480262047   (کد پیام از پنل)\n",
     );
     return;
   }

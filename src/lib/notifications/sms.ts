@@ -258,6 +258,91 @@ export async function meliAccountInfo(): Promise<{
   }
 }
 
+/**
+ * وضعیت واقعی تحویل یک پیام، با «کد پیام»ی که در پنل کنار هر ردیف است.
+ *
+ * چرا لازم شد: خودِ ارسال دیگر رد نمی‌شود — درخواست‌ها در پنل ثبت
+ * می‌شوند و کد پیام می‌گیرند — ولی پیام به گوشی نمی‌رسد. «پذیرفته شد»
+ * و «رسید» دو چیزند و تا امروز ما فقط اولی را می‌دیدیم. این متد تنها
+ * جایی است که فرقشان معلوم می‌شود: اگر بگوید «رسیده به مخابرات» ولی
+ * «رسیده به گوشی» نه، مشکل سمت اپراتور است نه سمت ما.
+ */
+export async function meliDeliveryStatus(recIds: string[]): Promise<{
+  rows?: { recId: string; code: string; label: string }[];
+  /** پاسخ خام — چون جدولِ کدها ممکن است کامل نباشد */
+  raw?: string;
+  error?: string;
+}> {
+  const username = process.env.MELIPAYAMAK_USERNAME;
+  const password = process.env.MELIPAYAMAK_PASSWORD;
+  if (!username || !password) return { error: "نام کاربری یا کلید تنظیم نشده" };
+
+  try {
+    const res = await fetch("https://rest.payamak-panel.com/api/SendSMS/GetDeliveries2", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      // هر دو املای recId/recID فرستاده می‌شود؛ ارزان‌تر از یک رفت‌وبرگشت
+      // دیگر با کاربر است اگر املای سند با پیاده‌سازی یکی نباشد
+      body: new URLSearchParams({
+        username,
+        password,
+        recId: recIds.join(","),
+        recID: recIds.join(","),
+      }).toString(),
+      cache: "no-store",
+    });
+
+    if (!res.ok) return { error: `خطای ${res.status} از ملی پیامک` };
+
+    const raw = await res.text();
+    let value = "";
+    try {
+      value = String((JSON.parse(raw) as { Value?: unknown }).Value ?? "").trim();
+    } catch {
+      return { raw, error: "پاسخ ملی پیامک قابل خواندن نبود" };
+    }
+
+    // قالب پاسخ: "recId:وضعیت,recId:وضعیت" — و اگر شناسه پیدا نشود،
+    // ممکن است فقط یک کد خطا برگردد
+    const rows = value
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((pair) => {
+        const [recId, code = ""] = pair.split(":").map((s) => s.trim());
+        return { recId, code, label: deliveryLabel(code) };
+      });
+
+    return { rows: rows.length ? rows : undefined, raw };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "ارتباط برقرار نشد" };
+  }
+}
+
+/**
+ * کدهای وضعیت تحویل ملی پیامک.
+ *
+ * عمداً فقط کدهایی نام‌گذاری شده‌اند که مطمئنم؛ بقیه با همان عدد چاپ
+ * می‌شوند و پاسخ خام هم همیشه نشان داده می‌شود، تا اگر برچسبی اشتباه
+ * بود خودت بتوانی با سند رسمی بسنجی — نه اینکه برچسبِ غلط گمراهت کند.
+ */
+function deliveryLabel(code: string): string {
+  switch (code) {
+    case "0":
+      return "ارسال شده به مخابرات — هنوز تحویل نشده";
+    case "1":
+      return "✅ رسیده به گوشی";
+    case "2":
+      return "❌ نرسیده به گوشی (اپراتور تحویل نداده)";
+    case "8":
+      return "رسیده به مخابرات — منتظر تحویل به گوشی";
+    case "16":
+      return "❌ نرسیده — اپراتور رد کرده";
+    default:
+      return `کد ${code || "خالی"} — معنی‌اش را در سند رسمی ملی پیامک ببین`;
+  }
+}
+
 // ─── انتخاب درایور بر اساس تنظیمات ─────────────────────────────
 
 let cached: SmsDriver | null = null;
