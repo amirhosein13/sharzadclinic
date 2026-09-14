@@ -138,10 +138,15 @@ function meliPayamakDriver(
 
   async function call(path: string, body: Record<string, string>): Promise<SmsResult> {
     try {
+      // نمونه‌های رسمی ملی پیامک (همه‌شان، از SendSMS تا BaseServiceNumber)
+      // از x-www-form-urlencoded استفاده می‌کنند، نه JSON. ما JSON
+      // می‌فرستادیم و ارسال با کد ۱۱ («ارسال نشده») رد می‌شد، در حالی که
+      // متدهای خواندنی مثل GetCredit با همان JSON جواب می‌دادند — که
+      // گمراه‌کننده بود و باعث شد دنبال اعتبار و خط فرستنده بگردیم.
       const res = await fetch(`${base}/${path}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, ...body }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ username, password, ...body }).toString(),
         cache: "no-store",
       });
 
@@ -180,7 +185,7 @@ function meliPayamakDriver(
       if (!sender) {
         return { ok: false, error: "شماره‌ی فرستنده (MELIPAYAMAK_SENDER) تنظیم نشده است." };
       }
-      return call("SendSMS", { to, from: sender, text: message, isFlash: "false" });
+      return call("SendSMS", { to, from: sender, text: message, isflash: "false" });
     },
     async sendOtp(to, code) {
       if (!otpBodyId) {
@@ -215,11 +220,14 @@ export async function meliAccountInfo(): Promise<{
   const password = process.env.MELIPAYAMAK_PASSWORD;
   if (!username || !password) return { error: "نام کاربری یا کلید تنظیم نشده" };
 
+  // بدنه یک بار ساخته می‌شود؛ داخل کلوزر، باریک‌سازی تایپ حفظ نمی‌شود
+  const credentials = new URLSearchParams({ username, password }).toString();
+
   async function post(path: string) {
     const res = await fetch(`https://rest.payamak-panel.com/api/SendSMS/${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: credentials,
       cache: "no-store",
     });
     if (!res.ok) throw new Error(`خطای ${res.status}`);

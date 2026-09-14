@@ -2280,6 +2280,27 @@ async function main() {
     const noCredit = await reply({ Value: "2", RetStatus: 1, StrRetStatus: "Ok" });
     check("کد ۲ شکست است و از شارژ می‌گوید", !noCredit.ok && (noCredit.error ?? "").includes("شارژ"));
 
+    // قالب درخواست باید مو‌به‌مو همان نمونه‌ی رسمی ملی پیامک باشد.
+    // ما JSON می‌فرستادیم و ارسال با کد ۱۱ رد می‌شد، در حالی که متدهای
+    // خواندنی با همان JSON جواب می‌دادند — پس خطا گمراه‌کننده بود.
+    let wire = { ct: "", body: "" };
+    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+      const h = new Headers(init?.headers);
+      wire = { ct: h.get("content-type") ?? "", body: String(init?.body ?? "") };
+      return new Response(JSON.stringify({ Value: "451632198765", RetStatus: 1 }), { status: 200 });
+    }) as typeof fetch;
+    await getSmsDriver().send("09123456789", "سلام");
+
+    check(
+      "درخواست ملی پیامک form-urlencoded است، نه JSON",
+      wire.ct.includes("application/x-www-form-urlencoded"),
+    );
+    const sentKeys = [...new URLSearchParams(wire.body).keys()].sort();
+    check(
+      `پارامترها همان نمونه‌ی رسمی‌اند (${sentKeys.join(",")})`,
+      ["from", "isflash", "password", "text", "to", "username"].every((k) => sentKeys.includes(k)),
+    );
+
     globalThis.fetch = realFetch;
   }
 
