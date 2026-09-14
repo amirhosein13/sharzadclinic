@@ -865,6 +865,85 @@ async function main() {
   await prisma.appointment.deleteMany({ where: { customerId: fuCustomer.id } });
   await prisma.customer.delete({ where: { id: fuCustomer.id } });
 
+  // ── مرزهای سنیِ پیگیری ──────────────────────────────────────
+  //
+  // بعد از مهاجرت، هزاران نوبتِ انجام‌شده‌ی سال‌های گذشته وارد شد و
+  // کارتابل منشی پر شد از «وقت جلسه‌ی بعد» برای کسانی که آخرین
+  // جلسه‌شان یک سال و نیم پیش بود. این تست‌ها هر سه باند سنی را قفل
+  // می‌کنند تا مرزها بی‌صدا جابه‌جا نشوند.
+  const AGE_PHONES = ["09125550011", "09125550012", "09125550013"] as const;
+  await prisma.followUp.deleteMany({ where: { customer: { phone: { in: [...AGE_PHONES] } } } });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: { in: [...AGE_PHONES] } } } });
+  await prisma.customer.deleteMany({ where: { phone: { in: [...AGE_PHONES] } } });
+
+  const ageStaff = await prisma.staff.findFirstOrThrow();
+  /** مشتری با یک جلسه‌ی انجام‌شده‌ی n روز پیش */
+  async function customerWithSessionDaysAgo(phone: string, days: number, code: string) {
+    const c = await prisma.customer.create({
+      data: { firstName: "تست", lastName: "مرز", phone },
+    });
+    const when = new Date();
+    when.setDate(when.getDate() - days);
+    when.setHours(11, 0, 0, 0);
+    await prisma.appointment.create({
+      data: {
+        code,
+        customerId: c.id,
+        serviceId: service.id,
+        staffId: ageStaff.id,
+        startsAt: when,
+        endsAt: new Date(when.getTime() + 45 * 60_000),
+        status: "DONE",
+        source: "smoke",
+      },
+    });
+    return c;
+  }
+
+  const midCourse = await customerWithSessionDaysAgo(AGE_PHONES[0], 40, "SH-AGE01");
+  const lapsed = await customerWithSessionDaysAgo(AGE_PHONES[1], 240, "SH-AGE02");
+  const ancient = await customerWithSessionDaysAgo(AGE_PHONES[2], 900, "SH-AGE03");
+
+  await generateFollowUps();
+
+  const kindFor = async (customerId: string) =>
+    (await prisma.followUp.findFirst({ where: { customerId, status: "OPEN" } }))?.kind ?? null;
+
+  check(
+    "جلسه‌ی ۴۰ روز پیش ⇒ «وقت جلسه‌ی بعد»",
+    (await kindFor(midCourse.id)) === "NEXT_SESSION",
+  );
+  check(
+    "جلسه‌ی ۸ ماه پیش ⇒ بازگردانی، نه جلسه‌ی بعد",
+    (await kindFor(lapsed.id)) === "CUSTOM",
+  );
+  check(
+    "جلسه‌ی ۲.۵ سال پیش ⇒ هیچ پیگیری‌ای ساخته نمی‌شود",
+    (await kindFor(ancient.id)) === null,
+  );
+
+  // و پیگیریِ قدیمی که با منطق قبلی ساخته شده باشد، خودکار بسته شود
+  await prisma.followUp.create({
+    data: {
+      customerId: ancient.id,
+      appointmentId: (await prisma.appointment.findFirstOrThrow({
+        where: { customerId: ancient.id },
+      })).id,
+      kind: "NEXT_SESSION",
+      dueAt: new Date(),
+      reason: "میراث منطق قبلی",
+    },
+  });
+  const retireRun = await generateFollowUps();
+  check(
+    `پیگیریِ کهنه‌ی «جلسه‌ی بعد» خودکار بسته می‌شود (${retireRun.retired})`,
+    retireRun.retired >= 1 && (await kindFor(ancient.id)) === null,
+  );
+
+  await prisma.followUp.deleteMany({ where: { customer: { phone: { in: [...AGE_PHONES] } } } });
+  await prisma.appointment.deleteMany({ where: { customer: { phone: { in: [...AGE_PHONES] } } } });
+  await prisma.customer.deleteMany({ where: { phone: { in: [...AGE_PHONES] } } });
+
   // ── تیکت ────────────────────────────────────────────────────
   const TK_PHONE = "09125556644";
   await prisma.supportTicket.deleteMany({ where: { customer: { phone: TK_PHONE } } });

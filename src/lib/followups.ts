@@ -19,6 +19,15 @@ import type { FollowUpKind } from "@prisma/client";
 const DEFAULT_NEXT_SESSION_DAYS = 28;
 /** حداکثر روزهای گذشته که برای نوبت‌های بلاتکلیف عقب می‌رویم */
 const STALE_LOOKBACK_DAYS = 14;
+/**
+ * پنجره‌ی بازگردانی: فقط کسانی که «تازه» از مرز بازگردانی گذشته‌اند.
+ *
+ * بدون این کران، کارتابل بازگردانی هر ۲۶۷۰ پرونده‌ی منتقل‌شده را در خود
+ * می‌ریزد — فهرستی که هیچ منشی‌ای نمی‌تواند با آن کار کند. کسی که دو
+ * سال است نیامده با تماس تلفنی برنمی‌گردد؛ او مخاطبِ «پیامک گروهی
+ * هدفمند» است، نه کارتابل روزانه.
+ */
+const WIN_BACK_WINDOW_MONTHS = 6;
 
 export type FollowUpItem = {
   id: string;
@@ -50,6 +59,8 @@ export async function generateFollowUps(): Promise<{
   nextSession: number;
   postCare: number;
   winBack: number;
+  /** پیگیری‌های قدیمی که دیگر معنی ندارند و خودکار بسته شدند */
+  retired: number;
 }> {
   const settings = await getSettings();
   const nextSessionDays = Number(settings.followUpAfterDays) || DEFAULT_NEXT_SESSION_DAYS;
@@ -86,12 +97,46 @@ export async function generateFollowUps(): Promise<{
   }
 
   // ─── ۲. مشتریانی که وقت جلسه‌ی بعدی دوره‌شان رسیده ───
+  //
+  // این بخش یک کرانِ بالا هم لازم دارد و نداشتنش یک باگ واقعی ساخت:
+  // بعد از مهاجرتِ سوابق قدیمی، هزاران نوبتِ انجام‌شده‌ی سال‌های گذشته
+  // وارد دیتابیس شد و همه‌شان «وقت جلسه‌ی بعد» شدند. کارتابل منشی پر
+  // شد از کسانی که آخرین جلسه‌شان یک سال و نیم پیش بوده — و تماس با
+  // آن‌ها به‌عنوان «جلسه‌ی بعدی دوره» بی‌معنی و خجالت‌آور است.
+  //
+  // مرز درست همان مرز بازگردانی است: کسی که بیش از winBackMonths
+  // نیامده، مشتریِ «وسط دوره» نیست؛ مشتریِ ازدست‌رفته است و بخش ۴
+  // سراغش می‌رود. عارضه‌ی دوم همین بود: چون این بخش اول اجرا می‌شود و
+  // برای همه پیگیری باز می‌ساخت، شرط «پیگیری باز نداشته باشد» در بخش
+  // ۴ همیشه رد می‌شد و بازگردانی هیچ‌وقت کار نمی‌کرد.
+  const winBackMonths = Number(settings.winBackAfterMonths) || 6;
+  const winBackCutoff = new Date(now);
+  winBackCutoff.setMonth(winBackCutoff.getMonth() - winBackMonths);
+
   const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - nextSessionDays);
 
+  // پیگیری‌هایی که قبلاً (با منطق بدونِ کرانِ بالا) ساخته شده‌اند و
+  // دیگر معنی ندارند، خودشان بسته می‌شوند. بدون این، آن انبوهِ موارد
+  // قدیمی تا ابد در کارتابل منشی می‌ماند و باید دستی بایگانی شود.
+  const retired = await prisma.followUp.updateMany({
+    where: {
+      status: "OPEN",
+      kind: "NEXT_SESSION",
+      appointment: { startsAt: { lt: winBackCutoff } },
+    },
+    data: {
+      status: "DISMISSED",
+      handledAt: now,
+      outcome: "خودکار بسته شد: آخرین جلسه برای «جلسه‌ی بعدی دوره» خیلی قدیمی است",
+    },
+  });
+
   // آخرین جلسه‌ی هر مشتری که پیش از cutoff بوده
   const candidates = await prisma.appointment.findMany({
-    where: { status: "DONE", startsAt: { lt: cutoff } },
+    // lt: cutoff  → از آخرین جلسه‌اش به‌اندازه‌ی یک دوره گذشته
+    // gte: winBackCutoff → ولی آن‌قدر قدیمی نیست که مشتریِ ازدست‌رفته باشد
+    where: { status: "DONE", startsAt: { lt: cutoff, gte: winBackCutoff } },
     include: {
       customer: { select: { id: true, isBlocked: true } },
       service: { select: { title: true, sessionsNeeded: true } },
@@ -184,16 +229,20 @@ export async function generateFollowUps(): Promise<{
   }
 
   // ─── ۴. مشتریانی که خیلی وقت است نیامده‌اند ───
-  const winBackMonths = Number(settings.winBackAfterMonths) || 6;
-  const winBackCutoff = new Date(now);
-  winBackCutoff.setMonth(winBackCutoff.getMonth() - winBackMonths);
+  // winBackMonths و winBackCutoff بالاتر محاسبه شده‌اند، چون بخش ۲ هم
+  // به همان مرز نیاز دارد.
+
+  // کرانِ پایینِ پنجره: قدیمی‌تر از این، دیگر کارِ کارتابل نیست
+  const winBackFloor = new Date(winBackCutoff);
+  winBackFloor.setMonth(winBackFloor.getMonth() - WIN_BACK_WINDOW_MONTHS);
 
   const dormant = await prisma.customer.findMany({
     where: {
       isBlocked: false,
       appointments: {
-        some: { status: "DONE" },
-        // هیچ نوبتی — نه انجام‌شده نه آینده — بعد از این تاریخ نداشته باشد
+        // «تازه» غایب شده: آخرین مراجعه‌اش داخل پنجره است
+        some: { status: "DONE", startsAt: { gte: winBackFloor } },
+        // و هیچ نوبتی — نه انجام‌شده نه آینده — بعد از مرز نداشته باشد
         none: { startsAt: { gte: winBackCutoff } },
       },
       followUps: { none: { status: "OPEN" } },
@@ -217,7 +266,7 @@ export async function generateFollowUps(): Promise<{
       .catch(() => undefined);
   }
 
-  return { noShow, nextSession, postCare, winBack };
+  return { noShow, nextSession, postCare, winBack, retired: retired.count };
 }
 
 /** فهرست پیگیری‌های باز، مرتب‌شده بر اساس فوریت */
