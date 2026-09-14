@@ -1,7 +1,9 @@
 import Image from "next/image";
+import Link from "next/link";
 import { CalendarOff, Eye, EyeOff, Trash2, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/guard";
+import { ROLE_LABELS, can } from "@/lib/permissions";
 import { AdminPageHeader, Card, EmptyState } from "@/components/admin/page-header";
 import { ActionButton } from "@/components/admin/action-button";
 import { StaffForm } from "@/components/admin/forms/staff-form";
@@ -19,6 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminStaffPage() {
   const user = await guardPage("staff");
   const canEdit = user.role === "ADMIN" || user.role === "MANAGER";
+  const canManageUsers = can(user.role, "users");
 
   const [staff, services, timeOffs] = await Promise.all([
     prisma.staff.findMany({
@@ -26,6 +29,8 @@ export default async function AdminStaffPage() {
         services: { include: { service: { select: { id: true, title: true } } } },
         schedules: { where: { isActive: true }, orderBy: { weekday: "asc" } },
         _count: { select: { appointments: true } },
+        // برای نشان‌دادن اینکه این نفر حساب ورود به پنل دارد یا نه
+        user: { select: { role: true, isActive: true } },
       },
       orderBy: { order: "asc" },
     }),
@@ -46,7 +51,7 @@ export default async function AdminStaffPage() {
           canEdit ? (
             <div className="flex flex-wrap gap-2">
               <TimeOffForm staff={staff.map((s) => ({ id: s.id, name: s.name }))} />
-              <StaffForm services={services} />
+              <StaffForm services={services} canManageUsers={canManageUsers} />
             </div>
           ) : null
         }
@@ -169,6 +174,37 @@ export default async function AdminStaffPage() {
                       </span>
                     ))}
                   </div>
+                )}
+              </div>
+
+              {/*
+                «پرسنل» و «کاربر پنل» دو چیز جدا هستند و این تفکیک برای
+                کسی که فرم را باز می‌کند بدیهی نیست. همان‌جا که نبودِ
+                برنامه و خدمات هشدار می‌گیرد، نبودِ حساب ورود هم باید
+                دیده شود — وگرنه فقط وقتی معلوم می‌شود که طرف پشت
+                صفحه‌ی ورود مانده باشد.
+              */}
+              <div className="mt-5 border-t border-[color:var(--line)] pt-5">
+                <p className="mb-2.5 text-xs font-semibold">ورود به پنل</p>
+                {member.user ? (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <Badge tone="plum">{ROLE_LABELS[member.user.role]}</Badge>
+                    {!member.user.isActive && <Badge tone="red">حساب غیرفعال</Badge>}
+                  </div>
+                ) : (
+                  <p className="text-xs leading-6 text-[color:var(--fg-muted)]">
+                    حساب ورود ندارد — یعنی خودش نمی‌تواند نوبت‌ها و درآمدش را ببیند.
+                    {canManageUsers ? (
+                      <>
+                        {" "}
+                        <Link href="/admin/users" className="font-medium text-[color:var(--fg)] underline">
+                          از بخش کاربران پنل بساز
+                        </Link>
+                      </>
+                    ) : (
+                      " اگر لازم است، از مدیر کل بخواه."
+                    )}
+                  </p>
                 )}
               </div>
 

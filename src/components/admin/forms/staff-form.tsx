@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Pencil, Plus } from "lucide-react";
 import { CrudDialog, Check, MultiCheck } from "@/components/admin/crud-dialog";
 import { ImagePicker } from "@/components/admin/image-picker";
@@ -26,9 +27,12 @@ export type StaffFormValues = {
 export function StaffForm({
   member,
   services,
+  canManageUsers = false,
 }: {
   member?: StaffFormValues;
   services: { id: string; title: string }[];
+  /** آیا بیننده اجازه‌ی ساخت حساب کاربری دارد؟ فقط مدیر کل دارد. */
+  canManageUsers?: boolean;
 }) {
   const editing = !!member;
 
@@ -60,6 +64,35 @@ export function StaffForm({
       {(errors) => (
         <>
           {editing && <input type="hidden" name="id" value={member.id} />}
+
+          {/*
+            اولین سؤال هر کسی که این فرم را باز می‌کند این است: «پس رمز
+            عبورش کو؟» — چون در ذهن، «پرسنل» و «کسی که وارد پنل می‌شود»
+            یک چیزند. اینجا دو چیزند و فرم تا امروز این را نمی‌گفت.
+          */}
+          {!editing && (
+            <p className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-sunken)] p-4 text-xs leading-6 text-[color:var(--fg-muted)]">
+              اینجا <b className="text-[color:var(--fg)]">پرونده‌ی کاری</b> این نفر ساخته می‌شود: روی سایت
+              دیده می‌شود، نوبت می‌گیرد، و حقوق و پورسانتش از همین‌جا حساب می‌شود.
+              <br />
+              رمز عبور اینجا نیست، چون هر پرسنلی لازم نیست وارد پنل شود.{" "}
+              {canManageUsers ? (
+                <>
+                  اگر می‌خواهی خودش هم وارد پنل شود و نوبت‌ها و درآمدش را ببیند، بعد از
+                  ثبت، از بخش{" "}
+                  <Link href="/admin/users" className="font-medium text-[color:var(--fg)] underline">
+                    کاربران پنل
+                  </Link>{" "}
+                  برایش حساب با نقش «اپراتور / درمانگر» بساز و به همین نفر وصلش کن.
+                </>
+              ) : (
+                <>
+                  اگر می‌خواهی خودش هم وارد پنل شود، از مدیر کل بخواه از بخش «کاربران پنل»
+                  برایش حساب با نقش «اپراتور / درمانگر» بسازد.
+                </>
+              )}
+            </p>
+          )}
 
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="نام و نام خانوادگی" required error={errors.name}>
