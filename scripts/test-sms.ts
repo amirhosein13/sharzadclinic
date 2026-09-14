@@ -25,6 +25,8 @@ const to = args.find((a) => a.startsWith("--to="))?.split("=")[1] ?? "";
 const withOtp = args.includes("--otp");
 /** متن دلخواه — برای جدا کردن «مشکل متن» از «مشکل گیرنده یا خط» */
 const customText = args.find((a) => a.startsWith("--text="))?.slice("--text=".length) ?? "";
+/** همه‌ی حالت‌های ممکنِ درخواست را امتحان می‌کند و پاسخ خام را چاپ می‌کند */
+const probe = args.includes("--probe");
 
 /** رمز و کلید هیچ‌وقت کامل چاپ نمی‌شوند — این خروجی ممکن است جایی کپی شود */
 function mask(value: string | undefined) {
@@ -36,6 +38,55 @@ function mask(value: string | undefined) {
 function show(label: string, value: string | undefined, secret = false) {
   const shown = secret ? mask(value) : value ? `✅ ${value}` : "❌ خالی";
   console.log(`  ${label.padEnd(28)} ${shown}`);
+}
+
+/**
+ * کاوش: وقتی سرویس «نه» می‌گوید و نمی‌دانیم چرا، حدس‌زدن یکی‌یکی گران
+ * است — هر حدس یک رفت‌وبرگشت با کاربر. این تابع همه‌ی حالت‌های محتملِ
+ * قالب درخواست را یک‌جا امتحان می‌کند و *پاسخ خام* سرویس را چاپ
+ * می‌کند، نه تفسیر ما را.
+ *
+ * ⚠️ هر حالتِ موفق یک پیامک واقعی می‌فرستد و هزینه دارد.
+ */
+async function probeVariants(recipient: string, body: string) {
+  const username = process.env.MELIPAYAMAK_USERNAME ?? "";
+  const password = process.env.MELIPAYAMAK_PASSWORD ?? "";
+  const sender = process.env.MELIPAYAMAK_SENDER ?? "";
+
+  // شماره بدون صفر اول — نمونه‌های رسمی خودشان این‌طور نشان می‌دهند
+  const noZero = recipient.replace(/^0/, "");
+
+  const variants: { label: string; params: Record<string, string> }[] = [
+    { label: "همان چیزی که الان می‌فرستیم (09…)", params: { to: recipient, from: sender, text: body, isflash: "false" } },
+    { label: "گیرنده بدون صفر اول (9…)", params: { to: noZero, from: sender, text: body, isflash: "false" } },
+    { label: "گیرنده با کد کشور (98…)", params: { to: `98${noZero}`, from: sender, text: body, isflash: "false" } },
+    { label: "بدون پارامتر isflash", params: { to: recipient, from: sender, text: body } },
+    { label: "متن انگلیسی ساده", params: { to: recipient, from: sender, text: "test", isflash: "false" } },
+  ];
+
+  console.log("\n🔬 کاوش قالب درخواست — پاسخ خامِ ملی پیامک\n");
+  for (const v of variants) {
+    const form = new URLSearchParams({ username, password, ...v.params });
+    let raw: string;
+    try {
+      const res = await fetch("https://rest.payamak-panel.com/api/SendSMS/SendSMS", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form.toString(),
+        cache: "no-store",
+      });
+      raw = `HTTP ${res.status} — ${(await res.text()).slice(0, 200)}`;
+    } catch (error) {
+      raw = `ارتباط برقرار نشد: ${error instanceof Error ? error.message : "خطای ناشناخته"}`;
+    }
+    const ok = /"Value"\s*:\s*"?\d{6,}/.test(raw);
+    console.log(`  ${ok ? "✅" : "❌"} ${v.label}`);
+    console.log(`     to=${v.params.to}  →  ${raw}`);
+  }
+  console.log(
+    "\n   اگر همه ❌ شدند، قالب درخواست مشکل ندارد و مسئله در تنظیمات\n" +
+      "   حساب یا خط است — باید از پشتیبانی ملی پیامک بپرسی.\n",
+  );
 }
 
 async function main() {
@@ -118,7 +169,8 @@ async function main() {
     console.log(
       "\n   برای ارسال واقعی:  npm run sms:test -- --to=09123456789" +
         "\n   تست کد ورود:       --otp" +
-        "\n   متن دلخواه:        --text=\"سلام\"\n",
+        "\n   متن دلخواه:        --text=\"سلام\"" +
+        "\n   کاوش قالب:         --probe   (همه‌ی حالت‌ها را امتحان می‌کند)\n",
     );
     return;
   }
@@ -134,6 +186,11 @@ async function main() {
   const stamp = new Date().toLocaleTimeString("fa-IR");
   const body =
     customText || `تست اتصال سامانه‌ی کلینیک شهرزاد — ${stamp}. اگر این پیام رسید، پیامک درست کار می‌کند.`;
+
+  if (probe) {
+    await probeVariants(recipient, customText || "تست سامانه کلینیک شهرزاد");
+    return;
+  }
 
   console.log(`\n📤 ارسال پیامک آزمایشی به ${recipient} ...`);
   console.log(`   متن (${body.length} کاراکتر): ${body}`);
