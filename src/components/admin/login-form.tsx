@@ -14,7 +14,11 @@ export function LoginForm({ next }: { next?: string }) {
 
   return (
     <form action={action} className="space-y-5">
-      <input type="hidden" name="next" value={next ?? "/admin"} />
+      {/* خالی یعنی «خودت تصمیم بگیر»: قبل از ورود نقش کاربر معلوم
+          نیست، پس مقصد را اکشن ورود از روی نقش انتخاب می‌کند.
+          وقتی اینجا «/admin» ثابت بود، منشی و اپراتور همیشه روی
+          داشبورد می‌افتادند و homeFor هیچ‌وقت اثر نداشت. */}
+      <input type="hidden" name="next" value={next ?? ""} />
 
       <Field label="ایمیل" required error={state.errors?.email}>
         <Input

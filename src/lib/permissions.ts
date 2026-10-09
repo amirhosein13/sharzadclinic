@@ -7,24 +7,27 @@ import type { Role } from "@prisma/client";
  *  MANAGER   مدیر — محتوا، نوبت‌ها، مشتریان و حقوق، بدون مدیریت کاربران
  *  RECEPTION منشی — نوبت‌ها، مشتریان و پیام‌ها؛ محتوا و حقوق را نمی‌بیند
  *  OPERATOR  اپراتور/درمانگر — فقط نوبت‌ها و درآمد خودش
+ *
+ *  «today» (کارهای امروز من) را همه دارند — هر کارمندی باید بداند
+ *  امروز چه چیزی گردنش است. «duties» (تعریف مسئولیت) فقط مدیر.
  */
 export const PERMISSIONS = {
   ADMIN: [
     "dashboard", "appointments.all", "appointments.write", "customers", "customers.write",
     "content", "staff", "payroll", "payroll.write", "users", "settings", "notifications", "messages",
-    "audit", "help",
+    "audit", "help", "today", "duties",
   ],
   MANAGER: [
     "dashboard", "appointments.all", "appointments.write", "customers", "customers.write",
     "content", "staff", "payroll", "payroll.write", "settings", "notifications", "messages",
-    "audit", "help",
+    "audit", "help", "today", "duties",
   ],
   RECEPTION: [
     "dashboard", "appointments.all", "appointments.write", "customers", "customers.write", "messages",
-    "help",
+    "help", "today",
   ],
   // راهنما را همه می‌بینند — هر نقشی فقط بخش‌های خودش را
-  OPERATOR: ["dashboard.own", "appointments.own", "payroll.own", "help"],
+  OPERATOR: ["dashboard.own", "appointments.own", "payroll.own", "help", "today"],
 } as const satisfies Record<Role, readonly string[]>;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS][number];

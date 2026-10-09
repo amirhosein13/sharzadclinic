@@ -57,6 +57,8 @@ import { buildCashDay, closeCashDay, recentCloses, unclosedDays } from "../src/l
 import { cleanAmount, cleanDate, cleanPhone, normalizeName } from "./legacy-clean";
 import { tidyRichText } from "../src/lib/rich-text";
 import { getSmsDriver, meliErrorMessage } from "../src/lib/notifications/sms";
+import { dayKey, daysLate, dutyMatchesDay, ensureTasksForDay, retireStaleTasks } from "../src/lib/duties";
+import { fromJalali } from "../src/lib/date";
 
 const prisma = new PrismaClient();
 
@@ -2346,6 +2348,85 @@ async function main() {
     beforePrune.filter((b) => b.kind === "full").length >= 1 &&
       beforePrune.filter((b) => b.kind === "light").length >= 20
   );
+
+  // ─── مسئولیت‌ها و کارهای روزانه ──────────────────────────────
+  //
+  // این بخش دقیقاً همان تله‌ای را می‌پاید که کارتابل پیگیری در آن
+  // افتاد: تولیدِ بی‌مرز. پس هم «ساخته می‌شود» تست می‌شود و هم
+  // «دوباره ساخته نمی‌شود» و هم «کهنه‌ها بیرون می‌روند».
+
+  // ۱۴۰۵/۰۷/۱۷ یک جمعه است (jalaliWeekday = ۶)
+  const friday = fromJalali(1405, 7, 17);
+  const saturday = fromJalali(1405, 7, 18);
+
+  check(
+    "مسئولیت روزانه هر روزی را می‌گیرد",
+    dutyMatchesDay({ repeat: "DAILY", weekdays: [], monthDay: null }, friday) &&
+      dutyMatchesDay({ repeat: "DAILY", weekdays: [], monthDay: null }, saturday),
+  );
+  check(
+    "مسئولیت هفتگیِ شنبه فقط شنبه را می‌گیرد",
+    !dutyMatchesDay({ repeat: "WEEKLY", weekdays: [0], monthDay: null }, friday) &&
+      dutyMatchesDay({ repeat: "WEEKLY", weekdays: [0], monthDay: null }, saturday),
+  );
+  check(
+    "مسئولیت ماهانه فقط همان روزِ ماه را می‌گیرد",
+    dutyMatchesDay({ repeat: "MONTHLY", weekdays: [], monthDay: 17 }, friday) &&
+      !dutyMatchesDay({ repeat: "MONTHLY", weekdays: [], monthDay: 18 }, friday),
+  );
+  // تله‌ی واقعی: روز ۳۱ در ماهی که ۳۰ روز دارد. بدون محدودسازی،
+  // آن مسئولیت هیچ‌وقت اجرا نمی‌شد و کسی هم نمی‌فهمید چرا.
+  const lastOfAban = fromJalali(1405, 8, 30); // آبان ۳۰ روز دارد
+  check(
+    "ماهانه‌ی روز ۳۱ در ماه ۳۰ روزه به آخرین روز ماه می‌افتد",
+    dutyMatchesDay({ repeat: "MONTHLY", weekdays: [], monthDay: 31 }, lastOfAban),
+  );
+
+  const dutyUser = await prisma.user.create({
+    data: {
+      name: "تست مسئولیت",
+      email: "smoke-duty@example.com",
+      passwordHash: "x",
+      role: "RECEPTION",
+    },
+  });
+  const dailyDuty = await prisma.duty.create({
+    data: { title: "کار روزانه‌ی تستی", assigneeId: dutyUser.id, repeat: "DAILY" },
+  });
+
+  const firstRun = await ensureTasksForDay(new Date(), dutyUser.id);
+  const secondRun = await ensureTasksForDay(new Date(), dutyUser.id);
+  check("کار امروز ساخته می‌شود", firstRun === 1);
+  check("بار دوم کار تکراری ساخته نمی‌شود", secondRun === 0);
+
+  // روزِ گذشته نباید تاریخِ نداشته بسازد
+  const backfill = await ensureTasksForDay(new Date(Date.now() - 2 * 86_400_000), dutyUser.id);
+  check("برای روزهای گذشته کار ساخته نمی‌شود", backfill === 0);
+
+  // کارِ روزانه‌ی ۵ روز پیش باید بازنشسته شود، ولی کارِ دستی نه
+  const old = dayKey(new Date(Date.now() - 5 * 86_400_000));
+  await prisma.task.create({
+    data: { dutyId: dailyDuty.id, title: "کهنه", assigneeId: dutyUser.id, dueOn: old },
+  });
+  const manualOld = await prisma.task.create({
+    data: { title: "کار دستیِ کهنه", assigneeId: dutyUser.id, dueOn: old },
+  });
+  await retireStaleTasks();
+
+  const retired = await prisma.task.findFirst({
+    where: { dutyId: dailyDuty.id, dueOn: old },
+  });
+  const manualTaskAfter = await prisma.task.findUniqueOrThrow({ where: { id: manualOld.id } });
+  check("کار روزانه‌ی کهنه خودکار بسته می‌شود", retired?.status === "EXPIRED");
+  // همان اشتباهی که در کارتابل پیگیری شمارنده را ۳۳۵ نشان داد
+  check("بستنِ خودکار «انجام‌شده» ثبت نمی‌شود", retired?.doneAt === null);
+  check("کار دستیِ کهنه دست‌نخورده می‌ماند", manualTaskAfter.status === "OPEN");
+
+  check("شمارش روزهای عقب‌افتادگی درست است", daysLate(old) === 5);
+
+  await prisma.duty.deleteMany({ where: { assigneeId: dutyUser.id } });
+  await prisma.task.deleteMany({ where: { assigneeId: dutyUser.id } });
+  await prisma.user.delete({ where: { id: dutyUser.id } });
 
   await pruneBackups(14);
   const afterPrune = await listBackups();

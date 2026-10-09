@@ -416,3 +416,39 @@ export const ticketReplySchema = z.object({
   ticketId: z.string().min(1),
   body: z.string().trim().min(1, "متن پاسخ را بنویسید").max(4000),
 });
+
+// ─── مسئولیت‌ها و کارهای پرسنل ─────────────────────────────────
+
+export const dutySchema = z
+  .object({
+    title: z.string().trim().min(3, "عنوان کار را بنویسید").max(120),
+    note: z.string().trim().max(500).optional(),
+    assigneeId: z.string().min(1, "این مسئولیت را به چه کسی می‌دهید؟"),
+    repeat: z.enum(["DAILY", "WEEKLY", "MONTHLY"]),
+    // چک‌باکس‌های روز هفته؛ یک‌دانه هم به‌شکل رشته می‌آید
+    weekdays: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .transform((v) => {
+        const list = v === undefined ? [] : Array.isArray(v) ? v : [v];
+        return list.map((d) => Number(toEn(d))).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+      }),
+    monthDay: optionalInt,
+    timeHint: z.string().trim().max(60).optional(),
+    isActive: z.coerce.boolean().optional(),
+  })
+  .refine((v) => v.repeat !== "WEEKLY" || v.weekdays.length > 0, {
+    message: "حداقل یک روز هفته را انتخاب کنید",
+    path: ["weekdays"],
+  })
+  .refine((v) => v.repeat !== "MONTHLY" || (!!v.monthDay && v.monthDay >= 1 && v.monthDay <= 31), {
+    message: "روز ماه را بین ۱ تا ۳۱ وارد کنید",
+    path: ["monthDay"],
+  });
+
+export const taskSchema = z.object({
+  title: z.string().trim().min(3, "عنوان کار را بنویسید").max(120),
+  note: z.string().trim().max(500).optional(),
+  assigneeId: z.string().min(1, "این کار را به چه کسی می‌سپارید؟"),
+  dueOn: jalaliDate,
+});

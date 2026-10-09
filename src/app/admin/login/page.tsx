@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getSession } from "@/lib/auth";
+import { homeFor } from "@/lib/guard";
 import { LoginForm } from "@/components/admin/login-form";
 
 export const metadata: Metadata = { title: "ورود به پنل مدیریت", robots: { index: false } };
@@ -13,7 +14,9 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  if (await getSession()) redirect(next || "/admin");
+  // کسی که از قبل وارد است هم باید به خانه‌ی نقشِ خودش برود
+  const session = await getSession();
+  if (session) redirect(next || homeFor(session));
 
   return (
     <div className="grid min-h-dvh place-items-center bg-gradient-to-bl from-rose-50 via-cream-50 to-cream-100 p-5 dark:from-plum-800 dark:via-plum-900 dark:to-plum-900">

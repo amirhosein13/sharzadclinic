@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpen, Boxes, CalendarDays, Coins, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Gift, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, Megaphone, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, Stethoscope, TicketPercent, TrendingUp, Users, Wallet, X } from "lucide-react";
+import { BarChart3, BookOpen, Boxes, ClipboardList, ListChecks, CalendarDays, Coins, CalendarRange, CreditCard, DatabaseBackup, FileSignature, FileText, Gift, History, Home, Hourglass, Image as ImageIcon, LayoutDashboard, LogOut, Menu, Megaphone, MessageSquare, MessageSquareHeart, MessagesSquare, PhoneCall, Quote, Receipt, Send, Settings, Sparkles, Stethoscope, TicketPercent, TrendingUp, Users, Wallet, X } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { can, ROLE_LABELS, type Permission } from "@/lib/permissions";
@@ -20,6 +20,7 @@ const NAV: {
   /** فقط مدیر کل ببیند */
   adminOnly?: boolean;
 }[] = [
+  { href: "/admin/today", label: "کارهای امروز", icon: ListChecks, permission: "today", exact: true, badgeKey: "myOpenTasks" },
   { href: "/admin", label: "داشبورد", icon: LayoutDashboard, permission: "dashboard", exact: true },
   { href: "/admin/day", label: "برنامه‌ی روز", icon: CalendarRange, permission: "appointments.all" },
   { href: "/admin/appointments", label: "نوبت‌ها", icon: CalendarDays, permission: "appointments.all", badgeKey: "pendingAppointments" },
@@ -30,6 +31,7 @@ const NAV: {
   { href: "/admin/referrals", label: "کد معرف", icon: Gift, permission: "customers" },
   { href: "/admin/services", label: "خدمات", icon: Sparkles, permission: "content" },
   { href: "/admin/staff", label: "پرسنل", icon: Users, permission: "staff" },
+  { href: "/admin/duties", label: "مسئولیت‌ها", icon: ClipboardList, permission: "duties", badgeKey: "teamOverdueTasks" },
   { href: "/admin/payments", label: "پرداخت‌ها", icon: CreditCard, permission: "payroll" },
   { href: "/admin/payroll", label: "حقوق و دستمزد", icon: Wallet, permission: "payroll" },
   { href: "/admin/expenses", label: "هزینه‌ها", icon: Receipt, permission: "payroll" },
@@ -66,6 +68,10 @@ export type SidebarBadges = {
   lowStock?: number;
   openTickets?: number;
   unclosedDays?: number;
+  /** کارهای باز خودِ کاربر — امروز و عقب‌افتاده */
+  myOpenTasks?: number;
+  /** کارهای عقب‌افتاده‌ی کل تیم، برای مدیر */
+  teamOverdueTasks?: number;
 };
 
 export function Sidebar({

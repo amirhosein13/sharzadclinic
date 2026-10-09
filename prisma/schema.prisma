@@ -46,6 +46,11 @@ model User {
   cashCloses CashClose[]
   campaigns  Campaign[]
 
+  duties        Duty[] @relation("DutyAssignee")
+  dutiesCreated Duty[] @relation("DutyCreator")
+  tasks         Task[] @relation("TaskAssignee")
+  tasksCreated  Task[] @relation("TaskCreator")
+
   @@map("users")
 }
 
@@ -1189,4 +1194,103 @@ model SiteEvent {
   @@index([kind, createdAt])
   @@index([serviceSlug, createdAt])
   @@map("site_events")
+}
+
+// ─── مسئولیت‌ها و کارهای روزانه‌ی پرسنل ────────────────────────
+//
+// هدف: هر کارمند وقتی وارد پنل می‌شود بداند «امروز چه کارهایی
+// گردن من است»، و مدیر بتواند این را یک‌بار تعریف کند نه هر روز
+// شفاهی بگوید.
+//
+// دو مدل، چون دو چیز متفاوتند:
+//
+//   Duty  «مسئولیت» — قاعده‌ای که تکرار می‌شود: «هر روز آخر وقت
+//         صندوق را ببند». یک‌بار تعریف می‌شود و می‌ماند.
+//   Task  «کارِ یک روزِ مشخص» — چیزی که تیک می‌خورد. یا از یک
+//         مسئولیت برای امروز ساخته شده، یا مدیر دستی سپرده.
+//
+// اگر یکی‌شان می‌کردیم، تیک‌زدنِ «امروز انجام شد» یعنی مسئولیت
+// برای همیشه بسته شود.
+
+enum DutyRepeat {
+  DAILY /// هر روز
+  WEEKLY /// روزهای مشخصی از هفته
+  MONTHLY /// یک روز مشخص از هر ماه شمسی
+}
+
+model Duty {
+  id    String  @id @default(cuid())
+  title String /// «صندوق را ببند»
+  note  String? /// توضیح بیشتر، برای کسی که اولین بار انجامش می‌دهد
+
+  repeat DutyRepeat @default(DAILY)
+  /// برای WEEKLY — شماره‌ی روزهای هفته با مبنای شنبه = ۰
+  weekdays Int[]       @default([])
+  /// برای MONTHLY — روز ماه شمسی (۱ تا ۳۱). اگر ماه کوتاه‌تر بود،
+  /// آخرین روز همان ماه حساب می‌شود تا هیچ‌وقت از قلم نیفتد.
+  monthDay Int?
+  /// «آخر وقت» یا «قبل از اولین نوبت» — فقط متن راهنما
+  timeHint String?
+
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
+  /// کارمندی که این مسئولیت گردنش است
+  assigneeId String
+  assignee   User   @relation("DutyAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   User?   @relation("DutyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks Task[]
+
+  @@index([assigneeId, isActive])
+  @@map("duties")
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+  /// خودکار بسته شد چون برای کارتابل امروز خیلی کهنه بود.
+  /// بدون این، کارهای انجام‌نشده‌ی روزهای قبل روی هم می‌انبارند و
+  /// صفحه‌ی کارها همان بلایی می‌شود که سر کارتابل پیگیری آمد.
+  EXPIRED
+}
+
+model Task {
+  id     String  @id @default(cuid())
+  /// اگر از یک مسئولیتِ تکرارشونده ساخته شده باشد
+  dutyId String?
+  duty   Duty?   @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+
+  title String
+  note  String?
+
+  assigneeId String
+  assignee   User   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+
+  /// روزی که این کار برای آن است — همیشه نیمه‌شبِ محلی
+  dueOn  DateTime
+  status TaskStatus @default(OPEN)
+  doneAt DateTime?
+  /// کارمند می‌تواند موقع تیک‌زدن توضیح بگذارد
+  doneNote String?
+
+  createdById String?
+  createdBy   User?   @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// یک مسئولیت در یک روز بیشتر از یک کار نمی‌سازد. این قید است که
+  /// تولیدِ دوباره را بی‌خطر می‌کند: هر بار صفحه باز شود، تلاشِ
+  /// ساخت تکراری بی‌صدا رد می‌شود. (در پستگرس NULL با NULL برخورد
+  /// نمی‌کند، پس کارهای دستی — که dutyId ندارند — آزادند.)
+  @@unique([dutyId, dueOn])
+  @@index([assigneeId, dueOn, status])
+  @@index([dueOn, status])
+  @@map("tasks")
 }

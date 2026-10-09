@@ -8,6 +8,7 @@ import { can } from "@/lib/permissions";
 import { lowStockCount } from "@/lib/inventory";
 import { openTicketCount } from "@/lib/tickets";
 import { unclosedDays } from "@/lib/cash";
+import { ensureTasksForDay, openTaskCount, teamOverdueCount } from "@/lib/duties";
 
 export const metadata: Metadata = {
   title: { default: "پنل مدیریت", template: "%s | پنل مدیریت" },
@@ -18,8 +19,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const user = await getSession();
   if (!user) redirect("/admin/login");
 
+  // کارهای امروزِ این کاربر باید *قبل* از شمردن ساخته شوند، وگرنه
+  // بَجِ کنار «کارهای امروز» در اولین بازدیدِ روز عدد کمتری نشان
+  // می‌دهد و تا جابه‌جایی بعدی غلط می‌ماند. بار اضافه ناچیز است:
+  // یک کوئری ایندکس‌دار، و نوشتن فقط یک بار در روز.
+  await ensureTasksForDay(new Date(), user.id);
+
   // شمارنده‌های سایدبار فقط برای نقش‌هایی که آن بخش‌ها را می‌بینند
-  const [pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps, waitingList, openFeedback, lowStock, openTickets, unclosed] =
+  const [pendingAppointments, pendingTestimonials, unreadMessages, openFollowUps, waitingList, openFeedback, lowStock, openTickets, unclosed, myOpenTasks, teamOverdueTasks] =
     await Promise.all([
       can(user.role, "appointments.all") ? prisma.appointment.count({ where: { status: "PENDING" } }) : 0,
       can(user.role, "content") ? prisma.testimonial.count({ where: { isApproved: false } }) : 0,
@@ -38,6 +45,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       can(user.role, "payroll") ? lowStockCount() : 0,
       can(user.role, "messages") ? openTicketCount() : 0,
       can(user.role, "payroll") ? unclosedDays(14) : [],
+      // بَجِ کارهای خودش را همه می‌بینند؛ بَجِ عقب‌افتاده‌ی تیم فقط مدیر
+      openTaskCount(user.id),
+      can(user.role, "duties") ? teamOverdueCount() : 0,
     ]);
 
   return (
@@ -54,6 +64,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           lowStock,
           openTickets,
           unclosedDays: unclosed.length,
+          myOpenTasks,
+          teamOverdueTasks,
         }}
       />
       <div className="min-w-0 flex-1">
