@@ -44,7 +44,7 @@ import { EVENTS } from "../src/lib/events";
 import { WEEKDAYS_FA } from "../src/lib/date";
 import { GUIDE, guideFor } from "../src/lib/guide";
 import { can } from "../src/lib/permissions";
-import { mkdirSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BACKUP_DIR, listBackups, pruneBackups } from "../src/lib/backup";
 import {
@@ -58,6 +58,7 @@ import { cleanAmount, cleanDate, cleanPhone, normalizeName } from "./legacy-clea
 import { tidyRichText } from "../src/lib/rich-text";
 import { getSmsDriver, meliErrorMessage } from "../src/lib/notifications/sms";
 import { dayKey, daysLate, dutyMatchesDay, ensureTasksForDay, retireStaleTasks } from "../src/lib/duties";
+import { uploadDirStatus } from "../src/lib/upload";
 import { fromJalali } from "../src/lib/date";
 
 const prisma = new PrismaClient();
@@ -2427,6 +2428,39 @@ async function main() {
   await prisma.duty.deleteMany({ where: { assigneeId: dutyUser.id } });
   await prisma.task.deleteMany({ where: { assigneeId: dutyUser.id } });
   await prisma.user.delete({ where: { id: dutyUser.id } });
+
+  // ─── پوشه‌ی تصاویر ───────────────────────────────────────────
+  //
+  // آپلودِ بی‌صدا-خراب دقیقاً به این شکل اتفاق افتاد: پوشه بود ولی
+  // کاربرِ برنامه نمی‌توانست در آن بنویسد، و کاربر فقط «ارتباط با
+  // سرور برقرار نشد» می‌دید. پس چک باید *واقعاً بنویسد*.
+  const uploadOk = await uploadDirStatus();
+  check(
+    "پوشه‌ی تصاویر قابل نوشتن است",
+    uploadOk.ok && uploadOk.broken.length === 0,
+  );
+
+  // تست برعکس: اگر قابل نوشتن نباشد، باید *بفهمد*. بدون این، چک
+  // بالا ممکن است همیشه ok بدهد و هیچ‌وقت چیزی نگیرد.
+  // chmod فقط وقتی اثر دارد که این فرایند *مالک* پوشه باشد و root هم
+  // نباشد (root محدودیت نوشتن را نادیده می‌گیرد). هر حالت دیگری یعنی
+  // تست چیزی را نمی‌سنجد، پس به‌جای «پاس شد»ِ توخالی، رد می‌شود.
+  const probeDir = join(process.cwd(), "public", "uploads");
+  const me = process.getuid?.();
+  const canProve = me !== undefined && me !== 0 && statSync(probeDir).uid === me;
+
+  if (canProve) {
+    const before = statSync(probeDir).mode;
+    chmodSync(probeDir, 0o555);
+    const blocked = await uploadDirStatus();
+    chmodSync(probeDir, before);
+    check("پوشه‌ی غیرقابل‌نوشتن تشخیص داده می‌شود", !blocked.ok);
+  } else {
+    console.log(
+      "⏭️  تست پوشه‌ی غیرقابل‌نوشتن رد شد — این فرایند مالک پوشه نیست یا root است،" +
+        " پس chmod چیزی را ثابت نمی‌کند.",
+    );
+  }
 
   await pruneBackups(14);
   const afterPrune = await listBackups();

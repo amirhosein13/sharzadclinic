@@ -4,6 +4,7 @@ import { getSettings } from "./settings";
 import { listBackups } from "./backup";
 import { isZarinpalConfigured } from "./zarinpal";
 import { unclosedDays } from "./cash";
+import { uploadDirStatus } from "./upload";
 import { formatJalaliDateTime } from "./date";
 import { toFa } from "./utils";
 
@@ -266,6 +267,12 @@ export async function buildHealth(): Promise<HealthReport> {
     dbDetail = "پاسخ نمی‌دهد";
   }
 
+  /* ── پوشه‌ی تصاویر ───────────────────────────────────── */
+  // واقعاً یک فایل می‌نویسد و پاک می‌کند. «پوشه هست» کافی نیست:
+  // اگر مالکش root باشد، آپلود بی‌صدا شکست می‌خورد و تنها جایی که
+  // معلوم می‌شود، لحظه‌ای است که مدیر عکس می‌گذارد و چیزی نمی‌آید.
+  const uploads = await uploadDirStatus();
+
   const groups: HealthGroup[] = [
     { title: "سرویس‌های بیرونی", checks: services },
     { title: "امنیت و پشتیبان", checks: safety },
@@ -275,6 +282,18 @@ export async function buildHealth(): Promise<HealthReport> {
       title: "زیرساخت",
       checks: [
         { key: "db", title: "دیتابیس", level: dbLevel, detail: dbDetail },
+        {
+          key: "uploads",
+          title: "پوشه‌ی تصاویر",
+          level: uploads.ok ? "ok" : "bad",
+          detail: uploads.ok
+            ? "قابل نوشتن است"
+            : uploads.broken.map((b) => `${b.path} — ${b.reason}`).join(" • "),
+          impact: uploads.ok
+            ? undefined
+            : "آپلود عکس کار نمی‌کند. روی سرور این را بزن:  sudo chown -R sharzad:sharzad " +
+              uploads.broken.map((b) => b.path).join(" "),
+        },
         {
           key: "timezone",
           title: "منطقه‌ی زمانی",

@@ -82,6 +82,44 @@ export async function saveUpload(
 
 export const PRIVATE_URL_PREFIX = "/api/files/";
 
+/**
+ * آیا واقعاً می‌شود در پوشه‌های آپلود نوشت؟
+ *
+ * تست واقعی می‌کند (یک فایل می‌سازد و پاک می‌کند)، نه اینکه فقط
+ * وجودِ پوشه را ببیند: پوشه ممکن است باشد ولی مالکش root باشد و
+ * کاربرِ برنامه نتواند در آن بنویسد. همان حالتی که آپلود را بی‌صدا
+ * خراب می‌کند.
+ */
+export async function uploadDirStatus(): Promise<{
+  ok: boolean;
+  /** پوشه‌هایی که مشکل دارند، با مسیر واقعی‌شان */
+  broken: { path: string; reason: string }[];
+}> {
+  const broken: { path: string; reason: string }[] = [];
+
+  for (const dir of [PUBLIC_DIR, PRIVATE_DIR]) {
+    try {
+      await mkdir(dir, { recursive: true });
+      const probe = join(dir, `.write-test-${randomBytes(4).toString("hex")}`);
+      await writeFile(probe, "ok");
+      await unlink(probe);
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      broken.push({
+        path: dir,
+        reason:
+          code === "EACCES" || code === "EPERM"
+            ? "اجازه‌ی نوشتن ندارد"
+            : code === "ENOSPC"
+              ? "دیسک پر است"
+              : code || "خطای ناشناخته",
+      });
+    }
+  }
+
+  return { ok: broken.length === 0, broken };
+}
+
 /** آیا این آدرس یک فایل خصوصیِ پرونده است؟ */
 export function isPrivateUrl(url: string | null | undefined): boolean {
   return !!url && url.startsWith(PRIVATE_URL_PREFIX);

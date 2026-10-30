@@ -24,6 +24,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "دسترسی ندارید." }, { status: 403 });
   }
 
-  const result = await saveUpload(file, isPrivate ? "private" : "public");
-  return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+  // بدون این try، هر خطای دیسک (مثلاً پوشه‌ی آپلود که برای کاربر
+  // برنامه قابل نوشتن نیست) یک صفحه‌ی ۵۰۰ HTML می‌شود؛ آن‌وقت
+  // res.json() سمت مرورگر می‌شکند و کاربر «ارتباط با سرور برقرار
+  // نشد» می‌بیند — که به شبکه اشاره می‌کند و هیچ ربطی به ماجرا
+  // ندارد. نتیجه: آپلود بی‌صدا کار نمی‌کند و هیچ‌کس نمی‌فهمد چرا.
+  try {
+    const result = await saveUpload(file, isPrivate ? "private" : "public");
+    return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+  } catch (error) {
+    console.error("[upload] ذخیره‌ی فایل شکست خورد:", error);
+
+    const code = (error as { code?: string })?.code;
+    const message =
+      code === "EACCES" || code === "EPERM"
+        ? "سرور اجازه‌ی نوشتن در پوشه‌ی تصاویر را ندارد. در «سلامت سیستم» راه حلش نوشته شده."
+        : code === "ENOSPC"
+          ? "فضای دیسک سرور پر شده است."
+          : "ذخیره‌ی تصویر روی سرور ممکن نشد.";
+
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }
