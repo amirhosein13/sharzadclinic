@@ -4,7 +4,34 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 
 /** تصاویر عمومی سایت (گالری، خدمات، مجله) — مستقیم از وب سرو می‌شوند */
-const PUBLIC_DIR = join(process.cwd(), "public", "uploads");
+/**
+ * تصاویر عمومی سایت، عمداً *بیرون* از public.
+ *
+ * دلیلش یک رفتار نکست است که دو بار گولمان زد: `next start` فهرست
+ * پوشه‌ی public را موقع بالا آمدن می‌خواند و بعدش دیگر به دیسک نگاه
+ * نمی‌کند. یعنی هر عکسی که بعد از ری‌استارت آپلود می‌شد تا ری‌استارت
+ * بعدی ۴۰۴ می‌داد؛ فایل سالم روی دیسک بود و سایت نشانش نمی‌داد.
+ *
+ * گذاشتن یک route روی همان /uploads هم جواب نداد: هندلر فایل ثابت
+ * زودتر جواب می‌دهد. rewrite در middleware هم نه: فایل‌های public
+ * قبل از middleware سرو می‌شوند. هر دو تست شدند.
+ *
+ * با بیرون‌بردن پوشه، آن لایه اصلاً درگیر نمی‌شود و /media همیشه از
+ * دیسک می‌خواند.
+ */
+export const PUBLIC_UPLOAD_DIR = process.env.PUBLIC_UPLOAD_DIR
+  ? join(process.env.PUBLIC_UPLOAD_DIR)
+  : join(process.cwd(), "storage", "public");
+
+/**
+ * جای قدیمیِ تصاویر. عکس‌هایی که قبلاً آپلود شده‌اند همین‌جا مانده‌اند و
+ * آدرسشان در دیتابیس /uploads/... است؛ نکست خودش سروشان می‌کند. این
+ * مسیر فقط برای خواندنِ پشتیبان و تشخیص در /media نگه داشته شده —
+ * چیز تازه‌ای اینجا نوشته نمی‌شود.
+ */
+export const LEGACY_PUBLIC_DIR = join(process.cwd(), "public", "uploads");
+
+const PUBLIC_DIR = PUBLIC_UPLOAD_DIR;
 /**
  * فایل‌های پرونده‌ی مشتری (عکس قبل/بعد). بیرون از public نگه داشته می‌شوند
  * تا با حدس زدن آدرس قابل دیدن نباشند؛ فقط از مسیر /api/files و پس از
@@ -76,11 +103,13 @@ export async function saveUpload(
 
   return {
     ok: true,
-    url: visibility === "private" ? `${PRIVATE_URL_PREFIX}${name}` : `/uploads/${name}`,
+    url: visibility === "private" ? `${PRIVATE_URL_PREFIX}${name}` : `${PUBLIC_URL_PREFIX}${name}`,
   };
 }
 
 export const PRIVATE_URL_PREFIX = "/api/files/";
+/** آدرس عمومی تصاویر — مسیری که route handler آن را از دیسک می‌خواند */
+export const PUBLIC_URL_PREFIX = "/media/";
 
 /**
  * آیا واقعاً می‌شود در پوشه‌های آپلود نوشت؟

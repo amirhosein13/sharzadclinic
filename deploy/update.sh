@@ -90,6 +90,19 @@ current=$(git rev-parse --short HEAD)
 BRANCH=${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}
 info "شاخه: $BRANCH • نسخه‌ی فعلی: $current"
 
+# ─── ۰.۵ پوشه‌های آپلود ───────────────────────────────────────
+# اگر نباشند یا مالکشان کاربر برنامه نباشد، آپلود عکس بی‌صدا شکست
+# می‌خورد. ارزان است، پس هر بار چک می‌شود.
+step "پوشه‌های تصاویر"
+if [[ $(id -u) -eq 0 ]] && id -u "$APP_USER" >/dev/null 2>&1; then
+  mkdir -p "$APP_DIR/storage/public" "$APP_DIR/storage/private" "$APP_DIR/public/uploads"
+  chown -R "$APP_USER:$APP_USER" "$APP_DIR/storage" "$APP_DIR/public/uploads"
+  chmod 700 "$APP_DIR/storage/private"
+  ok "ساخته و مالکیتشان درست شد"
+else
+  warn "بدون root اجرا می‌شود — مالکیت پوشه‌ها چک نشد"
+fi
+
 # ─── ۱. پشتیبان ────────────────────────────────────────────────
 # قبل از هر چیز، چون مهاجرت دیتابیس برگشت‌پذیر نیست.
 step "پشتیبان‌گیری (قبل از دست‌زدن به دیتابیس)"

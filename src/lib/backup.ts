@@ -63,8 +63,14 @@ function uploadDirs(): { path: string; label: string }[] {
   const privateDir = process.env.PRIVATE_UPLOAD_DIR
     ? join(process.env.PRIVATE_UPLOAD_DIR)
     : join(process.cwd(), "storage", "private");
+  const publicDir = process.env.PUBLIC_UPLOAD_DIR
+    ? join(process.env.PUBLIC_UPLOAD_DIR)
+    : join(process.cwd(), "storage", "public");
   return [
-    { path: join(process.cwd(), "public", "uploads"), label: "uploads-public" },
+    { path: publicDir, label: "uploads-public" },
+    // جای قدیمی؛ عکس‌های قبل از جابه‌جایی هنوز اینجا هستند و باید در
+    // پشتیبان بیایند، وگرنه با بازیابی روی سرور تازه گم می‌شوند
+    { path: join(process.cwd(), "public", "uploads"), label: "uploads-public-legacy" },
     { path: privateDir, label: "uploads-private" },
   ];
 }

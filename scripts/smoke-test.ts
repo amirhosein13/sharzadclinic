@@ -44,8 +44,8 @@ import { EVENTS } from "../src/lib/events";
 import { WEEKDAYS_FA } from "../src/lib/date";
 import { GUIDE, guideFor } from "../src/lib/guide";
 import { can } from "../src/lib/permissions";
-import { chmodSync, mkdirSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { join, sep } from "node:path";
 import { BACKUP_DIR, listBackups, pruneBackups } from "../src/lib/backup";
 import {
   promoteToGallery, publishCandidates, withdrawPhotoConsent,
@@ -58,7 +58,7 @@ import { cleanAmount, cleanDate, cleanPhone, normalizeName } from "./legacy-clea
 import { tidyRichText } from "../src/lib/rich-text";
 import { getSmsDriver, meliErrorMessage } from "../src/lib/notifications/sms";
 import { dayKey, daysLate, dutyMatchesDay, ensureTasksForDay, retireStaleTasks } from "../src/lib/duties";
-import { uploadDirStatus } from "../src/lib/upload";
+import { PUBLIC_UPLOAD_DIR, PUBLIC_URL_PREFIX, saveUpload, uploadDirStatus } from "../src/lib/upload";
 import { fromJalali } from "../src/lib/date";
 
 const prisma = new PrismaClient();
@@ -2434,6 +2434,32 @@ async function main() {
   // آپلودِ بی‌صدا-خراب دقیقاً به این شکل اتفاق افتاد: پوشه بود ولی
   // کاربرِ برنامه نمی‌توانست در آن بنویسد، و کاربر فقط «ارتباط با
   // سرور برقرار نشد» می‌دید. پس چک باید *واقعاً بنویسد*.
+  // آدرس عمومی باید /media باشد، نه /uploads. اگر کسی روزی برش
+  // گرداند زیر public، همان باگِ «عکس آپلود شد ولی ۴۰۴ می‌دهد»
+  // برمی‌گردد: next start فهرست public را فقط موقع بالا آمدن می‌خواند.
+  check("تصاویر بیرون از پوشه‌ی public ذخیره می‌شوند", !PUBLIC_UPLOAD_DIR.includes(`${sep}public${sep}`));
+  check("آدرس عمومی تصاویر /media است", PUBLIC_URL_PREFIX === "/media/");
+
+  // یک آپلود واقعی، با همان مسیری که پنل می‌رود
+  const onePixel = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  const saved = await saveUpload(new File([onePixel], "t.png", { type: "image/png" }), "public");
+  check("آپلود تصویر موفق است", saved.ok);
+  if (saved.ok) {
+    const name = saved.url.slice(PUBLIC_URL_PREFIX.length);
+    check("فایل واقعاً روی دیسک نوشته می‌شود", existsSync(join(PUBLIC_UPLOAD_DIR, name)));
+    rmSync(join(PUBLIC_UPLOAD_DIR, name), { force: true });
+  }
+
+  // فایل غیرتصویری با نوع جعلی نباید رد شود
+  const fake = await saveUpload(
+    new File([Buffer.from("MZ not an image")], "x.png", { type: "image/png" }),
+    "public",
+  );
+  check("فایل جعلی با پسوند تصویر رد می‌شود", !fake.ok);
+
   const uploadOk = await uploadDirStatus();
   check(
     "پوشه‌ی تصاویر قابل نوشتن است",

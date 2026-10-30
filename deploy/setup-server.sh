@@ -362,7 +362,11 @@ fi
 # پوشه‌هایی که برنامه در آن‌ها می‌نویسد (طبق src/lib/upload.ts و backup.ts).
 # باید قبل از اولین اجرا باشند، چون ProtectSystem=strict اجازه‌ی ساختِ
 # پوشه‌ی تازه بیرون از ReadWritePaths را نمی‌دهد.
-mkdir -p "$APP_DIR/public/uploads" "$APP_DIR/storage/private" "$APP_DIR/storage/backups"
+# storage/public تصاویر عمومی سایت است — عمداً بیرون از public، چون
+# next start فهرست public را فقط موقع بالا آمدن می‌خواند و عکسِ تازه
+# تا ری‌استارت بعدی ۴۰۴ می‌داد
+mkdir -p "$APP_DIR/public/uploads" "$APP_DIR/storage/public" \
+         "$APP_DIR/storage/private" "$APP_DIR/storage/backups"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR/public/uploads" "$APP_DIR/storage"
 chmod 700 "$APP_DIR/storage/private"   # عکس پرونده‌ی پزشکی — فقط خودِ برنامه
 
