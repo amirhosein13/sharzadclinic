@@ -59,6 +59,7 @@ import { tidyRichText } from "../src/lib/rich-text";
 import { getSmsDriver, meliErrorMessage } from "../src/lib/notifications/sms";
 import { dayKey, daysLate, dutyMatchesDay, ensureTasksForDay, retireStaleTasks } from "../src/lib/duties";
 import { PUBLIC_UPLOAD_DIR, PUBLIC_URL_PREFIX, saveUpload, uploadDirStatus } from "../src/lib/upload";
+import { notifyOtp } from "../src/lib/notifications";
 import { fromJalali } from "../src/lib/date";
 
 const prisma = new PrismaClient();
@@ -2486,6 +2487,35 @@ async function main() {
       "⏭️  تست پوشه‌ی غیرقابل‌نوشتن رد شد — این فرایند مالک پوشه نیست یا root است،" +
         " پس chmod چیزی را ثابت نمی‌کند.",
     );
+  }
+
+  // ─── حالت «بدون پیامک» ───────────────────────────────────────
+  //
+  // تا وقتی پنل پیامک آماده نیست، سایت باید کامل کار کند و هیچ‌جا
+  // وعده‌ی پیامکی ندهد که قرار نیست برسد. مهم‌تر از همه: نبودِ پیامک
+  // نباید جلوی رزرو را بگیرد.
+  const smsBefore = await prisma.setting.findUnique({ where: { key: "smsEnabled" } });
+  await prisma.setting.upsert({
+    where: { key: "smsEnabled" },
+    create: { key: "smsEnabled", value: "0" },
+    update: { value: "0" },
+  });
+
+  const offResult = await notifyOtp("09123334455", "12345");
+  check("با پیامکِ خاموش، ارسال تلاش نمی‌شود", !offResult.ok);
+
+  // و مهم‌تر: هیچ رکورد شکست‌خورده‌ای در لاگ ننشیند، وگرنه گزارش
+  // «پیامک ناموفق ۲۴ ساعت» پر از خطایی می‌شود که کسی قرار نیست
+  // درستش کند
+  const failedAfterOff = await prisma.notificationLog.count({
+    where: { channel: "SMS", status: "failed", createdAt: { gte: new Date(Date.now() - 10_000) } },
+  });
+  check("خاموشیِ پیامک لاگ خطا تولید نمی‌کند", failedAfterOff === 0);
+
+  if (smsBefore) {
+    await prisma.setting.update({ where: { key: "smsEnabled" }, data: { value: smsBefore.value } });
+  } else {
+    await prisma.setting.delete({ where: { key: "smsEnabled" } }).catch(() => undefined);
   }
 
   await pruneBackups(14);

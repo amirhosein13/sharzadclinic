@@ -16,6 +16,29 @@
 
 set -uo pipefail
 
+# ─── از روی یک کپیِ بی‌حرکت اجرا شو ──────────────────────────
+#
+# این اسکریپت وسط کار خودش را به‌روزرسانی می‌کند (git pull نسخه‌ی تازه‌ی
+# همین فایل را می‌آورد). ولی bash اسکریپت را یک‌جا نمی‌خواند؛ تکه‌تکه و
+# بر اساس جای فعلی‌اش در فایل می‌خواند. پس وقتی فایل زیر پایش عوض
+# می‌شود، ادامه‌ی اجرا از جای غلط خوانده می‌شود.
+#
+# یک بار واقعاً اتفاق افتاد: قدمِ ساختِ پوشه‌ی تصاویر کامل رد شد، چون
+# در نسخه‌ی قبلیِ فایل وجود نداشت و merge بعد از عبور از آن نقطه رسید.
+# آن دفعه فقط یک قدم جا افتاد؛ دفعه‌ی بعد می‌توانست نصفِ یک دستور را
+# اجرا کند.
+#
+# راه‌حل: اول از خودمان یک کپی بگیر و همان را اجرا کن. کپی زیر پای
+# هیچ‌کس عوض نمی‌شود.
+if [[ ${SHARZAD_UPDATE_FROM_COPY:-} != 1 ]]; then
+  _copy=$(mktemp /tmp/sharzad-update.XXXXXX) || exit 1
+  cat "$0" > "$_copy" || exit 1
+  SHARZAD_UPDATE_FROM_COPY=1 bash "$_copy" "$@"
+  _status=$?
+  rm -f "$_copy"
+  exit $_status
+fi
+
 APP_DIR=${APP_DIR:-/var/www/sharzad}
 APP_USER=${APP_USER:-sharzad}
 SERVICE=${SERVICE:-sharzad}
@@ -97,6 +120,8 @@ step "پوشه‌های تصاویر"
 if [[ $(id -u) -eq 0 ]] && id -u "$APP_USER" >/dev/null 2>&1; then
   mkdir -p "$APP_DIR/storage/public" "$APP_DIR/storage/private" "$APP_DIR/public/uploads"
   chown -R "$APP_USER:$APP_USER" "$APP_DIR/storage" "$APP_DIR/public/uploads"
+  chmod 755 "$APP_DIR/storage/public" "$APP_DIR/public/uploads"
+  # عکس پرونده‌ی پزشکی: فقط خودِ برنامه
   chmod 700 "$APP_DIR/storage/private"
   ok "ساخته و مالکیتشان درست شد"
 else

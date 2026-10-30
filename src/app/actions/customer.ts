@@ -9,6 +9,7 @@ import {
 } from "@/lib/customer-auth";
 import { notifyBookingCancelled, notifyOtp } from "@/lib/notifications";
 import { isValidIranMobile, normalizePhone, toEn } from "@/lib/utils";
+import { DEFAULT_SETTINGS, getSettings } from "@/lib/settings";
 
 export type OtpState =
   | { step: "phone"; message?: string }
@@ -32,18 +33,27 @@ export async function requestOtp(_prev: OtpState, formData: FormData): Promise<O
   const exists = await prisma.customer.findFirst({ where: { phone }, select: { id: true } });
 
   let simulated = false;
+  let delivered = true;
   if (exists && result.code) {
     const sent = await notifyOtp(phone, result.code).catch(() => ({ ok: false, simulated: false }));
     simulated = !!sent.simulated;
+    delivered = sent.ok && !sent.simulated;
   }
 
   // در پروداکشن اگر پیامک واقعاً ارسال نشود، کد را روی صفحه نشان نمی‌دهیم —
   // این یعنی هر کسی می‌توانست با هر شماره‌ای وارد شود. به‌جایش صریح خطا می‌دهیم.
-  if (simulated && process.env.NODE_ENV === "production") {
+  //
+  // «ارسال نشد» هم مثل «شبیه‌سازی شد» باید اینجا بایستد. قبلاً فقط
+  // حالت شبیه‌سازی گرفته می‌شد و شکستِ واقعیِ ارسال کاربر را می‌برد به
+  // صفحه‌ی «کد را وارد کن» — جایی که تا ابد منتظر کدی می‌ماند که
+  // هیچ‌وقت نمی‌آید.
+  if (exists && !delivered && process.env.NODE_ENV === "production") {
+    const settings = await getSettings();
+    const clinicPhone = settings.mobile || settings.phone || DEFAULT_SETTINGS.phone;
     return {
       step: "phone",
       message:
-        "سرویس پیامک هنوز تنظیم نشده و کد ورود ارسال نشد. لطفاً با کلینیک تماس بگیرید.",
+        `ورود با کد پیامکی فعلاً در دسترس نیست. برای دیدن یا تغییر نوبتتان با کلینیک تماس بگیرید: ${clinicPhone}`,
     };
   }
 

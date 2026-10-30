@@ -15,6 +15,14 @@ async function sendSms(options: {
   message: string;
   otpCode?: string;
 }): Promise<NotifyResult> {
+  // وقتی مدیر گفته پیامک کار نمی‌کند، اصلاً تلاش نمی‌کنیم: نه وقتِ
+  // هر درخواست صرف یک رفت‌وبرگشتِ شکست‌خورده می‌شود، نه لاگ پر از
+  // خطایی می‌شود که هیچ‌کس قرار نیست درستش کند.
+  const settings = await getSettings();
+  if ((settings.smsEnabled ?? DEFAULT_SETTINGS.smsEnabled) === "0") {
+    return { ok: false, error: "پیامک فعلاً در تنظیمات خاموش است." };
+  }
+
   const driver = getSmsDriver();
   const recipient = smsRecipient(options.to);
 

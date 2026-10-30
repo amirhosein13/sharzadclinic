@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "./prisma";
-import { getSettings } from "./settings";
+import { DEFAULT_SETTINGS, getSettings } from "./settings";
 import { listBackups } from "./backup";
 import { isZarinpalConfigured } from "./zarinpal";
 import { unclosedDays } from "./cash";
@@ -48,22 +48,38 @@ export async function buildHealth(): Promise<HealthReport> {
     ? !!process.env.MELIPAYAMAK_USERNAME && !!process.env.MELIPAYAMAK_PASSWORD
     : provider === "kavenegar" && !!process.env.KAVENEGAR_API_KEY;
 
+  // خاموشیِ عمدی با خرابی فرق دارد: اولی تصمیم مدیر است و نباید
+  // قرمز شود، وگرنه صفحه‌ی سلامت همیشه قرمز می‌ماند و کسی دیگر
+  // جدی‌اش نمی‌گیرد — همان بلایی که سر هشدارهای همیشه‌روشن می‌آید.
+  const smsOff = (settings.smsEnabled ?? DEFAULT_SETTINGS.smsEnabled) === "0";
+
   const services: HealthCheck[] = [
-    {
-      key: "sms",
-      title: "پنل پیامک",
-      level: smsReady ? "ok" : "bad",
-      detail: smsReady
-        ? `${isMeli ? "ملی پیامک" : "کاوه‌نگار"} وصل است`
-        : `حالت «${provider}» — پیامک واقعی ارسال نمی‌شود`,
-      impact: smsReady
-        ? undefined
-        : "مشتری نمی‌تواند وارد حسابش شود، یادآوری نوبت نمی‌رود و نظرسنجی و هدیه‌ها ارسال نمی‌شوند.",
-      href: "/admin/notifications",
-    },
+    smsOff
+      ? {
+          key: "sms",
+          title: "پنل پیامک",
+          level: "warn",
+          detail: "عمداً خاموش است",
+          impact:
+            "هیچ پیامکی ارسال نمی‌شود: نه کد ورود مشتری، نه یادآوری نوبت، نه نظرسنجی. " +
+            "رزرو آنلاین و پیگیری با کد کار می‌کنند. هر وقت پنل پیامک آماده شد، در تنظیمات «پیامک فعال است؟» را ۱ کن.",
+          href: "/admin/settings",
+        }
+      : {
+          key: "sms",
+          title: "پنل پیامک",
+          level: smsReady ? "ok" : "bad",
+          detail: smsReady
+            ? `${isMeli ? "ملی پیامک" : "کاوه‌نگار"} وصل است`
+            : `حالت «${provider}» — پیامک واقعی ارسال نمی‌شود`,
+          impact: smsReady
+            ? undefined
+            : "مشتری نمی‌تواند وارد حسابش شود، یادآوری نوبت نمی‌رود و نظرسنجی و هدیه‌ها ارسال نمی‌شوند.",
+          href: "/admin/notifications",
+        },
   ];
 
-  if (smsReady && isMeli) {
+  if (!smsOff && smsReady && isMeli) {
     services.push({
       key: "sms-sender",
       title: "شماره‌ی فرستنده‌ی پیامک",
