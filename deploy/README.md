@@ -255,13 +255,47 @@ cat /root/.sharzad-db-pass
 
 ## به‌روزرسانی به آخرین نسخه
 
+یک دستور:
+
+```bash
+sudo bash /var/www/sharzad/deploy/update.sh
+```
+
+خودش به ترتیب: **پشتیبان می‌گیرد → کد را می‌آورد → پکیج‌ها را (فقط
+اگر لازم باشد) نصب می‌کند → دیتابیس را مهاجرت می‌دهد → بیلد می‌کند →
+ری‌استارت می‌کند → چکاپ کامل می‌گیرد.**
+
+اگر هر قدم بشکند، **قبل از ری‌استارت می‌ایستد** و می‌گوید دقیقاً کجا
+ماند؛ یعنی نسخه‌ی قبلی سرِ جایش می‌ماند. پشتیبان اولِ همه است چون
+تنها قدمِ برگشت‌ناپذیر، مهاجرت دیتابیس است.
+
+> **اولین بار:** خودِ اسکریپت داخل همین مخزن است، پس اگر سرور خیلی
+> عقب باشد هنوز آن را ندارد. یک بار:
+> ```bash
+> cd /var/www/sharzad && sudo -u sharzad git pull
+> sudo bash deploy/update.sh
+> ```
+
+<details>
+<summary>اگر بخواهی دستی انجامش بدهی</summary>
+
 ```bash
 cd /var/www/sharzad
+sudo -u sharzad npm run backup -- --light
 sudo -u sharzad git pull
 sudo -u sharzad npm ci
 sudo -u sharzad npx prisma migrate deploy
 sudo -u sharzad npm run build
 sudo systemctl restart sharzad
+bash deploy/doctor.sh
+```
+
+</details>
+
+**فقط می‌خواهی بدانی حالش چطور است** (چیزی را عوض نمی‌کند):
+
+```bash
+bash /var/www/sharzad/deploy/doctor.sh
 ```
 
 ---
